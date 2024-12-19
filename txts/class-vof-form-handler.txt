@@ -1,0 +1,118 @@
+<?php
+namespace VOF;
+
+if (!defined('ABSPATH')) exit;
+
+class VOF_Form_Handler {
+    public function __construct() {
+        // Override AJAX submission handlers with higher priority
+        add_action('wp_ajax_rtcl_update_listing', [$this, 'vof_handle_submission'], 5);
+        add_action('wp_ajax_nopriv_rtcl_update_listing', [$this, 'vof_handle_submission'], 5);
+
+        // Modify user capabilities temporarily
+        add_filter('user_has_cap', [$this, 'vof_allow_temporal_caps'], 10, 3);
+
+        // Validate listing data
+        add_filter('rtcl_validate_listing_data', [$this, 'vof_validate_listing_data'], 10, 2);
+
+        // After listing is inserted
+        add_action('rtcl_after_listing_insert', [$this, 'vof_after_listing_insert'], 10, 2);
+    }
+
+    /**
+     * Handle listing submission.
+     */
+    public function vof_handle_submission() {
+        // Check nonce for security
+        check_ajax_referer('rtcl_nonce_action', 'security');
+
+        // Get current user ID or 0 for guests
+        $user_id = get_current_user_id();
+
+        // Sanitize and validate data
+        $form_data = $_POST;
+        $errors = new \WP_Error();
+
+        // Perform necessary validations
+        $form_data = apply_filters('rtcl_validate_listing_data', $form_data, $errors);
+
+        if ($errors->has_errors()) {
+            wp_send_json_error(['error' => $errors->get_error_messages()]);
+        }
+
+        // Insert the listing as a draft
+        $listing_id = $this->vof_create_draft_listing($form_data, $user_id);
+
+        if (is_wp_error($listing_id)) {
+            wp_send_json_error(['error' => $listing_id->get_error_message()]);
+        }
+
+        // Proceed with the onboarding flow (e.g., redirect to payment)
+        $redirect_url = $this->vof_get_onboarding_url($listing_id);
+
+        wp_send_json_success(['redirect_url' => $redirect_url]);
+    }
+
+    /**
+     * Temporarily allow users to post listings.
+     */
+    public function vof_allow_temporal_caps($allcaps, $caps, $args) {
+        if (!empty($args[0]) && $args[0] === 'publish_rtcl_listing') {
+            $allcaps[$args[0]] = true;
+        }
+        return $allcaps;
+    }
+
+    /**
+     * Custom validation for listing data.
+     */
+    public function vof_validate_listing_data($data, $errors) {
+        // Perform custom validations
+        // Example: Ensure category is selected
+        if (empty($data['category'])) {
+            $errors->add('category_required', __('Please select a category.', 'vendor-onboarding-flow'));
+        }
+        return $data;
+    }
+
+    /**
+     * After listing is inserted.
+     */
+    public function vof_after_listing_insert($listing_id, $data) {
+        // Perform actions after listing is created
+        // For example, send notification or modify listing status
+    }
+
+    /**
+     * Create a draft listing.
+     */
+    private function vof_create_draft_listing($data, $user_id) {
+        $post_data = [
+            'post_title'   => sanitize_text_field($data['title']),
+            'post_content' => wp_kses_post($data['description']),
+            'post_status'  => 'draft',
+            'post_type'    => 'rtcl_listing',
+            'post_author'  => $user_id,
+        ];
+
+        $listing_id = wp_insert_post($post_data);
+
+        if (is_wp_error($listing_id)) {
+            return $listing_id;
+        }
+
+        // Additional logic for saving listing meta data can go here
+
+        return $listing_id;
+    }
+
+    /**
+     * Get the onboarding URL after listing creation.
+     */
+    private function vof_get_onboarding_url($listing_id) {
+        // Generate the URL to redirect user to the next step in onboarding
+        return add_query_arg('listing_id', $listing_id, site_url('/onboarding-step'));
+    }
+
+    // Other methods and logic...
+}
