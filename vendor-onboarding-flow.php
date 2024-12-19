@@ -1,0 +1,37 @@
+<?php
+/**
+ * Plugin Name: Vendor Onboarding Flow
+ * Description: Custom onboarding flow for vendors.
+ * Version: 1.0
+ * Author: TheNoise
+ */
+
+if (!defined('ABSPATH')) exit;
+
+// Autoload classes
+spl_autoload_register(function ($class) {
+    $prefix = 'VOF\\';
+    $base_dir = __DIR__ . '/includes/';
+
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        // Not our class
+        return;
+    }
+
+    $relative_class = substr($class, $len);
+    $file = $base_dir . 'class-' . strtolower(str_replace('_', '-', $relative_class)) . '.php';
+
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+// Initialize the plugin
+function vof_init() {
+    new VOF\Core\VOF_Form_Handler();
+    new VOF\Core\VOF_Listing();
+    new VOF\Core\VOF_Stripe();
+    new VOF\Core\VOF_Subscription();
+}
+add_action('plugins_loaded', 'vof_init');
