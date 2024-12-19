@@ -1,0 +1,32 @@
+<?php
+namespace VOF;
+
+if (!defined('ABSPATH')) exit;
+
+class VOF_Subscription {
+    public function __construct() {
+        // Initialize subscription-related hooks and filters
+    }
+
+    public static function vof_has_active_subscription($user_id = null) {
+        error_log('VOF: Checking subscription status');
+        return false; // For testing, always return false
+
+        // Logic to check if user has an active subscription
+        // if (!$user_id) {
+        //     $user_id = get_current_user_id();
+        // }
+        // // Check WooCommerce Subscriptions if available
+        // if (class_exists('WC_Subscriptions')) {
+        //     $subscriptions = wcs_get_users_subscriptions($user_id);
+        //     foreach($subscriptions as $subscription) {
+        //         if ($subscription->has_status('active')) {
+        //             return true;
+        //         }
+        //     }
+        // }
+        // // Fallback to custom subscription logic
+        // $subscription = get_user_meta($user_id, 'vof_subscription_status', true);
+        // return $subscription === 'active';
+    }
+}
