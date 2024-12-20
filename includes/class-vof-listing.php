@@ -4,10 +4,16 @@ namespace VOF;
 
 class VOF_Listing {
     public function __construct() {
-        remove_action('rtcl_listing_form_submit_button', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button']);
-        add_action('rtcl_listing_form_submit_button', [$this, 'custom_submit_button']);
+        //remove_action('rtcl_listing_form_submit_button', 
+        remove_action('rtcl_listing_form_end', 
+            ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
+        
+        //if($this->is_post_ad_page()){    
+            // add_action('rtcl_listing_form_submit_button', [$this, 'custom_submit_button']);
+            add_action('rtcl_listing_form_end', [$this, 'custom_submit_button']);
+        //}
     }
-
+    
     public function custom_submit_button($post_id) {
         if (!is_user_logged_in() && $this->is_post_ad_page()) {
             $this->render_guest_submit_button();
