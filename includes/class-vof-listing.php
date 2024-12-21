@@ -7,11 +7,13 @@ class VOF_Listing {
         //remove_action('rtcl_listing_form_submit_button', 
         remove_action('rtcl_listing_form_end', 
             ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
-        
-        //if($this->is_post_ad_page()){    
-            // add_action('rtcl_listing_form_submit_button', [$this, 'custom_submit_button']);
             add_action('rtcl_listing_form_end', [$this, 'custom_submit_button']);
-        //}
+            // add_filter('rtcl_is_valid_to_post_at_category', function($is_valid, $cat_id) {
+            //     return true; // Always allow posting
+            // }, 1, 2);
+             add_filter('rtcl_category_validation', function($is_valid, $cat_id) {
+                 return true; // Always allow posting
+             }, 10, 2);
     }
     
     public function custom_submit_button($post_id) {
@@ -20,7 +22,7 @@ class VOF_Listing {
             return;
         }
 
-        if (is_user_logged_in() && !VOF_Subscription::has_active_subscription() && $this->is_post_ad_page()) {
+        if (is_user_logged_in() && !VOF_Subscription::has_active_subscription() && $this->is_post_ad_page()) {           
             $this->render_subscription_required_button(); 
             return;
         }
@@ -59,5 +61,9 @@ class VOF_Listing {
 
     private function is_post_ad_page() {
         return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
+    }
+
+    private function bypass_category_check() {
+
     }
 }
