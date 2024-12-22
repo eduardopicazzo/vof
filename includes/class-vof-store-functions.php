@@ -17,6 +17,12 @@ class VOF_Store_Functions extends StoreFunctions {
     }
 
     public static function is_valid_to_post_at_category(int $cat_id): bool {
+        // Handle array input
+        if (is_array($cat_id)) {
+            $cat_id = (int) reset($cat_id); // Get first element and cast to int
+        }
+
+
         // Add debugging
         error_log('VOF: Category validation called for cat_id: ' . $cat_id);
         
@@ -33,4 +39,4 @@ class VOF_Store_Functions extends StoreFunctions {
 }
 
 // Initialize immediately
-VOF_Store_Functions::init();
+//VOF_Store_Functions::init();

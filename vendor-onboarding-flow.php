@@ -13,9 +13,13 @@ namespace VOF;
 
 if (!defined('ABSPATH')) exit;
 
+// Add this near the top, after namespace declaration but before any other code
+require_once plugin_dir_path(__FILE__) . 'includes/class-vof-store-functions.php';
+VOF_Store_Functions::init();
+
 // Load dependencies first
 require_once plugin_dir_path(__FILE__) . 'includes/class-vof-dependencies.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-vof-store-functions.php';
+
 
 // Early hook registration on plugins_loaded
 add_action('plugins_loaded', function() {
