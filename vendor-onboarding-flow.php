@@ -13,35 +13,8 @@ namespace VOF;
 
 if (!defined('ABSPATH')) exit;
 
-// Add this near the top, after namespace declaration but before any other code
-require_once plugin_dir_path(__FILE__) . 'includes/class-vof-store-functions.php';
-VOF_Store_Functions::init();
-
 // Load dependencies first
-require_once plugin_dir_path(__FILE__) . 'includes/class-vof-dependencies.php';
-
-
-// Early hook registration on plugins_loaded
-add_action('plugins_loaded', function() {
-    static $registered = false;
-    if ($registered) return;
-    $registered = true;
-
-    // Force our class to be loaded first
-    if (!class_exists('\VOF\VOF_Store_Functions')) {
-        return;
-    }
-    
-    // Load our custom Functions class override
-    // require_once plugin_dir_path(__FILE__) . 'includes/class-vof-store-functions.php';
-    
-    // Replace original class with our extended version. Prevent original class from loading first.
-    if (!class_exists('RtclStore\Helpers\Functions')) {
-        class_alias('VOF\VOF_Store_Functions', 'RtclStore\Helpers\Functions');
-    }
-    
-//}, 4); // Note priority 4 to load before original plugin
-}, 1); // Note priority 1 to load before original plugin
+// require_once WP_PLUGIN_DIR . '/classified-listing-store/app/Helpers/Functions.php';
 
 require_once plugin_dir_path(__FILE__) . 'includes/class-vof-core.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-vof-dependencies.php';

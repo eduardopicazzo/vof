@@ -28,13 +28,10 @@ class VOF_Core {
     }
 
     public function init() {
-        // Load dependencies
+
         VOF_Dependencies::check(); // Check for required plugins
-
-        // Initialize Store Functions override first
-        VOF_Store_Functions::init(); // Ensure our override is loaded
-
-        // Initialize components
+        
+        // Initialize components (non-static) after dependencies are loaded
         new VOF_Listing(); // Initialize listing management
         new VOF_Subscription(); // Initialize subscription checks
         new VOF_Form_Handler(); // Initialize form handling

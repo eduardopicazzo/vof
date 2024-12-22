@@ -2,6 +2,7 @@
 
 namespace VOF;
 
+// TODO: Rename to VOF_Listing_Form
 class VOF_Listing {
     public function __construct() {
         //remove_action('rtcl_listing_form_submit_button', 

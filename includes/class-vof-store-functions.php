@@ -3,18 +3,32 @@ namespace VOF;
 
 use RtclStore\Helpers\Functions as StoreFunctions;
 
-class VOF_Store_Functions extends StoreFunctions {
-    private static $initialized = false;
+//class VOF_Store_Functions extends StoreFunctions {
+class StoreHelperFunctions extends \RtclStore\Helpers\Functions {  
+    //private static $initialized = false;
 
+    // public static function init() {
+    //     if (self::$initialized) return;
+    //     self::$initialized = true;
+    // }
+/*
+    if using autoloader, we don't need this
     public static function init() {
         if (self::$initialized) return;
         self::$initialized = true;
 
+        // // Force our methods to be used
+        // if (!method_exists('RtclStore\Helpers\Functions', 'is_valid_to_post_at_category')) {
+        //     class_alias(__CLASS__, 'RtclStore\Helpers\Functions');
+        // }
+
         // Force our methods to be used
-        if (!method_exists('RtclStore\Helpers\Functions', 'is_valid_to_post_at_category')) {
+        if (class_exists('RtclStore\Helpers\Functions')) {
             class_alias(__CLASS__, 'RtclStore\Helpers\Functions');
-        }
-    }
+        }        
+    } 
+
+*/
 
     public static function is_valid_to_post_at_category(int $cat_id): bool {
         // Handle array input
@@ -37,6 +51,5 @@ class VOF_Store_Functions extends StoreFunctions {
         return true;
     }
 }
-
 // Initialize immediately
 //VOF_Store_Functions::init();
