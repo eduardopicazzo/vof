@@ -31,6 +31,9 @@ class VOF_Core {
         // Load dependencies
         VOF_Dependencies::check(); // Check for required plugins
 
+        // Initialize Store Functions override first
+        VOF_Store_Functions::init(); // Ensure our override is loaded
+
         // Initialize components
         new VOF_Listing(); // Initialize listing management
         new VOF_Subscription(); // Initialize subscription checks
