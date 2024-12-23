@@ -32,28 +32,42 @@ use RtclStore\Helpers\Functions as StoreFunctions;
      }
      
      public function vof_init_hooks() {
-         // Debugging: Log all current callbacks for the hook
-         $this->vof_log_current_callbacks('rtcl_ajax_category_selection_before_post');
+        // Debugging: Log all current callbacks for the hook
+        $this->vof_log_current_callbacks('rtcl_ajax_category_selection_before_post');
  
-         // Remove original filters with exact parameters
-         remove_filter('rtcl_ajax_category_selection_before_post', 
-             [StoreMembership::class, 'is_valid_to_post_at_category'], 10);
+        // Remove original filters with exact parameters
+        remove_filter('rtcl_ajax_category_selection_before_post', 
+            [StoreMembership::class, 'is_valid_to_post_at_category'], 10);
  
-         remove_filter('rtcl_ajax_category_selection_before_post', 
-             [ProFilterHooks::class, 'ajax_filter_modify_data'], 10);
+        remove_filter('rtcl_ajax_category_selection_before_post', 
+            [ProFilterHooks::class, 'ajax_filter_modify_data'], 10);
  
-         // Add our filter with appropriate priority
-         add_filter('rtcl_ajax_category_selection_before_post', 
-             [$this, 'vof_is_valid_to_post_at_category'], 5);
+        // Add our filter with appropriate priority
+        add_filter('rtcl_ajax_category_selection_before_post', 
+            [$this, 'vof_is_valid_to_post_at_category'], -999);
  
-         // Remove original REST API filter
-         remove_filter('rtcl_rest_api_form_category_before_post', 
-             [StoreMembership::class, 'is_valid_to_post_at_category_rest_api'], 10);
+        // Remove original REST API filter
+        remove_filter('rtcl_rest_api_form_category_before_post', 
+            [StoreMembership::class, 'is_valid_to_post_at_category_rest_api'], 10);
  
-         // Add our REST API filter
-         add_filter('rtcl_rest_api_form_category_before_post', 
-             [$this, 'vof_is_valid_to_post_at_category_rest_api'], 5);
-     }
+        // Add our REST API filter
+        add_filter('rtcl_rest_api_form_category_before_post', 
+             [$this, 'vof_is_valid_to_post_at_category_rest_api'], -999);
+
+        // check if exist
+             
+        // Override core category validation
+        add_filter('rtcl_category_validation', function($is_valid, $cat_id) {
+            return true; // Always allow posting
+        }, -999, 2);
+     
+        // Override membership category validation
+        add_filter('rtcl_membership_category_validation', function($is_valid, $cat_id) {
+            return true;
+        }, -999, 2);
+
+            
+    }
  
      public function vof_is_valid_to_post_at_category($response) {
          // Debugging

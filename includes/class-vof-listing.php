@@ -9,9 +9,7 @@ class VOF_Listing {
         remove_action('rtcl_listing_form_end', 
             ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
             add_action('rtcl_listing_form_end', [$this, 'custom_submit_button']);
-            // add_filter('rtcl_is_valid_to_post_at_category', function($is_valid, $cat_id) {
-            //     return true; // Always allow posting
-            // }, 1, 2);
+
              add_filter('rtcl_category_validation', function($is_valid, $cat_id) {
                  return true; // Always allow posting
              }, 10, 2);
