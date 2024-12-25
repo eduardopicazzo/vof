@@ -18,14 +18,12 @@ class VOF_Subscription {
             }
         }
 
-        // Fallback to custom subscription logic
-        // return get_user_meta($user_id, 'vof_subscription_status', true) === 'active';
-		//return RtclFunctions::get_option_item( 'rtcl_membership_settings', 'enable_free_ads', false, 'checkbox' );
-	     // if (class_exists('\Rtcl\Helpers\Functions')) {
-		 // TODO: WORKS BUT MAKE MORE ROBUST...
-	     if (class_exists('\RtclStore\Helpers\Functions')) {
-	         return \RtclStore\Helpers\Functions::is_membership_enabled();
-	     }		
+	    if (class_exists('\RtclStore\Models\Membership')) {
+	        $membership = rtclStore()->factory->get_membership();
+	        if ($membership && !$membership->is_expired()) {
+	            return true;
+	        }
+	    }
     }
 }
 

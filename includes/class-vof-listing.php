@@ -26,7 +26,7 @@ class VOF_Listing {
             return;
         }
 
-        if (is_user_logged_in() && VOF_Subscription::has_active_subscription()) {
+        if (is_user_logged_in() && VOF_Subscription::has_active_subscription() && $this->is_post_ad_page()) {
             ?>
             <button type="submit" class="btn btn-primary rtcl-submit-btn">
                 <?php echo esc_html($post_id > 0 ? __('Update', 'classified-listing') : __('Submit', 'classified-listing')); ?>
@@ -38,18 +38,25 @@ class VOF_Listing {
 
     private function render_guest_submit_button() {
         ?>
-        <button type="submit" class="btn vof-guest-submit-btn" data-flow="guest">
+        <button type="button" class="btn vof-guest-submit-btn" data-flow="guest" onclick="handleTempListing()">
             <?php esc_html_e('Continue to Create Account', 'vendor-onboarding-flow'); ?>
         </button>
         <div class="vof-submit-help">
             <?php esc_html_e('You\'ll create an account and select a subscription plan next', 'vendor-onboarding-flow'); ?>
         </div>
+        <script type="text/javascript">
+        function handleTempListing() {
+            console.log('Button clicked'); // Debug line
+            window.location.href = 'https://thenoise.io';
+            return false;
+        }
+        </script>
         <?php
     }
 
     private function render_subscription_required_button() {
         ?>
-        <button type="submit" class="btn vof-subscription-submit-btn" data-flow="subscription">
+        <button type="button" class="btn vof-subscription-submit-btn" data-flow="subscription" onclick="handleTempListing(event)">
             <?php esc_html_e('Continue to Select Plan', 'vendor-onboarding-flow'); ?>
         </button>
         <div class="vof-submit-help">
