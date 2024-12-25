@@ -66,6 +66,13 @@ use RtclStore\Helpers\Functions as StoreFunctions;
             return true;
         }, -999, 2);
 
+        // // Add debugging
+        // error_log('VOF Form Handler: Initializing hooks');
+
+        // // Add form submission debugging
+        // add_action('wp_ajax_vof_save_temp_listing', function() {
+        //     error_log('VOF Ajax: Temp listing save triggered');
+        // });
             
     }
  

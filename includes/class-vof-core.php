@@ -1,9 +1,12 @@
 <?php
-
 namespace VOF;
 
 class VOF_Core {
     private static $instance = null;
+    private $api;
+    private $assets;
+    private $listing;
+    private $form_handler;
 
     public static function instance() {
         if (null === self::$instance) {
@@ -13,28 +16,63 @@ class VOF_Core {
     }
 
     private function __construct() {
-        $this->define_constants();
         $this->init_hooks();
     }
 
-    private function define_constants() {
-        define('VOF_VERSION', '1.0.0');
-        define('VOF_PLUGIN_DIR', plugin_dir_path(__FILE__));
-        define('VOF_PLUGIN_URL', plugin_dir_url(__FILE__));
-    }
-
     private function init_hooks() {
-        add_action('plugins_loaded', [$this, 'init'], 0);
+        // Check dependencies first
+        if (!VOF_Dependencies::check()) {
+            return;
+        }
+
+        // Initialize components
+        add_action('init', [$this, 'init_components'], 0);
+        
+        // Initialize REST API
+        add_action('rest_api_init', [$this, 'init_rest_api']);
+        
+        // Load text domain
+        add_action('init', [$this, 'load_textdomain']);
     }
 
-    public function init() {
-
-        VOF_Dependencies::check(); // Check for required plugins
+    public function init_components() {
+        $this->api = new VOF_API();
+        $this->assets = new VOF_Assets();
+        $this->listing = new VOF_Listing();
+        $this->form_handler = new VOF_Form_Handler();
         
-        // Initialize components (non-static) after dependencies are loaded
-        new VOF_Listing(); // Initialize listing management
-        new VOF_Subscription(); // Initialize subscription checks
-        new VOF_Form_Handler(); // Initialize form handling
-        new VOF_Stripe(); // Initialize Stripe integration
+        // Initialize only if needed
+        if (is_admin()) {
+            // Admin specific initializations
+        }
+    }
+
+    public function init_rest_api() {
+        $this->api->register_routes();
+    }
+
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'vendor-onboarding-flow',
+            false,
+            dirname(plugin_basename(VOF_PLUGIN_FILE)) . '/languages'
+        );
+    }
+
+    // Getters for components
+    public function api() {
+        return $this->api;
+    }
+
+    public function assets() {
+        return $this->assets;
+    }
+
+    public function listing() {
+        return $this->listing;
+    }
+
+    public function form_handler() {
+        return $this->form_handler;
     }
 }

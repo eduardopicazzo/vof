@@ -1,5 +1,9 @@
 {
+  "name": "thenoise/vendor-onboarding-flow",
+  "description": "Streamlined vendor onboarding with Stripe integration",
+  "type": "wordpress-plugin",
   "require": {
+    "php": ">=7.4",
     "stripe/stripe-php": "^10.0"
   },
   "autoload": {
