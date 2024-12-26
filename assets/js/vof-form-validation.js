@@ -1,0 +1,102 @@
+export const VOFFormValidation = {
+    requiredFields: {
+        'rtcl-title': {
+            message: 'Title is required',
+            validate: value => value.trim().length > 0
+        },
+        'rtcl-price-type': {
+            message: 'Price type is required',
+            validate: value => value.trim().length > 0
+        },
+        'rtcl-price': {
+            message: 'Price is required',
+            validate: value => !isNaN(value) && parseFloat(value) >= 0
+        },
+        'description_ifr': {
+            message: 'Description is required',
+            validate: value => {
+                const iframe = document.getElementById('description_ifr');
+                return iframe?.contentWindow.document.body.innerHTML.trim().length > 0;
+            }
+        },
+        'rtcl-gallery': {
+            message: 'At least one image is required',
+            validate: () => document.querySelector('.rtcl-gallery-uploads')?.querySelectorAll('.rtcl-gallery-item').length > 0
+        },
+        'rtcl-phone': {
+            message: 'Valid phone number is required',
+            validate: value => /^\+?[\d\s-]{10,}$/.test(value.trim())
+        },
+        'rtcl-whatsapp-number': {
+            message: 'Valid WhatsApp number is required',
+            validate: value => /^\+?[\d\s-]{10,}$/.test(value.trim())
+        },
+        'rtcl-email': {
+            message: 'Valid email is required',
+            validate: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+        }
+    },
+
+    validateForm(form) {
+        let isValid = true;
+        let firstError = null;
+
+        this.clearErrors(form);
+
+        Object.entries(this.requiredFields).forEach(([fieldId, config]) => {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+
+            if (!config.validate(field.value)) {
+                isValid = false;
+                firstError = this.showError(field, config.message) || firstError;
+            }
+        });
+
+        if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        return isValid;
+    },
+
+    clearErrors(form) {
+        form.querySelectorAll('.vof-error').forEach(el => {
+            el.classList.remove('vof-error');
+            el.querySelector('.vof-error-message')?.remove();
+        });
+    },
+
+    showError(field, message) {
+        const wrapper = field.closest('.form-group') || field.parentElement;
+        wrapper.classList.add('vof-error');
+
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'vof-error-message';
+        errorDiv.textContent = message;
+        wrapper.appendChild(errorDiv);
+
+        return wrapper;
+    },
+
+    init() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .vof-error input,
+            .vof-error select,
+            .vof-error textarea,
+            .vof-error .rtcl-gallery-uploads {
+                border-color: #dc3545 !important;
+            }
+            
+            .vof-error-message {
+                color: #dc3545;
+                font-size: 0.875em;
+                margin-top: 4px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+};
+
+export default VOFFormValidation;

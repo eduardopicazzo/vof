@@ -13,23 +13,37 @@ class VOF_Assets {
             return;
         }
 
-
         wp_enqueue_script(
-            'vof-listing-submit',
-           // plugins_url('/assets/js/vof-listing-submit.js', VOF_PLUGIN_FILE),
-            plugins_url('../assets/js/vof-listing-submit.js', __FILE__),
+            'vof-form-validation',
+            plugins_url('../assets/js/vof-form-validation.js', __FILE__),
             ['jquery'],
             VOF_VERSION,
             true
         );
 
-        wp_localize_script('vof-listing-submit', 'vofSettings', [
+        wp_enqueue_script(
+            'vof-listing-submit',
+            plugins_url('../assets/js/vof-listing-submit.js', __FILE__),
+            ['jquery'],
+            VOF_VERSION,
+            true
+        );
+       
+        // Add type="module" to scripts
+        add_filter('script_loader_tag', function($tag, $handle) {
+            if ($handle === 'vof-form-validation' || $handle === 'vof-listing-submit') {
+                return str_replace('<script', '<script type="module"', $tag);
+            }
+            return $tag;
+        }, 10, 2);
+
+        wp_localize_script('vof-listing-submit', 'vofSettings', array(
             'root' => esc_url_raw(rest_url()),
             'nonce' => wp_create_nonce('wp_rest'),
             'ajaxurl' => admin_url('admin-ajax.php'),
             'buttonText' => esc_html__('Continue to Create Account', 'vendor-onboarding-flow'),
             'redirectUrl' => VOF_Constants::REDIRECT_URL,
             'security' => wp_create_nonce('vof_temp_listing_nonce')
-        ]);
+        ));
     }
 }
