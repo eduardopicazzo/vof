@@ -1,13 +1,22 @@
 import VOFFormValidation from './vof-form-validation.js';
+window.handleTempListing = function(e) {
+    if (e) {
+        e.preventDefault();
+    }
+    
+    const button = e?.target || document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
+    const form = button?.closest('form');
+
+
 
 // Make handleTempListing available globally
-window.handleTempListing = function(event) {
-    event.preventDefault();
-    const button = event.target;
-    const form = button.closest('form');
+// window.handleTempListing = function(event) {
+//     event.preventDefault();
+//     const button = event.target;
+//     const form = button.closest('form');
 
     if (!form || !VOFFormValidation.validateForm(form)) {
-        return;
+        return false;
     }
 
     // ...existing submission code...
@@ -64,27 +73,19 @@ window.handleTempListing = function(event) {
 document.addEventListener('DOMContentLoaded', function() {
     VOFFormValidation.init();
 
-    const button = document.querySelector('.vof-guest-submit-btn') || 
-                  document.querySelector('.vof-subscription-submit-btn');
-    if (button) {
+    const buttons = document.querySelectorAll('.vof-guest-submit-btn, .vof-subscription-submit-btn');
+    buttons.forEach(button => {
         button.addEventListener('click', window.handleTempListing);
-    }
+    });
 });
 
-/*
-function handleTempListing(event) {
-    event.preventDefault();
-    const button = event.target;
-    const form = button.closest('form');
+// OLDER CODE
+// document.addEventListener('DOMContentLoaded', function() {
+//     VOFFormValidation.init();
 
-    // if (!form) {
-    //     // console.error('Form not found');
-    //     return;
-    // }
-
-    if (!form || !VOFFormValidation.validateForm(form)) {
-        return;
-    }
-*/
-
-// }
+//     const button = document.querySelector('.vof-guest-submit-btn') || 
+//                   document.querySelector('.vof-subscription-submit-btn');
+//     if (button) {
+//         button.addEventListener('click', window.handleTempListing);
+//     }
+// });

@@ -4,7 +4,16 @@ export const VOFFormValidation = {
             message: 'Title is required',
             validate: value => value.trim().length > 0
         },
-
+        'rtcl-gallery': {
+            message: 'At least one image is required',
+            validate: () => {
+                if (!window.vofGalleryValidator) {
+                    console.error('Gallery validator not initialized');
+                    return false;
+                }
+                return window.vofGalleryValidator.validateGallery();
+            }
+        },
 
 
 
@@ -29,13 +38,6 @@ export const VOFFormValidation = {
                     return iframe.contentWindow.document.body.textContent.trim().length > 0;
                 }
                 return false;
-            }
-        },
-        'rtcl-gallery': {
-            validate: () => {
-                // Reuse validation from VOFGalleryValidator
-                const vofGalleryValidator = new VOFGalleryValidator();
-                return vofGalleryValidator.validateGallery();
             }
         },
         // 'rtcl-gallery': {
@@ -103,18 +105,19 @@ export const VOFFormValidation = {
 
         this.clearErrors(form);
 
-        Object.entries(this.requiredFields).forEach(([fieldId, config]) => {
-            // Special handling for description field
-            if (fieldId === 'description') {
-                if (!config.validate()) {
-                    isValid = false;
-                    const editorWrapper = document.querySelector('.mce-edit-area');
-                    if (editorWrapper) {
-                        firstError = this.showError(editorWrapper, config.message);
-                    }
-                }
-                return;
+        // Validate gallery first
+        const galleryValid = this.requiredFields['rtcl-gallery'].validate();
+        if (!galleryValid) {
+            isValid = false;
+            const galleryWrapper = document.querySelector('.rtcl-gallery-uploads');
+            if (galleryWrapper) {
+                this.showError(galleryWrapper, this.requiredFields['rtcl-gallery'].message);
             }
+        }
+
+        // Continue with other validations
+        Object.entries(this.requiredFields).forEach(([fieldId, config]) => {
+            if (fieldId === 'rtcl-gallery') return; // Skip gallery as it's already validated
 
             const field = document.getElementById(fieldId);
             if (!field) return;
@@ -130,7 +133,7 @@ export const VOFFormValidation = {
             firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        return isValid;            
+        return isValid;
 
         
         //     const field = document.getElementById(fieldId);
