@@ -21,6 +21,7 @@ define('VOF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Load dependencies first
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-dependencies.php';
+require_once VOF_PLUGIN_DIR . 'helpers/class-vof-helper-functions.php';
 
 // Then load other classes
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-constants.php';

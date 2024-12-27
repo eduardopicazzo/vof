@@ -1,12 +1,19 @@
 <?php
 namespace VOF;
 
+use VOF_Helper_Functions;
+
 class VOF_Core {
     private static $instance = null;
     private $api;
     private $assets;
     private $listing;
     private $form_handler;
+    // private $vof_ajax;
+    private $vof_helper;
+    // private $vof_stripe;
+    // private $vof_subscription;
+
 
     public static function instance() {
         if (null === self::$instance) {
@@ -40,6 +47,10 @@ class VOF_Core {
         $this->assets = new VOF_Assets();
         $this->listing = new VOF_Listing();
         $this->form_handler = new VOF_Form_Handler();
+        // $this->vof_ajax = new VOF_Ajax();
+        $this->vof_helper = new VOF_Helper_Functions();
+        // $this->vof_stripe = new VOF_Stripe();
+        // $this->vof_subscription = new VOF_Subscription();
         
         // Initialize only if needed
         if (is_admin()) {
@@ -75,4 +86,21 @@ class VOF_Core {
     public function form_handler() {
         return $this->form_handler;
     }
+
+    // public function vof_ajax() {
+    //     return $this->vof_ajax;
+    // }
+
+    public function vof_helper() {
+        return $this->vof_helper;
+    }
+
+    // public function vof_stripe() {
+    //     return $this->vof_stripe;
+    // }
+
+    // public function vof_subscription() {
+    //     return $this->vof_subscription;
+    // }
+
 }

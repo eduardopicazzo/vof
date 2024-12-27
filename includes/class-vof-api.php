@@ -17,7 +17,7 @@ class VOF_API {
     public function save_temp_listing($request) {
         $params = $request->get_params();
 
-        // creat temporary post
+        // create temporary post
         $listing_data = array(
             'post_title'    => sanitize_text_field($params['title']),
             'post_content'  => wp_kses_post($params['description'] ?? ''),

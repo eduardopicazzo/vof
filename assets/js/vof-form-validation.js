@@ -32,23 +32,30 @@ export const VOFFormValidation = {
             }
         },
         'rtcl-gallery': {
-            message: 'At least one image is required',
             validate: () => {
-                const galleryWrapper = document.querySelector('.rtcl-gallery-uploads');
-                if (!galleryWrapper) return false;
-
-                // Check for existing uploads
-                const existingImages = galleryWrapper.querySelectorAll('.rtcl-gallery-item');
-                if (existingImages.length > 0) return true;
-
-                // Check plupload queue if available
-                if (typeof RTCL_PLUPLOAD_DATA !== 'undefined' && RTCL_PLUPLOAD_DATA[0]?.uploader) {
-                    return RTCL_PLUPLOAD_DATA[0].uploader.files.length > 0;
-                }
-
-                return false;
+                // Reuse validation from VOFGalleryValidator
+                const vofGalleryValidator = new VOFGalleryValidator();
+                return vofGalleryValidator.validateGallery();
             }
         },
+        // 'rtcl-gallery': {
+        //     message: 'At least one image is required',
+        //     validate: () => {
+        //         const galleryWrapper = document.querySelector('.rtcl-gallery-uploads');
+        //         if (!galleryWrapper) return false;
+
+        //         // Check for existing uploads
+        //         const existingImages = galleryWrapper.querySelectorAll('.rtcl-gallery-item');
+        //         if (existingImages.length > 0) return true;
+
+        //         // Check plupload queue if available
+        //         if (typeof RTCL_PLUPLOAD_DATA !== 'undefined' && RTCL_PLUPLOAD_DATA[0]?.uploader) {
+        //             return RTCL_PLUPLOAD_DATA[0].uploader.files.length > 0;
+        //         }
+
+        //         return false;
+        //     }
+        // },
         'rtcl-price': {
             message: 'Price is required',
             validate: value => {
