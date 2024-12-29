@@ -1,73 +1,122 @@
-import VOFFormValidation from './vof-form-validation.js';
-window.handleTempListing = function(e) {
-    if (e) {
-        e.preventDefault();
-    }
-    
-    const button = e?.target || 
-                document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
-    const form = button?.closest('form');
+(function($) {
+    'use strict';
 
-    if (!form || !VOFFormValidation.validateForm(form)) {
-        return false;
-    }
-
-    // ...existing submission code...
-    const formData = new FormData(form);
-    formData.append('action', 'vof_save_temp_listing');
-    formData.append('security', vofSettings.security);
-
-    button.innerHTML = 'Processing...';
-    button.disabled = true;
-
-    // First try REST API
-    fetch(`${vofSettings.root}vof/v1/save-temp-listing`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'same-origin',
-        headers: {
-            'X-WP-Nonce': vofSettings.nonce
+    window.handleTempListing = function(e) {
+        if (e) {
+            e.preventDefault();
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = vofSettings.redirectUrl;
-        } else {
-            throw new Error(data.message || 'Submission failed');
+        
+        const button = e?.target || 
+                    document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
+        const form = button?.closest('form');
+
+        // Add our custom flag to identify VOF submissions
+        const vofFlowInput = document.createElement('input');
+        vofFlowInput.type = 'hidden';
+        vofFlowInput.name = 'vof_flow';
+        vofFlowInput.value = 'true';
+        form.appendChild(vofFlowInput);
+
+        // Handle TinyMCE if active
+        try {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+                const editor = tinymce.get("description");
+                if (editor) {
+                    editor.save();
+                }
+            }
+        } catch (e) {
+            console.log('TinyMCE not available', e);
         }
-    })
-    .catch(error => {
-        // Fallback to admin-ajax if REST fails
-        jQuery.ajax({
-            url: vofSettings.ajaxurl,
-            type: 'POST',
-            data: formData,
-            processData: false,
+
+        // Handle reCAPTCHA if enabled
+        if (typeof rtcl !== 'undefined' && rtcl.recaptcha && rtcl.recaptcha.on) {
+            if (rtcl.recaptcha.v === 3) {
+                grecaptcha.ready(function() {
+                    $(form).rtclBlock();
+                    grecaptcha.execute(rtcl.recaptcha.site_key, {
+                        action: 'listing'
+                    }).then(function(token) {
+                        submitToOriginalEndpoint(form, token);
+                    });
+                });
+                return false;
+            }
+        }
+
+        submitToOriginalEndpoint(form);
+    };
+
+    function submitToOriginalEndpoint(form, reCaptcha_token = null) {
+        const formData = new FormData(form);
+        formData.set('action', 'rtcl_post_new_listing');
+        
+        if (reCaptcha_token) {
+            formData.set('g-recaptcha-response', reCaptcha_token);
+        }
+
+        // Add our flag
+        formData.set('vof_flow', 'true');
+
+        const msgHolder = $("<div class='alert rtcl-response'></div>");
+        const $form = $(form);
+
+        $.ajax({
+            url: rtcl.ajaxurl,
+            type: "POST",
+            dataType: 'json',
+            cache: false,
             contentType: false,
+            processData: false,
+            data: formData,
+            beforeSend: function() {
+                $form.find('.alert.rtcl-response').remove();
+                $form.find('button[type=submit], button[type=button]').prop("disabled", true);
+                $form.rtclBlock();
+            },
             success: function(response) {
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
+
+                let msg = '';
+                if (response.message?.length) {
+                    response.message.map(function(message) {
+                        msg += "<p>" + message + "</p>";
+                    });
+                }
+
                 if (response.success) {
-                    window.location.href = vofSettings.redirectUrl;
+                    form.reset();
+                    if (msg) {
+                        msgHolder.removeClass('alert-danger')
+                                .addClass('alert-success')
+                                .html(msg)
+                                .appendTo(form);
+                    }
+                    if (response.redirect_url) {
+                        setTimeout(function() {
+                            window.location.href = response.redirect_url;
+                        }, 500);
+                    }
                 } else {
-                    alert(response.data.message || 'Submission failed');
+                    if (msg) {
+                        msgHolder.removeClass('alert-success')
+                                .addClass('alert-danger')
+                                .html(msg)
+                                .appendTo(form);
+                    }
                 }
             },
-            error: function() {
-                alert('There was an error saving your listing. Please try again.');
+            error: function(e) {
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
+                
+                msgHolder.removeClass('alert-success')
+                        .addClass('alert-danger')
+                        .html(e.responseText)
+                        .appendTo(form);
             }
         });
-    })
-    .finally(() => {
-        button.innerHTML = vofSettings.buttonText;
-        button.disabled = false;
-    });
-};
-
-document.addEventListener('DOMContentLoaded', function() {
-    VOFFormValidation.init();
-
-    const buttons = document.querySelectorAll('.vof-guest-submit-btn, .vof-subscription-submit-btn');
-    buttons.forEach(button => {
-        button.addEventListener('click', window.handleTempListing);
-    });
-});
+    }
+})(jQuery);
