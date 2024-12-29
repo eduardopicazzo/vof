@@ -14,16 +14,6 @@ export const VOFFormValidation = {
                 return window.vofGalleryValidator.validateGallery();
             }
         },
-
-
-
-
-
-        // 'rtcl-price': {
-        //     message: 'Price is required',
-        //     validate: value => !isNaN(value) && parseFloat(value) >= 0
-        // },
-//////////
         'description': {
             message: 'Description is required',
             validate: () => {
@@ -40,24 +30,6 @@ export const VOFFormValidation = {
                 return false;
             }
         },
-        // 'rtcl-gallery': {
-        //     message: 'At least one image is required',
-        //     validate: () => {
-        //         const galleryWrapper = document.querySelector('.rtcl-gallery-uploads');
-        //         if (!galleryWrapper) return false;
-
-        //         // Check for existing uploads
-        //         const existingImages = galleryWrapper.querySelectorAll('.rtcl-gallery-item');
-        //         if (existingImages.length > 0) return true;
-
-        //         // Check plupload queue if available
-        //         if (typeof RTCL_PLUPLOAD_DATA !== 'undefined' && RTCL_PLUPLOAD_DATA[0]?.uploader) {
-        //             return RTCL_PLUPLOAD_DATA[0].uploader.files.length > 0;
-        //         }
-
-        //         return false;
-        //     }
-        // },
         'rtcl-price': {
             message: 'Price is required',
             validate: value => {
@@ -69,18 +41,6 @@ export const VOFFormValidation = {
                 return !isNaN(value) && parseFloat(value) >= 0;
             }
         },
-//////////
-        // 'description_ifr': {
-        //     message: 'Description is required',
-        //     validate: value => {
-        //         const iframe = document.getElementById('description_ifr');
-        //         return iframe?.contentWindow.document.body.innerHTML.trim().length > 0;
-        //     }
-        // },
-        // 'rtcl-gallery': {
-        //     message: 'At least one image is required',
-        //     validate: () => document.querySelector('.rtcl-gallery-uploads')?.querySelectorAll('.rtcl-gallery-item').length > 0
-        // },
         'rtcl-price-type': {
             message: 'Price type is required',
             validate: value => value.trim().length > 0
@@ -134,22 +94,6 @@ export const VOFFormValidation = {
         }
 
         return isValid;
-
-        
-        //     const field = document.getElementById(fieldId);
-        //     if (!field) return;
-
-        //     if (!config.validate(field.value)) {
-        //         isValid = false;
-        //         firstError = this.showError(field, config.message) || firstError;
-        //     }
-        // });
-
-        // if (firstError) {
-        //     firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // }
-
-        // return isValid;
     },
 
     clearErrors(form) {

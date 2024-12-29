@@ -2,8 +2,8 @@
 class VOF_Ajax {
     
     public function __construct() {
-        add_action('wp_ajax_vof_save_temp_listing', array($this, 'vof_save_temp_listing'));
-        add_action('wp_ajax_nopriv_vof_save_temp_listing', array($this, 'vof_save_temp_listing'));
+       // add_action('wp_ajax_vof_save_temp_listing', array($this, 'vof_save_temp_listing'));
+       // add_action('wp_ajax_nopriv_vof_save_temp_listing', array($this, 'vof_save_temp_listing'));
     }
 
     public function vof_save_temp_listing() {

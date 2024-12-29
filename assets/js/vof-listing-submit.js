@@ -4,16 +4,9 @@ window.handleTempListing = function(e) {
         e.preventDefault();
     }
     
-    const button = e?.target || document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
+    const button = e?.target || 
+                document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
     const form = button?.closest('form');
-
-
-
-// Make handleTempListing available globally
-// window.handleTempListing = function(event) {
-//     event.preventDefault();
-//     const button = event.target;
-//     const form = button.closest('form');
 
     if (!form || !VOFFormValidation.validateForm(form)) {
         return false;
@@ -78,14 +71,3 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', window.handleTempListing);
     });
 });
-
-// OLDER CODE
-// document.addEventListener('DOMContentLoaded', function() {
-//     VOFFormValidation.init();
-
-//     const button = document.querySelector('.vof-guest-submit-btn') || 
-//                   document.querySelector('.vof-subscription-submit-btn');
-//     if (button) {
-//         button.addEventListener('click', window.handleTempListing);
-//     }
-// });
