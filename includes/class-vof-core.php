@@ -46,7 +46,7 @@ class VOF_Core {
         $this->api = new VOF_API();
         $this->assets = new VOF_Assets();
         $this->listing = new VOF_Listing();
-        $this->form_handler = new VOF_Form_Handler();
+        $this->form_handler = new \VOF_Form_Handler();
         // $this->vof_ajax = new VOF_Ajax();
         $this->vof_helper = new VOF_Helper_Functions();
         // $this->vof_stripe = new VOF_Stripe();

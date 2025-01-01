@@ -14,7 +14,7 @@ class VOF_Constants {
     const REST_NAMESPACE = 'vof/v1';
     
     // Temporary constants (to be moved to settings later)
-    const REDIRECT_URL = 'https://thenoise.io';
+    const REDIRECT_URL = 'https://thenoise.io'; 
 
     // Prevent instantiation
     private function __construct() {}

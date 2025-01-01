@@ -1,130 +1,103 @@
 <?php
-
-namespace VOF;
 /**
+ * Form Handler Class
  * 
- * All the tricky (and helper) stuff goes here.
- * TODO: Rename to VOF_Listing_Form_Handler.
- * 
+ * Handles form modifications and validations for the vendor onboarding flow
  */
 
-/**
- * 
- * ##############################################################################################
- * #                NOT FULLY WORKING (needs checks login and subscription active)              #
- * ##############################################################################################
- *        [X] MOST LIKELY CATEGORY IS DONE OVERRIDEN 
- *        [ ] BUT MISSING: SUBSCRIPTION CHECK. OVERRIDE FOR NEW VENDORS 
- *        [ ] MISSING: IS VALID POST AS FREE OVERRIDE (NOT A PROBLEM NOW BUT WILL BE LATER) 
- * ##############################################################################################
- * 
- */
+use Rtcl\Helpers\Functions;
+use RtclStore\Models\Membership;
 
-use RtclStore\Controllers\Ajax\Membership as StoreMembership;
-use RtclPro\Controllers\Hooks\FilterHooks as ProFilterHooks;
-use RtclStore\Helpers\Functions as StoreFunctions;
- 
- class VOF_Form_Handler {
- 
-     public function __construct() {
-         // Hook into 'plugins_loaded' to ensure all plugins are loaded first
-         add_action('plugins_loaded', [$this, 'vof_init_hooks'], 20);
-     }
-     
-     public function vof_init_hooks() {
-        // Debugging: Log all current callbacks for the hook
-        $this->vof_log_current_callbacks('rtcl_ajax_category_selection_before_post');
- 
-        // Remove original filters with exact parameters
-        remove_filter('rtcl_ajax_category_selection_before_post', 
-            [StoreMembership::class, 'is_valid_to_post_at_category'], 10);
- 
-        remove_filter('rtcl_ajax_category_selection_before_post', 
-            [ProFilterHooks::class, 'ajax_filter_modify_data'], 10);
- 
-        // Add our filter with appropriate priority
-        add_filter('rtcl_ajax_category_selection_before_post', 
-            [$this, 'vof_is_valid_to_post_at_category'], -999);
- 
-        // Remove original REST API filter
-        remove_filter('rtcl_rest_api_form_category_before_post', 
-            [StoreMembership::class, 'is_valid_to_post_at_category_rest_api'], 10);
- 
-        // Add our REST API filter
-        add_filter('rtcl_rest_api_form_category_before_post', 
-             [$this, 'vof_is_valid_to_post_at_category_rest_api'], -999);
-
-        // check if exist
-             
-        // Override core category validation
-        add_filter('rtcl_category_validation', function($is_valid, $cat_id) {
-            return true; // Always allow posting
-        }, -999, 2);
-     
-        // Override membership category validation
-        add_filter('rtcl_membership_category_validation', function($is_valid, $cat_id) {
-            return true;
-        }, -999, 2);
-
-        // // Add debugging
-        // error_log('VOF Form Handler: Initializing hooks');
-
-        // // Add form submission debugging
-        // add_action('wp_ajax_vof_save_temp_listing', function() {
-        //     error_log('VOF Ajax: Temp listing save triggered');
-        // });
-            
+class VOF_Form_Handler {
+    
+    public function __construct() {
+        // Hook into form rendering
+        add_action('rtcl_listing_form', array($this, 'vof_maybe_add_confirm_email_field'), 20);
+        
+        // Add validation for confirm email
+        add_filter('rtcl_fb_extra_form_validation', array($this, 'vof_validate_confirm_email'), 10, 2);
     }
- 
-     public function vof_is_valid_to_post_at_category($response) {
-         // Debugging
-         error_log('VOF Debug - vof_is_valid_to_post_at_category called');
- 
-         // Get category ID from the response array
-         $cat_id = isset($response['cat_id']) ? absint($response['cat_id']) : 0;
- 
-         // Initialize response array if not already
-         if (!is_array($response)) {
-             $response = array(
-                 'success' => true,
-                 'message' => array(),
-                 'child_cats' => '',
-                 'cat_id' => $cat_id
-             );
-         }
- 
-         // CASE 3: use original validation if user is logged in and has active subscription.
-         if (is_user_logged_in() && \VOF\VOF_Subscription::has_active_subscription()) {
-             $is_valid = StoreFunctions::is_valid_to_post_at_category($cat_id);
-             if (!$is_valid) {
-                 $response['success'] = false;
-                 $response['message'][] = __('You are not allowed to post in this category with your current membership.', 'vendor-onboarding-flow');
-                 return $response;
-             }
-         }
- 
-         // CASE 1 & 2: Always allow posting for onboarding flow.
-         $response['success'] = true;
-         $response['message'] = array(); // Clear any error messages.
- 
-         // Debugging
-         error_log('VOF Debug - Response: ' . print_r($response, true));
- 
-         return $response;
-     }
- 
-     public function vof_is_valid_to_post_at_category_rest_api($response) {
-         return $this->vof_is_valid_to_post_at_category($response);
-     }
- 
-     private function vof_log_current_callbacks($hook_name) {
-         global $wp_filter;
-         if (isset($wp_filter[$hook_name])) {
-             $callbacks = $wp_filter[$hook_name];
-             error_log("VOF Debug - Registered callbacks for {$hook_name}:");
-             error_log(print_r($callbacks, true));
-         } else {
-             error_log("VOF Debug - No callbacks registered for {$hook_name}");
-         }
-     }
- }
+
+    /**
+     * Check if user has active membership
+     */
+    // private function vof_has_active_membership(): bool {
+    //     if (!is_user_logged_in()) {
+    //         return false;
+    //     }
+    //     try {
+    //         $membership = new Membership(get_current_user_id());
+    //         return $membership->has_membership() && !$membership->is_expired();
+    //     } catch (Exception $e) {
+    //         return false;
+    //     }
+    // }
+
+    /**
+     * Maybe add confirm email field based on user state
+     */
+    public function vof_maybe_add_confirm_email_field() {
+        // Only add field if user is not logged in or has no active membership
+        if (!is_user_logged_in() || !\VOF\VOF_Subscription::has_active_subscription()) {
+            ?>
+            <div class="row classima-form-confirm-email-row">
+                <div class="col-12 col-sm-3">
+                    <label class="control-label"><?php esc_html_e('Confirm Email', 'vendor-onboarding-flow'); ?><span class="require-star">*</span></label>
+                </div>
+                <div class="col-12 col-sm-9">
+                    <div class="form-group">
+                        <input type="email" class="form-control" id="rtcl-confirm-email" name="confirm_email" required />
+                        <div class="help-block"><?php esc_html_e('Please confirm your email address', 'vendor-onboarding-flow'); ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php
+            
+            // Add JavaScript validation
+            add_action('wp_footer', array($this, 'vof_add_email_validation_script'));
+        }
+    }
+
+    /**
+     * Add client-side validation for email confirmation
+     */
+    public function vof_add_email_validation_script() {
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            $('#rtcl-post-form').on('submit', function(e) {
+                var email = $('#rtcl-email').val();
+                var confirmEmail = $('#rtcl-confirm-email').val();
+                
+                if (email !== confirmEmail) {
+                    e.preventDefault();
+                    alert('<?php esc_html_e('Email addresses do not match!', 'vendor-onboarding-flow'); ?>');
+                    return false;
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Validate confirm email field
+     */
+    public function vof_validate_confirm_email($errors, $form) {
+        if (!is_user_logged_in() || !\VOF\VOF_Subscription::has_active_subscription()) {
+            $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+            $confirm_email = isset($_POST['confirm_email']) ? sanitize_email($_POST['confirm_email']) : '';
+            
+            if (empty($confirm_email)) {
+                $errors->add('confirm_email', esc_html__('Please confirm your email address', 'vendor-onboarding-flow'));
+            } elseif ($email !== $confirm_email) {
+                $errors->add('confirm_email_mismatch', esc_html__('Email addresses do not match', 'vendor-onboarding-flow'));
+            }
+        }
+        
+        return $errors;
+    }
+}
+
+// Initialize the form handler
+//new VOF_Form_Handler();
