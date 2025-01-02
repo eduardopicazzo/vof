@@ -3,6 +3,7 @@ class VOF_Helper_Functions {
     public function __construct() {
     }
 
+
     /**
 	 * @return bool
 	 */
