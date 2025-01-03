@@ -110,6 +110,7 @@ use RtclPro\Helpers\Fns;
 $labelColumn = is_admin() ? 'col-sm-2' : 'col-sm-3';
 $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 ?>
+<!-- <form action="vof-helper-functions.php" method="post"> -->
 <div class="rtcl-post-contact-details rtcl-post-section<?php echo esc_attr( is_admin() ? " rtcl-is-admin" : '' ) ?>">
     <div class="classified-listing-form-title">
         <i class="fa fa-user" aria-hidden="true"></i>
@@ -256,12 +257,13 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-	<?php if ( ! in_array( 'phone', $hidden_fields ) ):
+	    <?php if ( ! in_array( 'phone', $hidden_fields ) ): 
 		$phoneIsRequired = Functions::listingFormPhoneIsRequired();
         ?>
         <div class="row classima-form-phone-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label" for="rtcl-phone">
+                <!-- <label class="control-label" for="rtcl-phone"> -->
+                <label class="control-label" for="vof-phone">
                     <?php esc_html_e( "Phone [VOF]", 'classima' ); ?>
 	                <?php if ( $phoneIsRequired ) { ?><span class="rtcl-required">*</span> <?php } ?>
                 </label>
@@ -270,7 +272,8 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
                 <div class="form-group">
 					<?php
 					$required_attr = $phoneIsRequired ? 'required' : '';
-					$field = '<input type="text" name="phone" id="rtcl-phone" value="' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
+					// $field = '<input type="text" name="phone" id="rtcl-phone" value="' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
+					$field = '<input type="text" name="vof-phone" id="vof-phone"' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
 					Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );
 					?>
 					<?php do_action( 'rtcl_listing_form_phone_warning' ); ?>
@@ -282,11 +285,16 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 	<?php if ( ! in_array( 'whatsapp_number', $hidden_fields ) ): ?>
         <div class="row classima-form-whatsapp-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label"><?php esc_html_e( "Whatsapp Number [VOF]", 'classima' ); ?></label>
+                <!-- <label class="control-label"> -->
+                <label class="control-label" for="vof-whatsapp-number">
+                    <?php esc_html_e( "Whatsapp Number [VOF]", 'classima' ); ?>
+                    <span class="rtcl-required"> *</span>
+                </label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
-                    <input type="text" class="form-control" id="rtcl-whatsapp-number" name="_rtcl_whatsapp_number"
+                    <!-- <input type="text" class="form-control" id="rtcl-whatsapp-number" name="_rtcl_whatsapp_number" -->
+                    <input type="text" class="form-control" id="vof-whatsapp-number" name="vof-whatsapp-number"
                            value="<?php echo esc_attr( $whatsapp_number ); ?>"/>
                     <p class="description small"><?php esc_html_e( "Whatsapp number with your country code. e.g.+1xxxxxxxxxx", 'classima' ) ?></p>
                 </div>
@@ -298,14 +306,36 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         <div class="row classima-form-email-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <label class="control-label"><?php esc_html_e( "Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                <!-- <label class="control-label" for="vof-email"><//?php esc_html_e( "Email [VOF]", 'classima' ); ?><//?php if ( $enable_post_for_unregister ): ?>  -->
                         <span> *</span><?php endif; ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
+                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
                     <input type="email" class="form-control" id="rtcl-email" name="email"
                            value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
 					<?php if ( $enable_post_for_unregister ): ?>
                         <p class="description"><?php esc_html_e( "This will be your username", 'classima' ); ?></p>
+					<?php endif; ?>
+                </div>
+            </div>
+        </div>
+	<?php endif; ?>
+
+	<?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?>
+        <div class="row classima-form-email-row">
+            <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
+                <!-- <label class="control-label"><//?php esc_html_e( "Confirm Your Email [VOF]", 'classima' ); ?><//?php if ( $enable_post_for_unregister ): ?> -->
+                <label class="control-label" for="vof-email-confirm"><?php esc_html_e( "Confirm Your Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                        <span> *</span><?php endif; ?></label>
+            </div>
+            <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
+                <div class="form-group">
+                    <!-- <input type="email" class="form-control" id="vof-email-confirm" name="email-confirm" -->
+                    <input type="email" class="form-control" id="vof-email-confirm" name="vof-email-confirm"
+                           value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
+					<?php if ( $enable_post_for_unregister ): ?>
+                        <p class="description"><?php esc_html_e( "Please confirm your email", 'classima' ); ?></p>
 					<?php endif; ?>
                 </div>
             </div>
@@ -359,3 +389,17 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 	<?php endif; ?>
 
 </div>
+<!-- </form> -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get references to the form fields
+        const phoneField = document.getElementById('vof-phone');
+        const whatsappField = document.getElementById('vof-whatsapp-number');
+
+        // Add an event listener to the phone field
+        phoneField.addEventListener('input', function () {
+            // Update the value of the WhatsApp field
+            whatsappField.value = phoneField.value;
+        });
+    });
+</script>

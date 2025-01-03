@@ -6,6 +6,22 @@
             e.preventDefault();
         }
         
+        // Get the phone field
+        // const phoneField = document.getElementById('rtcl-phone');
+        // const phonePattern = phoneField.getAttribute('data-validation-pattern');
+        // const phoneMessage = phoneField.getAttribute('data-validation-message');
+
+        // // Validate phone
+        // if (phoneField && phoneField.value) {
+        //     const phoneRegex = new RegExp(phonePattern);
+        //     if (!phoneRegex.test(phoneField.value)) {
+        //         alert(phoneMessage);
+        //         phoneField.focus();
+        //         return false;
+        //     }
+        // }
+
+
         const button = e?.target || 
                     document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
         const form = button?.closest('form');

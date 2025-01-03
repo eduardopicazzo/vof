@@ -4,6 +4,7 @@ namespace VOF;
 
 use Rtcl\Controllers\FormHandler;
 use Rtcl\Helpers\Functions;
+use VOF_Helper_Functions;
 
 class VOF_Listing {
     public function __construct() {
@@ -502,24 +503,24 @@ class VOF_Listing {
 
 							
 
-                            // $new_user_id = Functions::do_registration_from_listing_form( [ 'email' => $meta['email'] ] );
-							// if ( $new_user_id && is_numeric( $new_user_id ) ) {
-							// 	$user_id = $new_user_id;
-							// 	/* translators:  Account registered email sent  */
-							// 	Functions::add_notice(
-							// 		apply_filters(
-							// 			'rtcl_listing_new_registration_success_message',
-							// 			sprintf(
-							// 			// translators: Email address
-							// 				esc_html__( 'A new account is registered, password is sent to your email(%s).', 'classified-listing' ),
-							// 				$meta['email']
-							// 			),
-							// 			$meta['email']
-							// 		)
-							// 	);
-							// }
+                            $new_user_id = Functions::do_registration_from_listing_form( [ 'email' => $meta['email'] ] );
+							if ( $new_user_id && is_numeric( $new_user_id ) ) {
+								$user_id = $new_user_id;
+								/* translators:  Account registered email sent  */
+								Functions::add_notice(
+									apply_filters(
+										'rtcl_listing_new_registration_success_message',
+										sprintf(
+										// translators: Email address
+											esc_html__( 'A new account is registered, password is sent to your email(%s).', 'classified-listing' ),
+											$meta['email']
+										),
+										$meta['email']
+									)
+								);
+							}
 						}
-						// if ( $user_id ) {
+						if ( $user_id ) {
 							$new_listing_status = Functions::get_option_item( 'rtcl_moderation_settings', 'new_listing_status', 'pending' );
 							if ( $post_id && is_object( $post ) && $post->post_type == rtcl()->post_type ) {
 
@@ -646,7 +647,7 @@ class VOF_Listing {
 									'error'
 								);
 							}
-						// }
+						}
 					}
 				}
 			}

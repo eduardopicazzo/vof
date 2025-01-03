@@ -9,23 +9,60 @@ namespace VOF;
 
 use Rtcl\Helpers\Functions;
 use RtclStore\Models\Membership;
+use VOF\Helpers\VOF_Helper_Functions;
 
 class VOF_Form_Handler {
     
     public function __construct() {
         // Hook into template loading with correct priority and argument count
-        // add_filter('rtcl_locate_template', array($this, 'vof_maybe_override_template'), 10, 3);
         remove_action("rtcl_listing_form", [ \Rtcl\Controllers\Hooks\TemplateHooks::class ,'listing_contact' ], 30);
         add_action("rtcl_listing_form", [self::class ,'vof_listing_contact' ], 30);
-        
-
-        // if (!is_user_logged_in() || !VOF_Subscription::has_active_subscription()) {
-        //     rtcl_listing_form
-        // }
-        
-        // Add validation for confirm email
-       // add_filter('rtcl_fb_extra_form_validation', array($this, 'vof_validate_confirm_email'), 10, 2);
+		add_filter('rtcl_listing_contact_details_fields', [self::class, 'vof_listing_contact_details_fields']);
     }
+
+
+	public static function vof_listing_contact_details_fields( $fields ) {
+		$vof_fields = [
+			'vof_email' => [
+				'type' => 'email',
+				'label' => '[VOF test] Email',
+				'id' => 'vof-email',
+				'required' => true,
+				/** The validation attribute specifies a callback function that will be used to validate this field 
+				 * However, 'custom_validation_callback' is not a real function name and won't trigger any validation
+				 * To properly validate this field, we should specify an actual validation callback function, 
+				 * for example: [self::class, 'validate_vof_email']
+				 */
+				'validation' => [ VOF_Helper_Functions::class, 'vof_validate_email' ], 
+				'class' => ''
+			],
+			'vof_email_confirm' => [
+				'type' => 'email',
+				'label' => '[VOF test] Email Confirm',
+				'id' => 'vof-email-confirm',
+				'required' => true,
+				'validation' => [ VOF_Helper_Functions::class, 'vof_validate_email_confirm' ],
+				'class' => ''
+			],
+			'vof_phone' => [
+				'type' => 'text',
+				'label' => '[VOF test] Phone',
+				'id' => 'vof-phone',
+				'required' => true,
+				'validation' => [ VOF_Helper_Functions::class, 'vof_validate_phone' ],
+				'class' => ''
+			],
+			'vof_whatsapp_number' => [
+				'type' => 'text',
+				'label' => '[VOF test] Whatsapp Number',
+				'id' => 'vof-whatsapp-number',
+				'required' => true,
+				'validation' => [ VOF_Helper_Functions::class, 'vof_validate_whatsapp_number' ],
+				'class' => ''
+			]
+		];
+		return array_merge($fields, $vof_fields);
+	}
 
     public static function vof_is_vof_conditions() : bool { 
         return !is_user_logged_in() || !VOF_Subscription::has_active_subscription();
@@ -86,10 +123,10 @@ class VOF_Form_Handler {
 		];
 
         if (self::vof_is_vof_conditions()) { 
-            // $vof_template_path = 'wp-content/plugins/vendor-onboarding-flow/templates/listing-form/vof-contact.php';
-            // $vof_template_path = plugin_dir_path(dirname(__FILE__)) . 'templates/listing-form/vof-contact.php';
+            
             $template_name = 'listing-form/vof-contact';
             $plugin_template_path = VOF_PLUGIN_DIR . 'templates/';                            // path to the plugin's template directory.
+            
             Functions::get_template( 
                 $template_name,                                                               // template name to be rendered
                 apply_filters( 'rtcl_listing_form_contact_tpl_attributes', $data, $post_id ), // template args 
@@ -102,67 +139,7 @@ class VOF_Form_Handler {
 	}
 
 
-    /**
-     * Maybe override the template based on conditions
-     * 
-     * @param string $template      Template path
-     * @param string $template_name Template name
-     * @param string $template_path Template path
-     * 
-     * @return string Modified template path
-     */
-    public function vof_maybe_override_template($template, $template_name, $template_path = '') {
-        // Only override the contact template
-        if ($template_name !== 'listing-form/contact.php') {
-            return $template;
-        }
 
-        // Check if we need to override (not logged in or no active subscription)
-        if (!function_exists('is_user_logged_in') || !function_exists('wp_get_current_user')) {
-            return $template;
-        }
-
-        // Check if we're on the listing submission page
-        if (!class_exists('Rtcl\Helpers\Functions') || !method_exists('Rtcl\Helpers\Functions', 'is_listing_form_page')) {
-            return $template;
-        }
-
-        // Only override on the listing form page
-        if (!Functions::is_listing_form_page()) {
-            return $template;
-        }
-
-        if (!is_user_logged_in() || !VOF_Subscription::has_active_subscription()) {
-            // Get our custom template path
-            $plugin_path = plugin_dir_path(dirname(__FILE__));
-            $our_template = $plugin_path . 'templates/listing-form/vof-contact.php';
-
-            // Only override if our template exists
-            if (file_exists($our_template)) {
-                return $our_template;
-            }
-        }
-
-        return $template;
-    }
-
-    /**
-     * Validate confirm email field
-     */
-    public function vof_validate_confirm_email($errors, $form) {
-        if (!is_user_logged_in() || !VOF_Subscription::has_active_subscription()) {
-            $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
-            $confirm_email = isset($_POST['confirm_email']) ? sanitize_email($_POST['confirm_email']) : '';
-            
-            if (empty($confirm_email)) {
-                $errors->add('confirm_email', esc_html__('Please confirm your email address', 'vendor-onboarding-flow'));
-            } elseif ($email !== $confirm_email) {
-                $errors->add('confirm_email_mismatch', esc_html__('Email addresses do not match', 'vendor-onboarding-flow'));
-            }
-        }
-        
-        return $errors;
-    }
 }
 
 // Initialize the form handler

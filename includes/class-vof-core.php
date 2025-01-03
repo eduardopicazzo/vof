@@ -1,7 +1,7 @@
 <?php
 namespace VOF;
 
-use VOF_Helper_Functions;
+use VOF\Helpers\VOF_Helper_Functions;
 
 class VOF_Core {
     private static $instance = null;
