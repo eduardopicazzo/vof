@@ -5,7 +5,7 @@
         if (e) {
             e.preventDefault();
         }
-        
+
         // Get the phone field
         // const phoneField = document.getElementById('rtcl-phone');
         // const phonePattern = phoneField.getAttribute('data-validation-pattern');

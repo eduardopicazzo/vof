@@ -13,7 +13,8 @@ class VOF_Listing {
 
         // Intercept the AJAX submission
         add_action('wp_ajax_rtcl_post_new_listing', [$this, 'vof_handle_listing_submission'], 9);
-        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_handle_listing_submission'], 9);
+        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_handle_listing_submission'], 9);
+        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_handle_listing_submissionTEST'], 9);
 
         // Custom submit button 
         remove_action('rtcl_listing_form_end', 
@@ -296,7 +297,7 @@ class VOF_Listing {
         ]);
     }
 
-    public function vof_handle_listing_submission() {
+    public function vof_handle_listing_submissionPause() {
 		Functions::clear_notices();// Clear previous notice
 		$success = false;
 		$post_id = 0;
@@ -683,5 +684,9 @@ class VOF_Listing {
 				]
 			)
 		);
+	}
+
+	public function vof_handle_listing_submissionTEST() {
+		Functions::clear_notices(); // Clear all notice created by checkin
 	}
 }

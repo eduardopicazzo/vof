@@ -107,10 +107,12 @@
 use Rtcl\Helpers\Functions;
 use RtclPro\Helpers\Fns;
 
+error_log('VOF Debug: vof-contact.php template loaded');
+error_log('VOF Debug: Template variables: ' . print_r(get_defined_vars(), true));
+
 $labelColumn = is_admin() ? 'col-sm-2' : 'col-sm-3';
 $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 ?>
-<!-- <form action="vof-helper-functions.php" method="post"> -->
 <div class="rtcl-post-contact-details rtcl-post-section<?php echo esc_attr( is_admin() ? " rtcl-is-admin" : '' ) ?>">
     <div class="classified-listing-form-title">
         <i class="fa fa-user" aria-hidden="true"></i>
@@ -257,32 +259,44 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-	    <?php if ( ! in_array( 'phone', $hidden_fields ) ): 
-		$phoneIsRequired = Functions::listingFormPhoneIsRequired();
+
+
+
+
+	    <!-- <//?php if ( ! in_array( 'phone', $hidden_fields ) ):  -->
+	    <?php if ( ! in_array( 'vof_phone', $hidden_fields ) ): 
+		// $PhoneIsRequired = Functions::listingFormPhoneIsRequired();
         ?>
         <div class="row classima-form-phone-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <!-- <label class="control-label" for="rtcl-phone"> -->
                 <label class="control-label" for="vof-phone">
                     <?php esc_html_e( "Phone [VOF]", 'classima' ); ?>
-	                <?php if ( $phoneIsRequired ) { ?><span class="rtcl-required">*</span> <?php } ?>
+	                <span class="rtcl-required">*</span>
+	                <!-- <//?php if ( $phoneIsRequired ) { ?><span class="rtcl-required">*</span> <//?php } ?> -->
                 </label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
-					<?php
-					$required_attr = $phoneIsRequired ? 'required' : '';
+                    <?php
+                        $field = '<input type="text" name="vof_phone" id="vof-phone" value="' . esc_attr( $phone ) . '" class="form-control" />';
+                        Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );   
+                    ?>
+					<!-- <//?php 
+					//$required_attr = $phoneIsRequired ? 'required' : '';
 					// $field = '<input type="text" name="phone" id="rtcl-phone" value="' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
 					$field = '<input type="text" name="vof-phone" id="vof-phone"' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
-					Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );
-					?>
-					<?php do_action( 'rtcl_listing_form_phone_warning' ); ?>
+					// Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );
+					?>-->
+					<!-- <//?php do_action( 'rtcl_listing_form_phone_warning' ); ?> --> 
                 </div>
             </div>
         </div>
 	<?php endif; ?>
 
-	<?php if ( ! in_array( 'whatsapp_number', $hidden_fields ) ): ?>
+
+	<!-- <//?php if ( ! in_array( 'whatsapp_number', $hidden_fields ) ): ?> -->
+	<?php if ( ! in_array( 'vof_whatsapp_number', $hidden_fields ) ): ?>
         <div class="row classima-form-whatsapp-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <!-- <label class="control-label"> -->
@@ -294,7 +308,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
                     <!-- <input type="text" class="form-control" id="rtcl-whatsapp-number" name="_rtcl_whatsapp_number" -->
-                    <input type="text" class="form-control" id="vof-whatsapp-number" name="vof-whatsapp-number"
+                    <input type="text" class="form-control" id="vof-whatsapp-number" name="vof_whatsapp_number"
                            value="<?php echo esc_attr( $whatsapp_number ); ?>"/>
                     <p class="description small"><?php esc_html_e( "Whatsapp number with your country code. e.g.+1xxxxxxxxxx", 'classima' ) ?></p>
                 </div>
@@ -302,17 +316,21 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-	<?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?>
+
+
+
+
+	<!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
+	<?php if ( ! in_array( 'vof_email', $hidden_fields ) || $enable_post_for_unregister ): ?>
         <div class="row classima-form-email-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <label class="control-label"><?php esc_html_e( "Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
-                <!-- <label class="control-label" for="vof-email"><//?php esc_html_e( "Email [VOF]", 'classima' ); ?><//?php if ( $enable_post_for_unregister ): ?>  -->
-                        <span> *</span><?php endif; ?></label>
+                    <span> *</span><?php endif; ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
                     <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
-                    <input type="email" class="form-control" id="rtcl-email" name="email"
+                    <input type="email" class="form-control" id="vof-email" name="vof_email"
                            value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
 					<?php if ( $enable_post_for_unregister ): ?>
                         <p class="description"><?php esc_html_e( "This will be your username", 'classima' ); ?></p>
@@ -322,17 +340,18 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-	<?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?>
+
+    <!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
+	<?php if ( ! in_array( 'vof_email_confirm', $hidden_fields ) || $enable_post_for_unregister ): ?>
         <div class="row classima-form-email-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <!-- <label class="control-label"><//?php esc_html_e( "Confirm Your Email [VOF]", 'classima' ); ?><//?php if ( $enable_post_for_unregister ): ?> -->
-                <label class="control-label" for="vof-email-confirm"><?php esc_html_e( "Confirm Your Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
-                        <span> *</span><?php endif; ?></label>
+                <label class="control-label"><?php esc_html_e( "Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                    <span> *</span><?php endif; ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
-                    <!-- <input type="email" class="form-control" id="vof-email-confirm" name="email-confirm" -->
-                    <input type="email" class="form-control" id="vof-email-confirm" name="vof-email-confirm"
+                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
+                    <input type="email" class="form-control" id="vof-email-confirm" name="vof_email_confirm"
                            value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
 					<?php if ( $enable_post_for_unregister ): ?>
                         <p class="description"><?php esc_html_e( "Please confirm your email", 'classima' ); ?></p>
@@ -341,6 +360,10 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
             </div>
         </div>
 	<?php endif; ?>
+
+
+
+
 
 	<?php if ( ! in_array( 'website', $hidden_fields ) ): ?>
         <div class="row classima-form-website-row">
@@ -389,7 +412,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 	<?php endif; ?>
 
 </div>
-<!-- </form> -->
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Get references to the form fields
