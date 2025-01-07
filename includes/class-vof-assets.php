@@ -14,50 +14,53 @@ class VOF_Assets {
 
         // Ensure RTCL core and gallery scripts are loaded first
         wp_enqueue_script('rtcl-common');
+        wp_enqueue_script('public-add-post');
         wp_enqueue_script('rtcl-gallery');
 
         // Add our custom gallery extension
-        wp_enqueue_script(
-            'vof-gallery-extension',
-            plugins_url('../assets/js/vof-gallery-extension.js', __FILE__),
-            ['jquery', 'rtcl-common', 'rtcl-gallery'],
-            VOF_VERSION,
-            true
-        );
+        // wp_enqueue_script(
+        //     'vof-gallery-extension',
+        //     plugins_url('../assets/js/vof-gallery-extension.js', __FILE__),
+        //     ['jquery', 'rtcl-common', 'rtcl-gallery', 'public-add-post'],
+        //     VOF_VERSION,
+        //     true
+        // );
 
         // Add form validation script
-        wp_enqueue_script(
-            'vof-form-validation',
-            plugins_url('../assets/js/vof-form-validation.js', __FILE__),
-            ['jquery', 'vof-gallery-extension'],
-            VOF_VERSION,
-            true
-        );
+        // wp_enqueue_script(
+        //     'vof-form-validation',
+        //     plugins_url('../assets/js/vof-form-validation.js', __FILE__),
+        //     ['jquery', 'vof-gallery-extension'],
+        //     VOF_VERSION,
+        //     true
+        // );
 
         // Add listing submission script
         wp_enqueue_script(
             'vof-listing-submit',
             plugins_url('../assets/js/vof-listing-submit.js', __FILE__),
-            ['jquery', 'vof-form-validation'],
+            // ['jquery', 'vof-form-validation'],
+            // ['jquery', 'public-add-post'],
+            ['jquery'],
             VOF_VERSION,
             true
         );
 
         // Add type="module" to scripts that need it
-        add_filter('script_loader_tag', function($tag, $handle) {
-            if (in_array($handle, ['vof-form-validation', 'vof-listing-submit'])) {
-                return str_replace('<script', '<script type="module"', $tag);
-            }
-            return $tag;
-        }, 10, 2);
+        // add_filter('script_loader_tag', function($tag, $handle) {
+        //     if (in_array($handle, ['vof-form-validation', 'vof-listing-submit'])) {
+        //         return str_replace('<script', '<script type="module"', $tag);
+        //     }
+        //     return $tag;
+        // }, 10, 2);
 
         // Localize script with settings
-        wp_localize_script('vof-gallery-extension', 'vofGallerySettings', [
-            'nonce' => wp_create_nonce('rtcl-gallery'),
-            'messages' => [
-                'uploadRequired' => __('Please upload at least one image to proceed.', 'vendor-onboarding-flow'),
-            ]
-        ]);
+        // wp_localize_script('vof-gallery-extension', 'vofGallerySettings', [
+        //     'nonce' => wp_create_nonce('rtcl-gallery'),
+        //     'messages' => [
+        //         'uploadRequired' => __('Please upload at least one image to proceed.', 'vendor-onboarding-flow'),
+        //     ]
+        // ]);
 
         // Original vofSettings for form submission
         wp_localize_script('vof-listing-submit', 'vofSettings', [

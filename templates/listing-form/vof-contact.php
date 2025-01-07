@@ -1,4 +1,5 @@
 <?php
+error_log('VOF Debug: Custom VOF contact template loaded');
 /**
  * Listing Form Contact
  *
@@ -106,6 +107,9 @@
 
 use Rtcl\Helpers\Functions;
 use RtclPro\Helpers\Fns;
+
+// Add this near the top after error_log statements you already have
+error_log('VOF Debug: Email field value at template load: ' . (isset($vof_email) ? $vof_email : 'not set'));
 
 error_log('VOF Debug: vof-contact.php template loaded');
 error_log('VOF Debug: Template variables: ' . print_r(get_defined_vars(), true));
@@ -309,7 +313,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
                 <div class="form-group">
                     <!-- <input type="text" class="form-control" id="rtcl-whatsapp-number" name="_rtcl_whatsapp_number" -->
                     <input type="text" class="form-control" id="vof-whatsapp-number" name="vof_whatsapp_number"
-                           value="<?php echo esc_attr( $whatsapp_number ); ?>"/>
+                           value="<?php echo esc_attr( $vof_whatsapp_number ); ?>"/>
                     <p class="description small"><?php esc_html_e( "Whatsapp number with your country code. e.g.+1xxxxxxxxxx", 'classima' ) ?></p>
                 </div>
             </div>
@@ -330,8 +334,17 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
                     <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
-                    <input type="email" class="form-control" id="vof-email" name="vof_email"
-                           value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
+                    <input type="email" 
+                           class="form-control" 
+                           id="vof_email" 
+                           name="vof_email"
+                           value="<?php echo esc_attr( $vof_email ); ?>" 
+                    <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
+                    
+                    <!-- Add a hidden field for compatibility -->
+                    <input type="hidden" 
+                            name="email" 
+                            value="<?php echo esc_attr( $vof_email ); ?>" />
 					<?php if ( $enable_post_for_unregister ): ?>
                         <p class="description"><?php esc_html_e( "This will be your username", 'classima' ); ?></p>
 					<?php endif; ?>
@@ -341,25 +354,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 	<?php endif; ?>
 
 
-    <!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
-	<?php if ( ! in_array( 'vof_email_confirm', $hidden_fields ) || $enable_post_for_unregister ): ?>
-        <div class="row classima-form-email-row">
-            <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label"><?php esc_html_e( "Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
-                    <span> *</span><?php endif; ?></label>
-            </div>
-            <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
-                <div class="form-group">
-                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
-                    <input type="email" class="form-control" id="vof-email-confirm" name="vof_email_confirm"
-                           value="<?php echo esc_attr( $email ); ?>" <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
-					<?php if ( $enable_post_for_unregister ): ?>
-                        <p class="description"><?php esc_html_e( "Please confirm your email", 'classima' ); ?></p>
-					<?php endif; ?>
-                </div>
-            </div>
-        </div>
-	<?php endif; ?>
+
 
 
 
@@ -418,11 +413,20 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         // Get references to the form fields
         const phoneField = document.getElementById('vof-phone');
         const whatsappField = document.getElementById('vof-whatsapp-number');
+        const vofEmailField = document.getElementById('vof_email');
+        const emailField = document.querySelector('input[name="email"]');
+
 
         // Add an event listener to the phone field
         phoneField.addEventListener('input', function () {
             // Update the value of the WhatsApp field
             whatsappField.value = phoneField.value;
         });
+
+        vofEmailField.addEventListener('input', function () {
+        emailField.value = this.value;
+        });
+
+
     });
 </script>

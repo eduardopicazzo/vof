@@ -40,11 +40,13 @@ function vof() {
 // Start the plugin
 add_action('plugins_loaded', 'VOF\vof', 0);
 
+// TO DO: Remove this after testing
 add_action('init', function() {
     error_log('VOF Debug: Checking if vof_listing_contact_details_fields is hooked: ' . 
         (has_filter('rtcl_listing_form_contact_tpl_attributes') ? 'Yes' : 'No'));
 });
 
+// TO DO: MAYBE CHECK IF THIS IS NEEDED
 // Add the new filter hook
 add_action('init', function() {
     add_filter('rtcl_listing_form_contact_tpl_attributes', ['\VOF\VOF_Form_Handler', 'vof_listing_contact_details_fields']);

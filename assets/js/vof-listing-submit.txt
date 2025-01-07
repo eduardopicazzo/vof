@@ -1,0 +1,215 @@
+(function($) {
+    'use strict';
+
+    window.handleTempListing = function(e) {
+        if (e) {
+            e.preventDefault();
+        }
+
+    // Enhanced gallery data handling from RTCL.File.Registered
+    if (RTCL.File && RTCL.File.Registered && RTCL.File.Registered[0]) {
+        const galleryData = [];
+        let featuredId = null;
+        // First pass - collect all valid image IDs and find featured
+        Object.values(RTCL.File.Registered[0].Item).forEach(item => {
+            if (item.result && item.result.attach_id) {
+                galleryData.push(item.result.attach_id);
+                if (item.result.featured) {
+                    featuredId = item.result.attach_id;
+                }
+            }
+        });
+
+        // Set gallery IDs if we have any
+        if (galleryData.length) {
+            formData.set('rtcl_gallery_ids', galleryData.join(','));
+            
+            // Set featured image - either explicitly set featured or first image
+            formData.set('featured_image_id', featuredId || galleryData[0]);
+            
+            // Add meta flag to indicate gallery was processed
+            formData.set('_rtcl_has_gallery', '1');
+            
+            // Debug log
+            console.log('VOF Gallery Data:', {
+                gallery_ids: galleryData,
+                featured_id: featuredId || galleryData[0]
+            });
+        }
+        // Ensure RTCL's internal image count is updated
+        if (typeof RTCL.File.Uploader === 'function' && RTCL.File.Registered[0]) {
+            RTCL.File.Registered[0].CheckFileLimit();
+        }
+    }
+
+
+
+        // Get the phone field
+        // const phoneField = document.getElementById('rtcl-phone');
+        // const phonePattern = phoneField.getAttribute('data-validation-pattern');
+        // const phoneMessage = phoneField.getAttribute('data-validation-message');
+
+        // // Validate phone
+        // if (phoneField && phoneField.value) {
+        //     const phoneRegex = new RegExp(phonePattern);
+        //     if (!phoneRegex.test(phoneField.value)) {
+        //         alert(phoneMessage);
+        //         phoneField.focus();
+        //         return false;
+        //     }
+        // }
+
+
+        const button = e?.target || 
+                    document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
+        const form = button?.closest('form');
+
+        // Add our custom flag to identify VOF submissions
+        const vofFlowInput = document.createElement('input');
+        vofFlowInput.type = 'hidden';
+        vofFlowInput.name = 'vof_flow';
+        vofFlowInput.value = 'true';
+        form.appendChild(vofFlowInput);
+
+        // Handle TinyMCE if active
+        try {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+                const editor = tinymce.get("description");
+                if (editor) {
+                    editor.save();
+                }
+            }
+        } catch (e) {
+            console.log('TinyMCE not available', e);
+        }
+
+        // Handle reCAPTCHA if enabled
+        if (typeof rtcl !== 'undefined' && rtcl.recaptcha && rtcl.recaptcha.on) {
+            if (rtcl.recaptcha.v === 3) {
+                grecaptcha.ready(function() {
+                    $(form).rtclBlock();
+                    grecaptcha.execute(rtcl.recaptcha.site_key, {
+                        action: 'listing'
+                    }).then(function(token) {
+                        submitToOriginalEndpoint(form, token);
+                    });
+                });
+                return false;
+            }
+        }
+
+        submitToOriginalEndpoint(form);
+    };
+
+    function submitToOriginalEndpoint(form, reCaptcha_token = null) {
+        const formData = new FormData(form);
+
+        // Include gallery data from RTCL.File.Registered
+        if (RTCL.File.Registered && RTCL.File.Registered[0]) {
+            const galleryData = [];
+            Object.values(RTCL.File.Registered[0].Item).forEach(item => {
+                if (item.result && item.result.attach_id) {
+                    galleryData.push(item.result.attach_id);
+                }
+            });
+
+            if (galleryData.length) {
+                formData.set('rtcl_gallery_ids', galleryData.join(','));
+                
+                // Set featured image if available
+                const featuredImage = Object.values(RTCL.File.Registered[0].Item).find(item => 
+                    item.result && item.result.featured
+                );
+                if (featuredImage) {
+                    formData.set('featured_image_id', featuredImage.result.attach_id);
+                } else if (galleryData[0]) {
+                    // Use first image as featured if none set
+                    formData.set('featured_image_id', galleryData[0]);
+                }
+            }
+        }
+
+        // Set the action to rtcl_post_new_listing  
+        formData.set('action', 'rtcl_post_new_listing');
+        // formData.set('action', 'wp_ajax_nopriv_rtcl_post_new_listing');
+
+        // Debug log
+        console.log('Gallery Data being sent:');
+        console.log('Gallery IDs:', formData.get('rtcl_gallery_ids'));
+        console.log('Featured Image:', formData.get('featured_image_id'));        
+        
+        if (reCaptcha_token) {
+            formData.set('g-recaptcha-response', reCaptcha_token);
+        }
+
+        // Add our flag
+        formData.set('vof_flow', 'true');
+
+        // Debug log after setting additional fields
+        console.log('Final form data:');
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
+
+        const msgHolder = $("<div class='alert rtcl-response'></div>");
+        const $form = $(form);
+
+        $.ajax({
+            url: rtcl.ajaxurl,
+            type: "POST",
+            dataType: 'json',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: formData,
+            beforeSend: function() {
+                $form.find('.alert.rtcl-response').remove();
+                $form.find('button[type=submit], button[type=button]').prop("disabled", true);
+                $form.rtclBlock();
+            },
+            success: function(response) {
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
+
+                let msg = '';
+                if (response.message?.length) {
+                    response.message.map(function(message) {
+                        msg += "<p>" + message + "</p>";
+                    });
+                }
+
+                if (response.success) {
+                    form.reset();
+                    if (msg) {
+                        msgHolder.removeClass('alert-danger')
+                                .addClass('alert-success')
+                                .html(msg)
+                                .appendTo(form);
+                    }
+                    if (response.redirect_url) {
+                        setTimeout(function() {
+                            window.location.href = response.redirect_url;
+                        }, 500);
+                    }
+                } else {
+                    if (msg) {
+                        msgHolder.removeClass('alert-success')
+                                .addClass('alert-danger')
+                                .html(msg)
+                                .appendTo(form);
+                    }
+                }
+            },
+            error: function(e) {
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
+                
+                msgHolder.removeClass('alert-success')
+                        .addClass('alert-danger')
+                        .html(e.responseText)
+                        .appendTo(form);
+            }
+        });
+    }
+})(jQuery);
