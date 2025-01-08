@@ -6,8 +6,6 @@
         if (!data) return null;
 
         const sanitizedData = [];
-
-        // Only take what we need from each registered uploader
         data.forEach(uploader => {
             if (uploader && uploader.Item) {
                 const items = {};
@@ -28,13 +26,11 @@
                 sanitizedData.push({ Item: items });
             }
         });
-
         return sanitizedData;
     }
 
     // Helper to download logs
     function vof_download_logs(logs, fileName = 'vof-submission-logs.json') {
-        // Create a sanitized copy of the logs
         const sanitizedLogs = {
             ...logs,
             gallery_data: {
@@ -66,17 +62,31 @@
         if (e) {
             e.preventDefault();
         }
+        
+        // Log raw form data for debugging
+        const debugFormData = function(formData) {
+            const formDataObj = {};
+            for (const [key, value] of formData.entries()) {
+                formDataObj[key] = value;
+            }
+            return formDataObj;
+        };
 
-        const button = e?.target || 
-                    document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
-        const form = button?.closest('form');
+        // Get form reference using jQuery
+        const $button = $(e?.target || '.vof-guest-submit-btn, .vof-subscription-submit-btn');
+        const $form = $button.closest('form');
+        
+        if (!$form.length) {
+            console.error('VOF: Form not found');
+            return;
+        }
 
-        // Add our custom flag to identify VOF submissions
+        // Add our custom flag
         const vofFlowInput = document.createElement('input');
         vofFlowInput.type = 'hidden';
         vofFlowInput.name = 'vof_flow';
         vofFlowInput.value = 'true';
-        form.appendChild(vofFlowInput);
+        $form.append(vofFlowInput);
 
         // Handle TinyMCE if active
         try {
@@ -93,7 +103,7 @@
         }
 
         // Handle gallery data
-        const formData = new FormData(form);
+        const formData = new FormData($form[0]); // Note: FormData needs DOM element
         let galleryInfo = { attachments: [], featured: null };
 
         if (RTCL.File.Registered && RTCL.File.Registered[0]) {
@@ -123,80 +133,29 @@
             }
         }
 
-        // Log gallery data
+        // Log form and gallery data
+        vof_logs.submission_data = {
+            timestamp: new Date().toISOString(),
+            form_data: debugFormData(formData)
+        };
+        
         vof_logs.gallery_data = {
             timestamp: new Date().toISOString(),
             gallery_info: galleryInfo,
             RTCL_File_Registered: RTCL.File.Registered
         };
 
-        // Handle reCAPTCHA if enabled
-        if (typeof rtcl !== 'undefined' && rtcl.recaptcha && rtcl.recaptcha.on) {
-            if (rtcl.recaptcha.v === 3) {
-                grecaptcha.ready(function() {
-                    $(form).rtclBlock();
-                    grecaptcha.execute(rtcl.recaptcha.site_key, {
-                        action: 'listing'
-                    }).then(function(token) {
-                        vof_submit_to_original_endpoint(form, token);
-                    });
-                });
-                return false;
-            }
-        }
-
-        vof_submit_to_original_endpoint(form);
-    };
-
-    function vof_submit_to_original_endpoint(form, reCaptcha_token = null) {
-        const formData = new FormData(form);
-
-        // Handle gallery data
-        if (RTCL.File.Registered && RTCL.File.Registered[0]) {
-            const galleryData = [];
-            Object.values(RTCL.File.Registered[0].Item).forEach(item => {
-                if (item.result && item.result.attach_id) {
-                    galleryData.push(item.result.attach_id);
-                }
-            });
-
-            if (galleryData.length) {
-                // Important: This was missing - set the gallery IDs as a comma-separated string
-                formData.set('rtcl_gallery_ids', galleryData.join(','));
-
-                // Set featured image
-                const featuredImage = Object.values(RTCL.File.Registered[0].Item).find(item => 
-                    item.result && item.result.featured
-                );
-                if (featuredImage) {
-                    formData.set('featured_image_id', featuredImage.result.attach_id);
-                } else if (galleryData[0]) {
-                    // Use first image as featured if none set
-                    formData.set('featured_image_id', galleryData[0]);
-                }
-            }
-        }
-
-        // Debug log before sending
-        console.log('Gallery Data being sent:');
-        console.log('Gallery IDs:', formData.get('rtcl_gallery_ids'));
-        console.log('Featured Image:', formData.get('featured_image_id'));
-
-
-
-        // Set the action 
-        formData.set('action', 'rtcl_post_new_listing');
+        const $msgHolder = $("<div class='alert rtcl-response'></div>");
         
-        if (reCaptcha_token) {
-            formData.set('g-recaptcha-response', reCaptcha_token);
-        }
+        // Set action
+        formData.set('action', 'rtcl_post_new_listing');
 
         // Add our flag
         formData.set('vof_flow', 'true');
 
-        const msgHolder = $("<div class='alert rtcl-response'></div>");
-        const $form = $(form);
+        console.log('Submitting form data:', formData);
 
+        // Make the AJAX request
         $.ajax({
             url: rtcl.ajaxurl,
             type: "POST",
@@ -211,17 +170,19 @@
                 $form.rtclBlock();
             },
             success: function(response) {
-                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
-                $form.rtclUnblock();
-
+                console.log('VOF: Submission response:', response);
+                
                 // Log response
                 vof_logs.responses.success = {
                     timestamp: new Date().toISOString(),
                     response: response
                 };
 
-                // Download logs before potential redirect
+                // Download logs 
                 vof_download_logs(vof_logs);
+
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
 
                 let msg = '';
                 if (response.message?.length) {
@@ -230,32 +191,37 @@
                     });
                 }
 
-                if (response.success) {
-                    form.reset();
+                if (response.success || (response.data && response.data.success)) {
+                    const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
+                    
+                    $form[0].reset();
                     if (msg) {
-                        msgHolder.removeClass('alert-danger')
+                        $msgHolder.removeClass('alert-danger')
                                 .addClass('alert-success')
                                 .html(msg)
-                                .appendTo(form);
+                                .appendTo($form);
                     }
-                    if (response.redirect_url) {
-                        // Add small delay to ensure log download completes
+                    
+                    // Handle redirection with delay to ensure logs are downloaded
+                    if (redirectUrl) {
+                        console.log('VOF: Redirecting to:', redirectUrl);
                         setTimeout(function() {
-                            window.location.href = response.redirect_url;
+                            window.location.href = redirectUrl;
                         }, 1000);
+                    } else {
+                        console.error('VOF: No redirect URL found in response');
                     }
                 } else {
                     if (msg) {
-                        msgHolder.removeClass('alert-success')
+                        $msgHolder.removeClass('alert-success')
                                 .addClass('alert-danger')
                                 .html(msg)
-                                .appendTo(form);
+                                .appendTo($form);
                     }
                 }
             },
             error: function(e) {
-                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
-                $form.rtclUnblock();
+                console.error('VOF: Submission error:', e);
                 
                 // Log error
                 vof_logs.responses.error = {
@@ -265,12 +231,15 @@
 
                 // Download logs on error
                 vof_download_logs(vof_logs);
+
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
                 
-                msgHolder.removeClass('alert-success')
+                $msgHolder.removeClass('alert-success')
                         .addClass('alert-danger')
                         .html(e.responseText)
-                        .appendTo(form);
+                        .appendTo($form);
             }
         });
-    }
+    };
 })(jQuery);

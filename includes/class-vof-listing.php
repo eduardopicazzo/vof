@@ -10,6 +10,9 @@ use VOF_Helper_Functions;
 class VOF_Listing {
     public function __construct() {
 		error_log('VOF Debug: VOF_Listing constructor called');
+
+
+        
 		    // Add registration validation filter
 			add_filter('rtcl_process_registration_errors', function($validation_error, $email) {
 				error_log('VOF Debug: Registration validation filter running');
@@ -141,6 +144,10 @@ class VOF_Listing {
     	    return $response;
     	}, 1, 1);
 
+        // Register post status and admin filters
+        add_action('init', [$this, 'vof_register_temp_post_status']);
+        add_action('admin_init', [$this, 'vof_add_temp_status_to_dropdown']);
+        add_filter('parse_query', [$this, 'vof_extend_admin_search']);
 
 		error_log('VOF Debug: VOF handler hooked with priority 1');
 		
@@ -235,6 +242,55 @@ class VOF_Listing {
         </div>
         <?php
     }
+
+
+/**
+ * Register temporary listing status
+ */
+public function vof_register_temp_post_status() {
+    register_post_status('rtcl-temp', array(
+        'label' => _x('Temporary', 'vof'),
+        'public' => false,
+        'exclude_from_search' => true,
+        'show_in_admin_all_list' => true,
+        'show_in_admin_status_list' => true,
+        'label_count' => _n_noop('Temporary <span class="count">(%s)</span>',
+                                'Temporary <span class="count">(%s)</span>')
+    ));
+}
+
+/**
+ * Add temporary status to status dropdown in admin
+ */
+public function vof_add_temp_status_to_dropdown() {
+    global $post;
+    if($post && $post->post_type === rtcl()->post_type){
+        $complete = '';
+        if($post->post_status === 'rtcl-temp'){
+            $complete = ' selected="selected"';
+        }
+        echo '<script>
+        jQuery(document).ready(function($){
+            $("select#post_status").append(\'<option value="rtcl-temp"'.$complete.'>Temporary</option>\');
+        });
+        </script>';
+    }
+}
+
+/**
+ * Extend admin search to include temporary posts
+ */
+public function vof_extend_admin_search($query) {
+    if(is_admin() && $query->is_main_query()) {
+        $post_status = $query->get('post_status');
+        if($post_status === '' || $post_status === 'any') {
+            $post_status = array('publish', 'pending', 'draft', 'rtcl-temp');
+            $query->set('post_status', $post_status);
+        }
+    }
+    return $query;
+}    
+
 
 
     public function vof_handle_listing_submissionDEP() {
@@ -557,7 +613,7 @@ class VOF_Listing {
         Functions::clear_notices(); // Clear previous notice
         $success = false;
         $post_id = 0;
-        $type = 'new';
+        $type = 'new'; 
     
         if (!apply_filters('rtcl_listing_form_remove_nonce', false) 
             && !wp_verify_nonce(isset($_REQUEST[rtcl()->nonceId]) ? $_REQUEST[rtcl()->nonceId] : null, rtcl()->nonceText)) {
@@ -597,7 +653,10 @@ class VOF_Listing {
             $post_arg['ID'] = $post_id;
             $post_arg['post_title'] = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
             $post_arg['post_content'] = isset($_POST['description']) ? Functions::sanitize($_POST['description'], 'content') : '';
-            $post_arg['post_status'] = 'rtcl-temp'; // Keep as temp until subscription
+            $post_arg['post_status'] = 'pending'; // Keep as temp until subscription
+            // $post_arg['post_status'] = 'rtcl-temp'; // Keep as temp until subscription
+            // $post_arg['post_status'] = 'pending'; // Keep as temp until subscription
+            // $post_arg['post_status'] = 'draft'; // Keep as temp until subscription
             $post_arg['post_excerpt'] = isset($_POST['excerpt']) ? Functions::sanitize($_POST['excerpt'], 'excerpt') : '';
             
             // Update the post
@@ -609,7 +668,10 @@ class VOF_Listing {
                 'post_title'   => isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '',
                 'post_content' => isset($_POST['description']) ? Functions::sanitize($_POST['description'], 'content') : '',
                 'post_excerpt' => isset($_POST['excerpt']) ? Functions::sanitize($_POST['excerpt'], 'excerpt') : '',
-                'post_status'  => 'rtcl-temp',
+                'post_status'  => 'pending',
+                // 'post_status'  => 'pending',
+                // 'post_status'  => 'rtcl-temp',
+                // 'post_status'  => 'draft',
                 'post_author'  => 0,
                 'post_type'    => rtcl()->post_type
             ];
@@ -622,6 +684,15 @@ class VOF_Listing {
             return;
         }
     
+        // Add important meta to ensure visibility
+        // update_post_meta($post_id, 'post_type', rtcl()->post_type);  // Or your appropriate type
+        // update_post_meta($post_id, 'post_type', 'rtcl_listing');  // Or your appropriate type
+        // update_post_meta($post_id, '_listing_type', '');  // Or your appropriate type
+        
+        // update_post_meta($post_id, '_listing_status', 'rtcl-temp');
+        // update_post_meta($post_id, 'post_status', 'rtcl-temp');
+
+
         // Handle gallery attachments - update their post parent
         $gallery_ids = isset($_POST['rtcl_gallery_ids']) ? array_map('absint', explode(',', $_POST['rtcl_gallery_ids'])) : [];
                       
@@ -747,7 +818,7 @@ class VOF_Listing {
         }
     
         // Store complete form data in transient
-        set_transient('vof_temp_listing_' . $post_id, $_POST, 24 * HOUR_IN_SECONDS);
+        set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS * 3); // 3 days
     
         // Send success response
         wp_send_json_success([
