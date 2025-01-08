@@ -5,6 +5,9 @@ use Rtcl\Helpers\Functions;
 
 class VOF_Helper_Functions {
     public function __construct() {
+		// Register temporary post status
+		add_action('init', [$this, 'vof_register_temp_post_status']);
+
 		// add_filter('rtcl_verification_listing_form_phone_field', [$this, 'vof_validate_phone_field'], 10, 2);
 
 		// Add filter for form submission validation
@@ -17,6 +20,22 @@ class VOF_Helper_Functions {
 		// add_filter('rtcl_listing_form_validate', [$this, 'vof_validate_listing_email'], 10, 2);
 		// add_filter('rtcl_ajax_listing_form_validate', [$this, 'vof_validate_ajax_email'], 10, 1);
     }
+
+
+	public static function vof_register_temp_post_status() {
+		register_post_status('vof_temp', [
+			'label' => _x('Temporary Listing','post status', 'vof'),
+			'public' => false, // not publicly accessible
+			'exclude_from_search' => true, // exclude from search
+			'show_in_admin_all_list' => true, // visible in admin "ALL" posts
+			'show_in_admin_status_list' => true, // visible in admin "Status" dropdown
+			'label_count' => _n_noop(
+				'VOF Temps <span class="count">(%s)</span>', 
+				'VOF Temps <span class="count">(%s)</span>', 
+				'vof'
+			)
+		]);
+	}
 
 
 	// Add new email validation methods
@@ -154,61 +173,7 @@ class VOF_Helper_Functions {
             );
         }
     }   
-
-	// // Existing render validation
-	// public static function vof_validate_phone_field($field, $phone) {
-	// 	// Add data attributes for frontend validation
-	// 	$phone_pattern = '/^\+?[\d\s-]{10,}$/';
-	// 	$field = str_replace('/>', 
-	// 		'data-validation-pattern="' . $phone_pattern . '" ' .
-	// 		'data-validation-message="Please enter a valid phone number with country code (e.g., +1xxxxxxxxxx)" />', 
-	// 		$field
-	// 	);
-	// 	return $field;
-	// }
-
-	// New submission validation
-	// public function vof_validate_listing_phone($data) {
-	// 	if (empty($data['phone'])) {
-	// 		return $data;
-	// 	}
-
-	// 	$phone = sanitize_text_field($data['phone']);
-	// 	if (!preg_match('/^\+?[\d\s-]{10,}$/', $phone)) {
-	// 		throw new \Exception(esc_html__('Please enter a valid phone number with country code (e.g., +1xxxxxxxxxx)', 'vendor-onboarding-flow'));
-	// 	}
-
-	// 	return $data;
-	// }
-
-	// New AJAX validation
-	// public function vof_validate_ajax_phone($response) {
-	// 	if (isset($_POST['phone'])) {
-	// 		$phone = sanitize_text_field($_POST['phone']);
-	// 		if (!preg_match('/^\+?[\d\s-]{10,}$/', $phone)) {
-	// 			$response['success'] = false;
-	// 			$response['message'] = [__('Please enter a valid phone number with country code (e.g., +1xxxxxxxxxx)', 'vendor-onboarding-flow')];
-	// 		}
-	// 	}
-	// 	return $response;
-	// }
-
-    /**
-	 * @return bool
-	 */
-	// public static function vof_do_registration_from_lsting_form() {}
-
-    // public static function vof_listingFormPhoneIsRequired() {
-	// 	return apply_filters( 'rtcl_listing_form_phone_is_required', true );
-	// }
-
-    // public static function vof_email_exists($email) {
-    //     if ( email_exists( sanitize_email( $email ) ) ) {
-	// 		return new WP_Error( 'registration-error-email-exists', apply_filters( 'rtcl_registration_error_email_exists',
-	// 			esc_html__( 'An account is already registered with your email address. Please log in.', 'classified-listing' ), $email ) );
-	// 	}
-	// }
-
+	
 }
 
 new VOF_Helper_Functions();
