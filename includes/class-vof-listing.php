@@ -421,8 +421,11 @@ public function vof_extend_admin_search($query) {
         if ($post_id) {
             // Update existing temp post instead of creating new one
             $post = get_post($post_id);
+            $title = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
             $post_arg['ID']           = $post_id;
-            $post_arg['post_title']   = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
+            // $post_arg['post_title']   = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
+            $post_arg['post_title']   = $title;
+            $post_arg['post_name']    = sanitize_title($title);
             $post_arg['post_content'] = isset($_POST['description']) ? Functions::sanitize($_POST['description'], 'content') : '';
             $post_arg['post_status']  = 'vof_temp'; // Keep as temp until subscription
             $post_arg['post_excerpt'] = isset($_POST['excerpt']) ? Functions::sanitize($_POST['excerpt'], 'excerpt') : '';
