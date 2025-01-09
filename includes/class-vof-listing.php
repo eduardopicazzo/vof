@@ -367,6 +367,8 @@ public function vof_extend_admin_search($query) {
             return;
         }
 
+        // Maybe add Ad Type validation SECTION?
+
         // SECTION: Category validation
         $raw_cat_id = isset($_POST['_category_id']) ? absint($_POST['_category_id']) : 0;
         if (!$raw_cat_id) {
@@ -386,12 +388,28 @@ public function vof_extend_admin_search($query) {
             return;
         }
 
+        /**
+         * This code gets the selected category's ID and finds its 
+         * topmost parent category ID in the category hierarchy. The 
+         * get_term_top_most_parent_id() function traverses up the 
+         * category tree until it reaches a category with no parent 
+         * ensuring we know the root-level category for the listing.
+         * 
+         * Reason: This is important for proper category validation and 
+         * organization of listings in a hierarchical category 
+         * structure.
+         */
+        $category_id = $category->term_id;
+        // $parent_id = Functions::get_term_top_most_parent_id($category_id, rtcl()->category);
+
         // SECTION: Get the existing temp post ID (important: required for gallery images with post sync) 
         // - if post_id is set, we're updating an existing post
         // - already set post_id triggered by front-end on image upload
             // - already set post_id is used to sync gallery images
         $post_id = isset($_POST['_post_id']) ? absint($_POST['_post_id']) : 0;
+        $cats = [$category_id]; // just in case we need to use it
         $post_arg = [];
+        $meta = [];
         
         /**
          * Builds BASE POST. 
@@ -403,13 +421,13 @@ public function vof_extend_admin_search($query) {
         if ($post_id) {
             // Update existing temp post instead of creating new one
             $post = get_post($post_id);
-            $post_arg['ID'] = $post_id;
-            $post_arg['post_title'] = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
+            $post_arg['ID']           = $post_id;
+            $post_arg['post_title']   = isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '';
             $post_arg['post_content'] = isset($_POST['description']) ? Functions::sanitize($_POST['description'], 'content') : '';
-            $post_arg['post_status'] = 'vof_temp'; // Keep as temp until subscription
+            $post_arg['post_status']  = 'vof_temp'; // Keep as temp until subscription
             $post_arg['post_excerpt'] = isset($_POST['excerpt']) ? Functions::sanitize($_POST['excerpt'], 'excerpt') : '';
-            
-            // Update the post
+                      
+            // Update the post because we're reusing the image gallery created post id.
             $post_id = wp_update_post(apply_filters('rtcl_listing_save_update_args', $post_arg, 'update'));
             
         } else {
@@ -451,10 +469,10 @@ public function vof_extend_admin_search($query) {
             }
         }
     
-        // Set category
+        // Set category (move up?)
         wp_set_object_terms($post_id, [$category->term_id], rtcl()->category);
     
-        // SECTION: Required Images Check
+        // SECTION: Required Images Check (move up)
         if ( Functions::is_gallery_image_required() && ( !$post_id || !count(Functions::get_listing_images($post_id)))) {
             Functions::add_notice(
                 esc_html__('Image is required. Please select an image.', 'classified-listing'),
@@ -463,55 +481,218 @@ public function vof_extend_admin_search($query) {
             );
         }
     
-        // TODO: REFACTOR AND ADD COMPLEX FORM RECOLECTION AND OTHER MISSING FIELDS: 
-        
-        // Set location terms if provided
-        if (!empty($_POST['location']) && is_array($_POST['location'])) {
-            wp_set_object_terms($post_id, array_map('absint', $_POST['location']), rtcl()->location);
+
+        // NEW: meta data collection from publicUser.php (rtcl_post_new_listing() code reuse)
+            
+        // Pricing information post_arg
+		if ( isset( $_POST['_rtcl_listing_pricing'] ) && $listing_pricing_type = sanitize_text_field( $_POST['_rtcl_listing_pricing'] ) ) {
+			$meta['_rtcl_listing_pricing'] = in_array( $listing_pricing_type, array_keys( \Rtcl\Resources\Options::get_listing_pricing_types() ) )
+				? $listing_pricing_type : 'price';
+
+			// Handle range pricing if applicable
+			if ( isset( $_POST['_rtcl_max_price'] ) && 'range' === $listing_pricing_type ) {
+				$meta['_rtcl_max_price'] = Functions::format_decimal( $_POST['_rtcl_max_price'] );
+			}
+		}
+
+        // SECTION: Location Processing
+		// Handle location data based on configured location type
+		if ( 'geo' === Functions::location_type() ) {
+			// Geo-location data
+			if ( isset( $_POST['rtcl_geo_address'] ) ) {
+				$meta['_rtcl_geo_address'] = Functions::sanitize( $_POST['rtcl_geo_address'] );
+			}
+		} else {
+			// Traditional location data
+			if ( isset( $_POST['zipcode'] ) ) {
+				$meta['zipcode'] = Functions::sanitize( $_POST['zipcode'] );
+			}
+			if ( isset( $_POST['address'] ) ) {
+				$meta['address'] = Functions::sanitize( $_POST['address'] );
+			}
+		}
+
+		// SECTION: Contact Information
+		// Process all contact-related fields
+		if ( isset( $_POST['phone'] ) ) {
+			$meta['phone'] = Functions::sanitize( $_POST['phone'] );
+		}
+		if ( isset( $_POST['_rtcl_whatsapp_number'] ) ) {
+			$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['_rtcl_whatsapp_number'] );
+		}
+		if ( isset( $_POST['_rtcl_telegram'] ) ) {
+			$meta['_rtcl_telegram'] = Functions::sanitize( $_POST['_rtcl_telegram'] );
+		}
+
+		// if ( isset( $_POST['email'] ) ) {
+		// 	$meta['email'] = Functions::sanitize( $_POST['email'], 'email' );
+		// }
+
+        if ( isset( $_POST['website'] ) ) {
+            $meta['website'] = Functions::sanitize( $_POST['website'], 'url' );
         }
+
+        if ( isset( $_POST['latitude'] ) ) {
+            $meta['latitude'] = Functions::sanitize( $_POST['latitude'] );
+        }
+
+        if ( isset( $_POST['longitude'] ) ) {
+            $meta['longitude'] = Functions::sanitize( $_POST['longitude'] );
+        }
+
+        $meta['hide_map']    = isset( $_POST['hide_map'] ) ? 1 : null;
+        if ( isset( $_POST['rtcl_listing_tag'] ) ) {
+            $tags          = Functions::sanitize( $_POST['rtcl_listing_tag'] );
+            $tags_as_array = ! empty( $tags ) ? explode( ',', $tags ) : [];
+            wp_set_object_terms( $post_id, $tags_as_array, rtcl()->tag );
+        }
+
+		// Process hierarchical location data
+		if ( 'local' === Functions::location_type() ) {
+			$locations = [];
+			if ( $loc = Functions::request( 'location' ) ) {
+				$locations[] = absint( $loc );
+			}
+			if ( $loc = Functions::request( 'sub_location' ) ) {
+				$locations[] = absint( $loc );
+			}
+			if ( $loc = Functions::request( 'sub_sub_location' ) ) {
+				$locations[] = absint( $loc );
+			}
+			wp_set_object_terms( $post_id, $locations, rtcl()->location );
+		}          
+
+        // TODO: REFACTOR AND ADD COMPLEX FORM RECOLECTION AND OTHER MISSING FIELDS: 
+
+            ////////////// NEW  //////////////////////
+		/**
+		 * 
+		 * Process custom fields (most likely the changing fields 
+         * given the category selected or ad type selected)
+		 * 
+		 * Yes, you're correct. This comment section precedes code that 
+         * processes custom fields which are dynamically 
+		 * loaded based on:
+		 * 	- Selected category (category-specific fields)
+		 * 	- Ad type (type-specific fields)
+		 * 	- Other conditional form logic
+		 * 
+		 * Process custom fields that dynamically change based on:
+		 * 	- The category selected (different categories can have different fields)
+		 * 	- The ad type chosen (different ad types can have different fields)
+		 * 	- Other conditional form logic (fields that depend on other form inputs)
+		 * 
+		 * This is evident from the code that follows it (rtcl_fields) which 
+         * processes these dynamic custom fields and saves their 
+         * values to the database.
+		 * 
+		 */
+		if ( isset( $_POST['rtcl_fields'] ) && $post_id ) {
+			foreach ( $_POST['rtcl_fields'] as $key => $value ) {
+				$field_id = (int) str_replace( '_field_', '', $key );
+				if ( $field = rtcl()->factory->get_custom_field( $field_id ) ) {
+					$field->saveSanitizedValue( $post_id, $value );
+				}
+			}
+		}            
+            
+        /**
+		 * 
+		 * This code block saves all the metadata that was collected earlier in the $meta array 
+		 * to the database using WordPress's update_post_meta() function. 
+		 * Yes, it's part of the larger form processing section above, specifically after processing custom fields. 
+		 * It's the final step that persists all collected metadata (like prices, contact info, locations) 
+		 * to the database for this listing.
+		 * 
+		 * Reason: The code's position and context show it's the culmination of all the metadata collection 
+		 * that happened in previous sections.
+		 * 
+		 */
+
+		// Save all collected meta data
+		if ( ! empty( $meta ) && $post_id ) {
+			foreach ( $meta as $key => $value ) {
+				update_post_meta( $post_id, $key, $value );
+			}
+		}    
+            
+            
+		// SECTION: Post-Processing [ TODO: IMPLEMENT PARTS OF THIS SECTION ]
+		// Handle successful listing creation/update
+		if ( $success && $post_id && ( $listing = rtcl()->factory->get_listing( $post_id ) ) ) {
+			if ( $type == 'new' ) {
+				// Initialize new listing metadata
+				update_post_meta( $post_id, 'featured', 0 ); 
+				update_post_meta( $post_id, '_views', 0 );
+										
+			    // TODO: (maybe not here but in the user creation section)
+                //CREATE A NEW DB TABLE AND UPDATE VOF-TEMP USER'S METADATA 
+                // WITH UUIDS AND OTHER USER METADATA (vof db table for user metadata linked to post_id)
+			    // $current_user_id = get_current_user_id();
+			    // $ads             = absint( get_user_meta( $current_user_id, '_rtcl_ads', true ) );
+			    // update_user_meta( $current_user_id, '_rtcl_ads', $ads + 1 );
+            }
+        } else {
+            Functions::add_notice(
+                apply_filters( 'rtcl_listing_error_message', esc_html__( 'Error!!', 'classified-listing' ), $_REQUEST ),
+                'error'
+            );
+        }							            
+            
+
+            ////////////// END OF NEW  //////////////////////
+
+
+
+            ////////////// OLD  //////////////////////    
+
+        // // Set location terms if provided
+        // if (!empty($_POST['location']) && is_array($_POST['location'])) {
+        //     wp_set_object_terms($post_id, array_map('absint', $_POST['location']), rtcl()->location);
+        // }
     
-        // TODO: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
-        // SECTION: Define? and Save all available meta data
-        $meta_fields = [
-            // Pricing fields
-            'price', 
-            'price_type', 
-            '_rtcl_price_unit', 
-            '_rtcl_max_price', 
-            '_rtcl_listing_pricing',
+        // TODO in use: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
+            // SECTION: Define? and Save all available meta data
+            // $meta_fields = [
+            //     // Pricing fields
+            //     'price', 
+            //     'price_type', 
+            //     '_rtcl_price_unit', 
+            //     '_rtcl_max_price', 
+            //     '_rtcl_listing_pricing',
             
-            // Contact fields with VOF prefix  
-            'vof_email', 
-            'vof_phone', 
-            'vof_whatsapp_number', 
-            'website', 
-            'telegram',
+            //     // Contact fields with VOF prefix  
+            //     'vof_email', 
+            //     'vof_phone', 
+            //     'vof_whatsapp_number', 
+            //     'website', 
+            //     'telegram',
             
-            // Location fields
-            'address', 
-            'zipcode', 
-            'latitude', 
-            'longitude', 
-            '_rtcl_geo_address',
+            //     // Location fields
+            //     'address', 
+            //     'zipcode', 
+            //     'latitude', 
+            //     'longitude', 
+            //     '_rtcl_geo_address',
             
-            // Media fields
-            '_rtcl_video_urls',
+            //     // Media fields
+            //     '_rtcl_video_urls',
             
-            // Custom fields (if any)
-            '_rtcl_custom_fields',
+            //     // Custom fields (if any)
+            //     '_rtcl_custom_fields',
             
-            // Business hours
-            '_rtcl_bhs',
+            //     // Business hours
+            //     '_rtcl_bhs',
             
-            // Ad type
-            'ad_type',
+            //     // Ad type
+            //     'ad_type',
             
-            // Featured listing
-            '_rtcl_featured',
+            //     // Featured listing
+            //     '_rtcl_featured',
             
-            // Other meta fields
-            '_rtcl_mark_as_sold'
-        ];
+            //     // Other meta fields
+            //     '_rtcl_mark_as_sold'
+        // ];
 
         // Define all meta fields that need to be processed
         // $meta_fields = [
@@ -543,37 +724,40 @@ public function vof_extend_admin_search($query) {
         // @classified-listing/app/Controllers/Ajax/PublicUser.php
 
         // SECTION: Update the meta fields
-        foreach ($meta_fields as $field) {
-            if (isset($_POST[$field])) {
-                $value = $field === 'price' || $field === '_rtcl_max_price' 
-                    ? Functions::format_decimal($_POST[$field])
-                    : Functions::sanitize($_POST[$field]);
+            // foreach ($meta_fields as $field) {
+            //     if (isset($_POST[$field])) {
+            //         $value = $field === 'price' || $field === '_rtcl_max_price' 
+            //             ? Functions::format_decimal($_POST[$field])
+            //             : Functions::sanitize($_POST[$field]);
     
-                // Store both VOF and standard versions for contact fields
-                if (in_array($field, ['vof_email', 'vof_phone', 'vof_whatsapp_number'])) {
-                    // Store VOF version
-                    update_post_meta($post_id, $field, $value);
+            //         // Store both VOF and standard versions for contact fields
+            //         if (in_array($field, ['vof_email', 'vof_phone', 'vof_whatsapp_number'])) {
+            //             // Store VOF version
+            //             update_post_meta($post_id, $field, $value);
     
-                    // Store standard version without vof_ prefix
-                    $standard_field = str_replace('vof_', '', $field);
-                    if ($field === 'vof_whatsapp_number') {
-                        $standard_field = '_rtcl_whatsapp_number'; // Match the core plugin's meta key
-                    }
-                    update_post_meta($post_id, $standard_field, $value);
-                } else {
-                    update_post_meta($post_id, $field, $value);
-                }
-            }
-        }
+            //             // Store standard version without vof_ prefix
+            //             $standard_field = str_replace('vof_', '', $field);
+            //             if ($field === 'vof_whatsapp_number') {
+            //                 $standard_field = '_rtcl_whatsapp_number'; // Match the core plugin's meta key
+            //             }
+            //             update_post_meta($post_id, $standard_field, $value);
+            //         } else {
+            //             update_post_meta($post_id, $field, $value);
+            //         }
+            //     }
+            // }
         
-        // TODO: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
-        // SECTION: Handle custom fields if any
-        if (!empty($_POST['custom_fields']) && is_array($_POST['custom_fields'])) {
-            foreach ($_POST['custom_fields'] as $key => $value) {
-                update_post_meta($post_id, $key, Functions::sanitize($value));
-            }
-        }
-    
+            // // TODO: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
+            // // SECTION: Handle custom fields if any
+            // if (!empty($_POST['custom_fields']) && is_array($_POST['custom_fields'])) {
+            //     foreach ($_POST['custom_fields'] as $key => $value) {
+            //         update_post_meta($post_id, $key, Functions::sanitize($value));
+            //     }
+        // }
+
+            ////////////// END OF OLD  //////////////////////
+
+
         // TODO: REFACTOR TO ORIGNAL codeblock in "rtcl_post_new_listing()" 
         // @classified-listing/app/Controllers/Ajax/PublicUser.php 
         // with customization for 'vof_temp_listing_' (probably use transiennt)

@@ -563,7 +563,7 @@ class VOF_Form_Handler {
 									wp_set_object_terms( $post_id, $tags_as_array, rtcl()->tag );
 								}
 
-								// Set initial categories and type for new listings
+								// Set initial categories and type for new listings [ DISREGARD THIS SECTION FOR NOW - CHECK IF THIS IS NEEDED AFTER TESTING ]
 								if ( $type == 'new' && $post_id ) {
 									wp_set_object_terms( $post_id, $cats, rtcl()->category );
 									$meta['ad_type'] = $listing_type;
