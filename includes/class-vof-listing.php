@@ -356,7 +356,8 @@ public function vof_extend_admin_search($query) {
         $success = false;
         $post_id = 0;
         $type = 'new'; 
-    
+
+        // SECTION: Security Validation
         if (!apply_filters('rtcl_listing_form_remove_nonce', false) 
             && !wp_verify_nonce(isset($_REQUEST[rtcl()->nonceId]) ? $_REQUEST[rtcl()->nonceId] : null, rtcl()->nonceText)) {
             wp_send_json([
@@ -365,8 +366,8 @@ public function vof_extend_admin_search($query) {
             ]);
             return;
         }
-    
-        // Category validation
+
+        // SECTION: Category validation
         $raw_cat_id = isset($_POST['_category_id']) ? absint($_POST['_category_id']) : 0;
         if (!$raw_cat_id) {
             wp_send_json([
@@ -384,11 +385,21 @@ public function vof_extend_admin_search($query) {
             ]);
             return;
         }
-    
-        // Important: Get the existing temp post ID 
+
+        // SECTION: Get the existing temp post ID (important: required for gallery images with post sync) 
+        // - if post_id is set, we're updating an existing post
+        // - already set post_id triggered by front-end on image upload
+            // - already set post_id is used to sync gallery images
         $post_id = isset($_POST['_post_id']) ? absint($_POST['_post_id']) : 0;
         $post_arg = [];
         
+        /**
+         * Builds BASE POST. 
+         * - collects standard base post arguments 
+         * - syncs with gallery images (if any)
+         * - updates existing temp post if it exists
+         * - sets to 'vof_temp' post status 
+         */
         if ($post_id) {
             // Update existing temp post instead of creating new one
             $post = get_post($post_id);
@@ -452,21 +463,36 @@ public function vof_extend_admin_search($query) {
             );
         }
     
+        // TODO: REFACTOR AND ADD COMPLEX FORM RECOLECTION AND OTHER MISSING FIELDS: 
+        
         // Set location terms if provided
         if (!empty($_POST['location']) && is_array($_POST['location'])) {
             wp_set_object_terms($post_id, array_map('absint', $_POST['location']), rtcl()->location);
         }
     
-        // Save all available meta data
+        // TODO: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
+        // SECTION: Define? and Save all available meta data
         $meta_fields = [
             // Pricing fields
-            'price', 'price_type', '_rtcl_price_unit', '_rtcl_max_price', '_rtcl_listing_pricing',
+            'price', 
+            'price_type', 
+            '_rtcl_price_unit', 
+            '_rtcl_max_price', 
+            '_rtcl_listing_pricing',
             
             // Contact fields with VOF prefix  
-            'vof_email', 'vof_phone', 'vof_whatsapp_number', 'website', 'telegram',
+            'vof_email', 
+            'vof_phone', 
+            'vof_whatsapp_number', 
+            'website', 
+            'telegram',
             
             // Location fields
-            'address', 'zipcode', 'latitude', 'longitude', '_rtcl_geo_address',
+            'address', 
+            'zipcode', 
+            'latitude', 
+            'longitude', 
+            '_rtcl_geo_address',
             
             // Media fields
             '_rtcl_video_urls',
@@ -513,7 +539,10 @@ public function vof_extend_admin_search($query) {
             // 'vof_whatsapp_number'
         // ];
     
-        // Update the meta fields
+        // TODO: REFACTOR TO ORIGNAL codeblock in "rtcl_post_new_listing()" 
+        // @classified-listing/app/Controllers/Ajax/PublicUser.php
+
+        // SECTION: Update the meta fields
         foreach ($meta_fields as $field) {
             if (isset($_POST[$field])) {
                 $value = $field === 'price' || $field === '_rtcl_max_price' 
@@ -536,18 +565,24 @@ public function vof_extend_admin_search($query) {
                 }
             }
         }
-    
-        // Handle custom fields if any
+        
+        // TODO: REFACTOR TO PROGRAMMATICALLY COLLECT AND 'rtcl_fields'
+        // SECTION: Handle custom fields if any
         if (!empty($_POST['custom_fields']) && is_array($_POST['custom_fields'])) {
             foreach ($_POST['custom_fields'] as $key => $value) {
                 update_post_meta($post_id, $key, Functions::sanitize($value));
             }
         }
     
-        // Store complete form data in transient
+        // TODO: REFACTOR TO ORIGNAL codeblock in "rtcl_post_new_listing()" 
+        // @classified-listing/app/Controllers/Ajax/PublicUser.php 
+        // with customization for 'vof_temp_listing_' (probably use transiennt)
+
+        // SECTION: Store complete form data in transient 
         set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS * 3); // 3 days
     
-        // Send success response
+        // SECTION: Send success response
+        // Works as expected, no changes needed
         wp_send_json_success([
             'success' => true,
             'listing_id' => $post_id,

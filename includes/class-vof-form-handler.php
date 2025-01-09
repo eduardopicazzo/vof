@@ -584,7 +584,25 @@ class VOF_Form_Handler {
 									wp_set_object_terms( $post_id, $locations, rtcl()->location );
 								}
 
-								// Process custom fields
+								/**
+								 * 
+								 * Process custom fields (most likely the changing fields given the category selected or ad type selected)
+								 * 
+								 * Yes, you're correct. This comment section precedes code that processes custom fields which are dynamically 
+								 * loaded based on:
+								 * 	- Selected category (category-specific fields)
+								 * 	- Ad type (type-specific fields)
+								 * 	- Other conditional form logic
+								 * 
+								 * Process custom fields that dynamically change based on:
+								 * 	- The category selected (different categories can have different fields)
+								 * 	- The ad type chosen (different ad types can have different fields)
+								 * 	- Other conditional form logic (fields that depend on other form inputs)
+								 * 
+								 * This is evident from the code that follows it (rtcl_fields) which processes these dynamic custom 
+								 * fields and saves their values to the database.
+								 * 
+								 */
 								if ( isset( $_POST['rtcl_fields'] ) && $post_id ) {
 									foreach ( $_POST['rtcl_fields'] as $key => $value ) {
 										$field_id = (int) str_replace( '_field_', '', $key );
@@ -594,6 +612,20 @@ class VOF_Form_Handler {
 									}
 								}
 
+
+								/**
+								 * 
+								 * This code block saves all the metadata that was collected earlier in the $meta array 
+								 * to the database using WordPress's update_post_meta() function. 
+								 * Yes, it's part of the larger form processing section above, specifically after processing custom fields. 
+								 * It's the final step that persists all collected metadata (like prices, contact info, locations) 
+								 * to the database for this listing.
+								 * 
+								 * Reason: The code's position and context show it's the culmination of all the metadata collection 
+								 * that happened in previous sections.
+								 * 
+								 */
+
 								// Save all collected meta data
 								if ( ! empty( $meta ) && $post_id ) {
 									foreach ( $meta as $key => $value ) {
@@ -601,12 +633,12 @@ class VOF_Form_Handler {
 									}
 								}
 
-								// SECTION: Post-Processing
+								// SECTION: Post-Processing [ TODO: IMPLEMENT PARTS OF THIS SECTION ]
 								// Handle successful listing creation/update
 								if ( $success && $post_id && ( $listing = rtcl()->factory->get_listing( $post_id ) ) ) {
 									if ( $type == 'new' ) {
 										// Initialize new listing metadata
-										update_post_meta( $post_id, 'featured', 0 );
+										update_post_meta( $post_id, 'featured', 0 ); 
 										update_post_meta( $post_id, '_views', 0 );
 										
 										// Update user's ad count
@@ -614,7 +646,7 @@ class VOF_Form_Handler {
 										$ads             = absint( get_user_meta( $current_user_id, '_rtcl_ads', true ) );
 										update_user_meta( $current_user_id, '_rtcl_ads', $ads + 1 );
 										
-										// Set expiration for published listings
+										// Set expiration for published listings [ DISREGARD THIS SECTION FOR NOW]
 										if ( 'publish' === $new_listing_status ) {
 											Functions::add_default_expiry_date( $post_id );
 										}
