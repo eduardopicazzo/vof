@@ -2,187 +2,30 @@
 
 namespace VOF;
 
-use Depicter\GuzzleHttp\Promise\Is;
-use Rtcl\Controllers\FormHandler;
-use Rtcl\Helpers\Functions;
-use VOF_Helper_Functions;
+use Depicter\GuzzleHttp\Promise\Is; // maybe remove
+use Rtcl\Controllers\FormHandler;   // maybe remove
+use Rtcl\Helpers\Functions;         // maybe remove
+use VOF_Helper_Functions;           // maybe remove
 
 class VOF_Listing {
     public function __construct() {
 		error_log('VOF Debug: VOF_Listing constructor called');
 
-
-        
-		// Add registration validation filter
-		add_filter('rtcl_process_registration_errors', function($validation_error, $email) {
-			error_log('VOF Debug: Registration validation filter running');
-			
-			if (isset($_POST['vof_email'])) {
-				$email = $_POST['vof_email'];
-				
-				// Basic email format validation
-				if (!is_email($email)) {
-					error_log('VOF Debug: Email validation result: Invalid format');
-					return $validation_error;
-				}
-				
-				// If email exists, let the core handle it
-				if (email_exists($email)) {
-					error_log('VOF Debug: Email validation result: Email exists');
-					return $validation_error;
-				}
-				
-				// For new valid emails, explicitly clear any validation errors
-				if ($validation_error->get_error_code()) {
-					error_log('VOF Debug: Clearing validation errors for new valid email');
-					$validation_error = new \WP_Error();
-				}
-				
-				error_log('VOF Debug: Email validation result: Valid new email');
-			}
-			
-			return $validation_error;
-		}, 1, 2);
-		
-
-		// Add response modification filter
-		add_filter('rtcl_listing_form_after_save_or_update_responses', function($response) {
-			error_log('VOF Debug: Response before modification: ' . print_r($response, true));
-			
-			if (isset($_POST['vof_email']) && is_email($_POST['vof_email'])) {
-				// Remove any email-related error messages
-				if (isset($response['message']) && is_array($response['message'])) {
-					$response['message'] = array_filter($response['message'], function($msg) {
-						return strpos($msg, 'email address') === false;
-					});
-				}
-			}
-			
-			return $response;
-		}, 1, 1);
-
-
-        // Add registration validation filter
-        add_filter('rtcl_process_registration_errors', function($validation_error, $email, $username=null, $password=null, $userData=null) {
-            error_log('VOF Debug: Registration validation filter running');
-            
-            if (isset($_POST['vof_email'])) {
-                $email = $_POST['vof_email'];
-                
-                // Validate email format
-                if (!is_email($email)) {
-                    $validation_error->add('registration-error-invalid-email', 
-                        __('Please provide a valid email address.', 'vendor-onboarding-flow')
-                    );
-                }
-                
-                // Check if email exists
-                if (email_exists($email)) {
-                    $validation_error->add('registration-error-email-exists', 
-                        __('An account is already registered with your email address. Please log in.', 'vendor-onboarding-flow')
-                    );
-                }
-                
-                error_log('VOF Debug: Email validation result: ' . ($validation_error->get_error_code() ? 'Invalid' : 'Valid'));
-            }
-            
-            return $validation_error;
-        }, 1, 5);
-
-
-		// Add validation before listing submission
-		add_action('rtcl_post_new_listing', function() {
-		    error_log('VOF Debug: New listing validation');
-		
-		    if (isset($_POST['vof_email']) && !is_email($_POST['vof_email'])) {
-		        Functions::add_notice(__('Please provide a valid email address.', 'vendor-onboarding-flow'), 'error');
-		        wp_send_json_error(['message' => ['Please provide a valid email address.']]);
-		    }
-		}, 1);	
-
-
         // Enqueue scripts
         add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
 
         // Intercept the AJAX submission
-        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_handle_onboarding_flow'], 1);
         add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'cursor_handle_listing_submission'], 1);
 		
         // Custom submit button 
-        remove_action('rtcl_listing_form_end', 
-		['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
+        remove_action('rtcl_listing_form_end', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
         add_action('rtcl_listing_form_end', [$this, 'custom_submit_button']);
-
-	    // Add email validation filter with high priority (1)
-		add_filter('rtcl_process_registration_errors', function($validation_error, $email, $username=null, $password=null, $userData=null) {
-			error_log('VOF Debug: Registration validation filter running');
-			
-			if (isset($_POST['vof_email'])) {
-				// Override the email being validated
-				$email = $_POST['vof_email'];
-				$_POST['email'] = $_POST['vof_email'];
-				$_REQUEST['email'] = $_POST['vof_email'];
-				
-				error_log('VOF Debug: Email values in registration validation:');
-				error_log('Email param: ' . $email);
-				error_log('POST[email]: ' . $_POST['email']);
-			}
-			
-			return $validation_error;
-		}, 1, 5);  // Priority 1 to run early	
-
-    	// Add filter to modify the response after listing save/update
-    	add_filter('rtcl_listing_form_after_save_or_update_responses', function($response) {
-    	    error_log('VOF Debug: Response before modification: ' . print_r($response, true));
-		
-    	    // If we have vof_email in the POST data, ensure it's used
-    	    if (isset($_POST['vof_email'])) {
-    	        $_POST['email'] = $_POST['vof_email'];
-    	        $_REQUEST['email'] = $_POST['vof_email'];
-			
-    	        error_log('VOF Debug: Email set to: ' . $_POST['email']);
-    	    }
-		
-    	    return $response;
-    	}, 1, 1);
-
-        // Register post status and admin filters
-        // add_action('init', [$this, 'vof_register_temp_post_status']);
-        add_action('admin_init', [$this, 'vof_add_temp_status_to_dropdown']);
-        add_filter('parse_query', [$this, 'vof_extend_admin_search']);
 
 		error_log('VOF Debug: VOF handler hooked with priority 1');
 		
-        // add_action('wp_ajax_rtcl_post_new_listing', [$this, 'vof_handle_listing_submission'], 9);
-        // add_action('wp_ajax_rtcl_post_new_listing', [$this, 'vof_handle_onboarding_flow'], 9);
-        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_handle_listing_submission'], 9);
-	    // Add email validation filter
-		// add_filter('rtcl_process_registration_errors', function($validation_error, $email, $username=null, $password=null, $userData=null) {
-		// 	if (isset($_POST['vof_email'])) {
-		// 		// Override the email being validated
-		// 		$email = $_POST['vof_email'];
-		// 		if (email_exists($email)) {
-		// 			$validation_error->add('registration-error-email-exists', 
-		// 				__('An account is already registered with your email address. Please log in.', 'vendor-onboarding-flow')
-		// 			);
-		// 		}
-		// 	}
-		// 	return $validation_error;
-		// }, -10, 5);	
-
-            // Intercept form submission action
-                // add_filter('rtcl_listing_save_data', [$this, 'modify_listing_data'], 10, 2);
-
-                // // Intercept user creation rtcl_before_user_registration_form
-                // add_filter('rtcl_before_user_registration', [$this, 'prevent_user_registration'], 10, 1);
-
-                // // Modify redirect URL
-                // add_filter('rtcl_listing_form_submit_redirect_url', [$this, 'modify_redirect_url'], 10, 2); 
-            // end of intercept form submission
     }
 
-
-    public function enqueue_scripts() {
+    public function enqueue_scripts() { // KEEP
         if ($this->is_post_ad_page()) {
             wp_enqueue_script(
                 'vof-listing-submit',
@@ -194,8 +37,7 @@ class VOF_Listing {
         }
     }
 
-
-    public function custom_submit_button($post_id) {
+    public function custom_submit_button($post_id) { // KEEP
         if (!is_user_logged_in() && $this->is_post_ad_page()) {
             $this->render_guest_submit_button();
             return;
@@ -216,7 +58,7 @@ class VOF_Listing {
         }
     }
 
-    private function render_guest_submit_button() {
+    private function render_guest_submit_button() { // KEEP
         wp_enqueue_script('vof-listing-submit'); // Ensure script is loaded
 		wp_enqueue_script('rtcl-gallery');
         ?>
@@ -230,7 +72,7 @@ class VOF_Listing {
         <?php
     }
 
-    private function render_subscription_required_button() {
+    private function render_subscription_required_button() { // KEEP
         wp_enqueue_script('vof-listing-submit'); // Ensure script is loaded
 		wp_enqueue_script('rtcl-gallery');
 
@@ -245,115 +87,11 @@ class VOF_Listing {
         <?php
     }
 
-
-/**
- * Register temporary listing status
- */
-// public function vof_register_temp_post_status() {
-//     register_post_status('rtcl-temp', array(
-//         'label' => _x('Temporary', 'vof'),
-//         'public' => false,
-//         'exclude_from_search' => true,
-//         'show_in_admin_all_list' => true,
-//         'show_in_admin_status_list' => true,
-//         'label_count' => _n_noop('Temporary <span class="count">(%s)</span>',
-//                                 'Temporary <span class="count">(%s)</span>')
-//     ));
-// }
-
-/**
- * Add temporary status to status dropdown in admin
- */
-public function vof_add_temp_status_to_dropdown() {
-    global $post;
-    if($post && $post->post_type === rtcl()->post_type){
-        $complete = '';
-        if($post->post_status === 'rtcl-temp'){
-            $complete = ' selected="selected"';
-        }
-        echo '<script>
-        jQuery(document).ready(function($){
-            $("select#post_status").append(\'<option value="rtcl-temp"'.$complete.'>Temporary</option>\');
-        });
-        </script>';
-    }
-}
-
-/**
- * Extend admin search to include temporary posts
- */
-public function vof_extend_admin_search($query) {
-    if(is_admin() && $query->is_main_query()) {
-        $post_status = $query->get('post_status');
-        if($post_status === '' || $post_status === 'any') {
-            $post_status = array('publish', 'pending', 'draft', 'rtcl-temp');
-            $query->set('post_status', $post_status);
-        }
-    }
-    return $query;
-}    
-
-    public function prevent_user_registration($user_data) {
-        if ($this->is_vof_submission()) {
-            // Store user data in transient for later
-            $listing_id = $_POST['listing_id'] ?? 0;
-            set_transient('vof_pending_user_' . $listing_id, $user_data, 24 * HOUR_IN_SECONDS);
-            throw new \Exception('User registration deferred');
-        }
-        return $user_data;
-    }
-
-    public function modify_listing_data($data, $listing_id) {
-        // Force draft status for our custom flow
-        if ($this->is_vof_submission()) {
-            $data['post_status'] = 'draft';
-        }
-        return $data;
-    }
-    
-    public function modify_redirect_url($url, $default = '/') {
-        // Validate the URL
-        if (!empty($url) && filter_var($url, FILTER_VALIDATE_URL)) {
-            // Safely redirect
-            header("Location: $url");
-            exit;
-        }
-    
-        // Fallback to default if validation fails
-        header("Location: $default");
-        exit;
-        // if ($this->is_vof_submission()) {
-        //     return 'https://thenoise.io'; // Test URL
-        // }
-        // return $url;
-    }
-
-    private function is_vof_submission() {
-        return isset($_POST['vof_flow']) && $_POST['vof_flow'] === 'true';
-    }
-
-    private function is_post_ad_page() {
+    private function is_post_ad_page() { // KEEP
         return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
     }
-
-
-    /**
-     * Retrieve temporary listing data
-     */
-    // public function get_temp_listing_data($listing_id) {
-    //     return get_transient('vof_temp_listing_' . $listing_id);
-    // }
-
-    /**
-     * Clean up temporary data
-     */
-    public function cleanup_temp_data($listing_id) {
-        delete_transient('vof_temp_listing_' . $listing_id);
-        delete_transient('vof_pending_user_' . $listing_id);
-    }
-
-    
-    public function cursor_handle_listing_submission() {
+   
+    public function cursor_handle_listing_submission() { // KEEP
         Functions::clear_notices(); // Clear previous notice
         $success = false;
         $post_id = 0;
@@ -718,8 +456,7 @@ public function vof_extend_admin_search($query) {
         ]);
     }    
 
-
-	public function vof_handle_onboarding_flow() {
+	public function vof_handle_onboarding_flow() { // KEEP NAME, REUSE SOME OF THIS CODE
 		    // Add these debug statements at the start of the method
 			error_log('VOF Debug: Full POST data: ' . print_r($_POST, true));
 			error_log('VOF Debug: vof_email value: ' . (isset($_POST['vof_email']) ? $_POST['vof_email'] : 'not set'));
