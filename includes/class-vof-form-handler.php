@@ -497,7 +497,7 @@ class VOF_Form_Handler {
 						$user_id             = get_current_user_id();
 						$post_for_unregister = Functions::is_enable_post_for_unregister();
 						
-						// Create account for unregistered users if enabled
+						// Create account for unregistered users if enabled (BYPASSED REGISTRATION WITH CUSTOM CODE VOF LISTING)
 						if ( ! is_user_logged_in() && $post_for_unregister ) {
 							$new_user_id = Functions::do_registration_from_listing_form( [ 'email' => $meta['email'] ] );
 							if ( $new_user_id && is_numeric( $new_user_id ) ) {
@@ -515,12 +515,12 @@ class VOF_Form_Handler {
 							}
 						}
 
-						// SECTION: Listing Creation/Update
+						// SECTION: Listing Creation/Update (BYPASSED WITH CUSTOM CODE VOF LISTING)
 						// Process the actual listing creation or update
 						if ( $user_id ) {
 							$new_listing_status = Functions::get_option_item( 'rtcl_moderation_settings', 'new_listing_status', 'pending' );
 							
-							// Update existing listing
+							// Update existing listing (BYPASSED WITH CUSTOM CODE VOF LISTING)
 							if ( $post_id && is_object( $post ) && $post->post_type == rtcl()->post_type ) {
 								// Verify user has permission to update
 								if ( ( $post->post_author > 0 && in_array($post->post_author, [ apply_filters( 'rtcl_listing_post_user_id', get_current_user_id() ), get_current_user_id() ] ) )
@@ -545,17 +545,17 @@ class VOF_Form_Handler {
 									$post_arg['ID'] = $post_id;
 									$success        = wp_update_post( apply_filters( 'rtcl_listing_save_update_args', $post_arg, $type ) );
 								}
-							} else {
+							} else { // ELSE CREATE NEW LISTING (BYPASSED WITH CUSTOM CODE VOF LISTING)
 								// Create new listing
 								$post_arg['post_status'] = $new_listing_status;
 								$post_arg['post_author'] = $user_id;
 								$post_arg['post_type']   = rtcl()->post_type;
 								$post_id                 = $success = wp_insert_post( apply_filters( 'rtcl_listing_save_update_args', $post_arg, $type ) );
-							}
+							} // END OF CREATE NEW LISTING (BYPASSED WITH CUSTOM CODE VOF LISTING)
 
 							// SECTION: Additional Data Processing
 							// Process additional listing data if creation/update was successful
-							if ( $post_id ) {
+							if ( $post_id ) { // START OF ADDITIONAL DATA PROCESSING
 								// Process tags
 								if ( isset( $_POST['rtcl_listing_tag'] ) ) {
 									$tags          = Functions::sanitize( $_POST['rtcl_listing_tag'] );
@@ -690,10 +690,10 @@ class VOF_Form_Handler {
 										'error'
 									);
 								}
-							}
+							} // END OF ADDITIONAL DATA PROCESSING
 						}
 					}
-				}
+				} // END OF BUILDING THE POST
 			}
 		} else {
 			Functions::add_notice(
