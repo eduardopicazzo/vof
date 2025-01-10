@@ -13,7 +13,7 @@ use VOF\Helpers\VOF_Helper_Functions;
 
 class VOF_Form_Handler {
     
-    public function __construct() {
+    public function __construct() { // TODO: CLEANUP
 		    // Move all hook registrations to init
 			add_action('init', [$this, 'vof_register_hooks']);
 
@@ -30,7 +30,7 @@ class VOF_Form_Handler {
     }
 
 
-	public function vof_register_hooks() {
+	public function vof_register_hooks() { // TODO: CLEANUP
 	
 		// Add this filter early to prevent default registration
     	// Intercept the AJAX action that handles form submission
@@ -61,7 +61,7 @@ class VOF_Form_Handler {
 		});
 	}
 
-	public function vof_intercept_listing_submission() {
+	public function vof_intercept_listing_submission() { // TODO: CLEANUP ???
 		if (self::vof_is_vof_conditions()) {
 			error_log('VOF Debug: Form submission data: ' . print_r($_POST, true));
 
@@ -89,7 +89,7 @@ class VOF_Form_Handler {
 	}
 
 
-	public static function vof_listing_contact_details_fields( $fields ) {
+	public static function vof_listing_contact_details_fields( $fields ) { // KEEP SUPER IMPORTANT
 		error_log('VOF Debug: vof_listing_contact_details_fields ENTRY POINT');
 		error_log('VOF Debug: Received fields: ' . print_r($fields, true));
 		
@@ -138,7 +138,7 @@ class VOF_Form_Handler {
 		return $result;
 	}
 
-    public static function vof_is_vof_conditions() : bool { 
+    public static function vof_is_vof_conditions() : bool {  // KEEP
         return !is_user_logged_in() || !VOF_Subscription::has_active_subscription();
     }
 
@@ -147,7 +147,7 @@ class VOF_Form_Handler {
 	 * maybe not cause vof_fields are for new users only. and we know they will be synced with the rtcl fields. 
 	 * eventually... on validation most likely.
 	 */ 
-	public static function vof_listing_contact( $post_id ) {
+	public static function vof_listing_contact( $post_id ) { // super important KEEP
 		// Initialize default values for a new listing
 		$location_id = $sub_location_id = $sub_sub_location_id = 0;
 		
@@ -313,8 +313,8 @@ class VOF_Form_Handler {
 	 * 
 	 * @return void Sends JSON response with status and redirect information
 	 */
-	// COMMENT WHEN NOT COPYING THIS CODE HAHA
-	public function vof_do_rtcl_black_box() {
+	
+	public function vof_do_rtcl_black_box() { // COMMENT WHEN NOT COPYING THIS CODE HAHA
 		// Initialize state and clear any existing notices
 		Functions::clear_notices();
 		$success = false;
