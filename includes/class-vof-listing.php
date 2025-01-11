@@ -345,6 +345,40 @@ class VOF_Listing {
                         wp_set_object_terms( $post_id, $locations, rtcl()->location );
                     }
 
+                    if ( isset( $_POST['_rtcl_active_bhs'] ) || isset( $_POST['_rtcl_active_special_bhs'] ) ) {
+                        delete_post_meta( $post_id, '_rtcl_bhs' );
+                        delete_post_meta( $post_id, '_rtcl_special_bhs' );
+                        if ( !empty( $_POST['_rtcl_active_bhs'] ) && !empty( $_POST['_rtcl_bhs'] ) && is_array( $_POST['_rtcl_bhs'] ) ) {
+                            $new_bhs = Functions::sanitize( $_POST['_rtcl_bhs'], 'business_hours' );
+                            if ( !empty( $new_bhs ) ) {
+                                update_post_meta( $post_id, '_rtcl_bhs', $new_bhs );
+                            }
+            
+                            if ( !empty( $_POST['_rtcl_active_special_bhs'] ) && !empty( $_POST['_rtcl_special_bhs'] ) && is_array( $_POST['_rtcl_special_bhs'] ) ) {
+                                $new_shs = Functions::sanitize( $_POST['_rtcl_special_bhs'], 'special_business_hours' );
+                                if ( !empty( $new_shs ) ) {
+                                    update_post_meta( $post_id, '_rtcl_special_bhs', $new_shs );
+                                }
+                            }
+                        }
+                    }
+
+                    if ( isset( $_POST['rtcl_social_profiles'] ) && is_array( $_POST['rtcl_social_profiles'] ) ) {
+                        $raw_profiles = $_POST['rtcl_social_profiles'];
+                        $social_list  = \Rtcl\Resources\Options::get_social_profiles_list();
+                        $profiles     = [];
+                        foreach ( $social_list as $item => $value ) {
+                            if ( ! empty( $raw_profiles[ $item ] ) ) {
+                                $profiles[ $item ] = esc_url_raw( $raw_profiles[ $item ] );
+                            }
+                        }
+                        if ( ! empty( $profiles ) ) {
+                            update_post_meta( $post_id, '_rtcl_social_profiles', $profiles );
+                        } else {
+                            delete_post_meta( $post_id, '_rtcl_social_profiles' );
+                        }
+                    }
+
                     /**
                      * 
                      * Process custom fields (most likely the changing fields given the category selected or ad type selected)
