@@ -242,18 +242,18 @@ class VOF_Listing {
 
                 // SECTION: Contact Information
 		        // Process all contact-related fields
-		        if ( isset( $_POST['phone'] ) ) {
-		        	$meta['phone'] = Functions::sanitize( $_POST['phone'] );
-		        }
-                if ( isset( $_POST['_rtcl_whatsapp_number'] ) ) {
-		        	$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['_rtcl_whatsapp_number'] );
-		        }
-                if ( isset( $_POST['_rtcl_telegram'] ) ) {
-		        	$meta['_rtcl_telegram'] = Functions::sanitize( $_POST['_rtcl_telegram'] );
-		        }
-		        if ( isset( $_POST['email'] ) ) {
-		        	$meta['email'] = Functions::sanitize( $_POST['email'], 'email' );
-		        }
+		        // if ( isset( $_POST['phone'] ) ) {
+		        // 	$meta['phone'] = Functions::sanitize( $_POST['phone'] );
+		        // }
+                // if ( isset( $_POST['_rtcl_whatsapp_number'] ) ) {
+		        // 	$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['_rtcl_whatsapp_number'] );
+		        // }
+                // if ( isset( $_POST['_rtcl_telegram'] ) ) {
+		        // 	$meta['_rtcl_telegram'] = Functions::sanitize( $_POST['_rtcl_telegram'] );
+		        // }
+		        // if ( isset( $_POST['email'] ) ) {
+		        // 	$meta['email'] = Functions::sanitize( $_POST['email'], 'email' );
+		        // }
                 if ( isset( $_POST['website'] ) ) {
                     $meta['website'] = Functions::sanitize( $_POST['website'], 'url' );
                 }
@@ -345,6 +345,7 @@ class VOF_Listing {
                         wp_set_object_terms( $post_id, $locations, rtcl()->location );
                     }
 
+                    // SECTION: Business Hours Processing
                     if ( isset( $_POST['_rtcl_active_bhs'] ) || isset( $_POST['_rtcl_active_special_bhs'] ) ) {
                         delete_post_meta( $post_id, '_rtcl_bhs' );
                         delete_post_meta( $post_id, '_rtcl_special_bhs' );
@@ -363,6 +364,7 @@ class VOF_Listing {
                         }
                     }
 
+                    // SECTION: Social Profiles Processing
                     if ( isset( $_POST['rtcl_social_profiles'] ) && is_array( $_POST['rtcl_social_profiles'] ) ) {
                         $raw_profiles = $_POST['rtcl_social_profiles'];
                         $social_list  = \Rtcl\Resources\Options::get_social_profiles_list();
@@ -432,13 +434,6 @@ class VOF_Listing {
                             // Initialize new listing metadata
                             update_post_meta( $post_id, 'featured', 0 ); 
                             update_post_meta( $post_id, '_views', 0 );
-                            
-                            // TODO: (maybe not here but in the user creation section)
-                            //CREATE A NEW DB TABLE AND UPDATE VOF-TEMP USER'S METADATA 
-                            // WITH UUIDS AND OTHER USER METADATA (vof db table for user metadata linked to post_id)
-                            // $current_user_id = get_current_user_id();
-                            // $ads             = absint( get_user_meta( $current_user_id, '_rtcl_ads', true ) );
-                            // update_user_meta( $current_user_id, '_rtcl_ads', $ads + 1 );
                         }
                     } else {
                         Functions::add_notice(
@@ -481,12 +476,38 @@ class VOF_Listing {
         // SECTION: Store complete form data in transient 
         set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS * 3); // 3 days
     
+        /**
+         * SECTION: CREATE TEMP VOF USER METADATA
+         * 
+         * TODO: (maybe not here but in the user creation section) CREATE A NEW DB TABLE 
+         * AND UPDATE VOF-TEMP USER'S METADATA WITH UUIDS AND OTHER USER METADATA 
+         * (vof db table for user metadata linked to post_id)
+         * 
+         * $current_user_id = get_current_user_id(); 
+         * $ads = absint( get_user_meta( $current_user_id, '_rtcl_ads', true ) ); 
+         * update_user_meta( $current_user_id, '_rtcl_ads', $ads + 1 );
+         */
+
+         $vof_meta = array(
+            'vof_email'           => isset($_POST['vof_email']) ? sanitize_email($_POST['vof_email']) : '',
+            'vof_phone'           => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : '',
+            'vof_whatsapp_number' => isset($_POST['vof_whatsapp_number']) ? sanitize_text_field($_POST['vof_whatsapp_number']) : ''
+        );
+
+        // Create temp user entry in vof_temp_user_meta table
+        $vof_temp_user_meta = \VOF\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_meta);
+
+        // Store UUID in post meta for reference
+        update_post_meta($post_id, '_vof_temp_user_uuid', $uuid);
+
         // SECTION: Send success response. Works as expected, no changes needed
         wp_send_json_success([
-            'success' => true,
-            'listing_id' => $post_id,
-            'redirect_url' => VOF_Constants::REDIRECT_URL,
-            'message' => [__('Listing saved successfully', 'classified-listing')]
+            'success'        => true,
+            'listing_id'     => $post_id,
+            'temp_user_uuid' => $uuid,
+            'redirect_url'   => VOF_Constants::REDIRECT_URL,
+            'message'        => [__('Listing saved successfully', 'classified-listing')]
         ]);
     }    
 
