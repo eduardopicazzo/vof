@@ -1,12 +1,12 @@
 <?php
 namespace VOF;
 
-use VOF\Helpers\VOF_Helper_Functions;
-use VOF\Helpers\VOF_Temp_User_Meta;
+use VOF\Utils\Helpers\VOF_Helper_Functions;
+use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 
 class VOF_Core {
     private static $instance = null;
-    private $api;
+    // private $api;
     private $assets;
     private $listing;
     private $form_handler;
@@ -64,7 +64,7 @@ class VOF_Core {
         add_action('init', [$this, 'init_components'], 0);
         
         // Initialize REST API
-        add_action('rest_api_init', [$this, 'init_rest_api']);
+        // add_action('rest_api_init', [$this, 'init_rest_api']);
         
         // Load text domain
         add_action('init', [$this, 'load_textdomain']);
@@ -81,7 +81,7 @@ class VOF_Core {
     }
 
     public function init_components() {
-        $this->api = new VOF_API();
+        // $this->api = new VOF_API();
         $this->assets = new VOF_Assets();
         $this->listing = new VOF_Listing();
         $this->form_handler = new VOF_Form_Handler();
@@ -100,9 +100,9 @@ class VOF_Core {
         }
     }
 
-    public function init_rest_api() {
-        $this->api->register_routes();
-    }
+    // public function init_rest_api() {
+    //     $this->api->register_routes();
+    // }
 
     public function load_textdomain() {
         load_plugin_textdomain(
@@ -113,9 +113,9 @@ class VOF_Core {
     }
 
     // Getters for components
-    public function api() {
-        return $this->api;
-    }
+    // public function api() {
+    //     return $this->api;
+    // }
 
     public function assets() {
         return $this->assets;

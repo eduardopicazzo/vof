@@ -9,7 +9,7 @@ namespace VOF;
 
 use Rtcl\Helpers\Functions;
 use RtclStore\Models\Membership;
-use VOF\Helpers\VOF_Helper_Functions;
+use VOF\Utils\Helpers\VOF_Helper_Functions;
 
 class VOF_Form_Handler {
     
@@ -104,7 +104,7 @@ class VOF_Form_Handler {
 				 * To properly validate this field, we should specify an actual validation callback function, 
 				 * for example: [self::class, 'validate_vof_email']
 				 */
-				'validation' => [ '\VOF\Helpers\VOF_Helper_Functions', 'vof_validate_email' ], 
+				'validation' => [ '\VOF\Utils\Helpers\VOF_Helper_Functions', 'vof_validate_email' ], 
 				'class' 	 => ''
 			],
 			'vof_email_confirm' => [
@@ -112,7 +112,7 @@ class VOF_Form_Handler {
 				'label'      => '[VOF test] Email Confirm',
 				'id'         => 'vof-email-confirm',
 				'required'   => true,
-				'validation' => [ '\VOF\Helpers\VOF_Helper_Functions', 'vof_validate_email_confirm' ],
+				'validation' => [ '\VOF\Utils\Helpers\VOF_Helper_Functions', 'vof_validate_email_confirm' ],
 				'class' 	 => ''
 			],
 			'vof_phone' => [
@@ -120,7 +120,7 @@ class VOF_Form_Handler {
 				'label' 	 => '[VOF test] Phone',
 				'id' 		 => 'vof-phone',
 				'required'   => true,
-				'validation' => [ '\VOF\Helpers\VOF_Helper_Functions', 'vof_validate_phone' ],
+				'validation' => [ '\VOF\Utils\Helpers\VOF_Helper_Functions', 'vof_validate_phone' ],
 				'class' 	 => ''
 			],
 			'vof_whatsapp_number' => [
@@ -128,7 +128,7 @@ class VOF_Form_Handler {
 				'label'      => '[VOF test] Whatsapp Number',
 				'id'         => 'vof-whatsapp-number',
 				'required'   => true,
-				'validation' => [ '\VOF\Helpers\VOF_Helper_Functions', 'vof_validate_whatsapp_number' ],
+				'validation' => [ '\VOF\Utils\Helpers\VOF_Helper_Functions', 'vof_validate_whatsapp_number' ],
 				'class' 	 => ''
 				]
 		];
@@ -139,7 +139,7 @@ class VOF_Form_Handler {
 	}
 
     public static function vof_is_vof_conditions() : bool {  // KEEP
-        return !is_user_logged_in() || !VOF_Subscription::has_active_subscription();
+        return !is_user_logged_in() || !VOF_Helper_Functions::vof_has_active_subscription();
     }
 
 	/**

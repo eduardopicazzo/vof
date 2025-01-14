@@ -2,10 +2,10 @@
 
 namespace VOF;
 
-use Depicter\GuzzleHttp\Promise\Is; // maybe remove
-use Rtcl\Controllers\FormHandler;   // maybe remove
-use Rtcl\Helpers\Functions;         // maybe remove
-use VOF_Helper_Functions;           // maybe remove
+use Depicter\GuzzleHttp\Promise\Is;         // maybe remove
+use Rtcl\Controllers\FormHandler;           // maybe remove
+use Rtcl\Helpers\Functions;                 // maybe remove
+use VOF\Utils\Helpers\VOF_Helper_Functions;
 
 class VOF_Listing {
     public function __construct() {
@@ -43,12 +43,12 @@ class VOF_Listing {
             return;
         }
 
-        if (is_user_logged_in() && !VOF_Subscription::has_active_subscription() && $this->is_post_ad_page()) {           
+        if (is_user_logged_in() && !VOF_Helper_Functions::vof_has_active_subscription() && $this->is_post_ad_page()) {           
             $this->render_subscription_required_button(); 
             return;
         }
 
-        if (is_user_logged_in() && VOF_Subscription::has_active_subscription() && $this->is_post_ad_page()) {
+        if (is_user_logged_in() && VOF_Helper_Functions::vof_has_active_subscription() && $this->is_post_ad_page()) {
             ?>
             <button type="submit" class="btn btn-primary rtcl-submit-btn">
                 <?php echo esc_html($post_id > 0 ? __('Update', 'classified-listing') : __('Submit', 'classified-listing')); ?>
@@ -495,7 +495,7 @@ class VOF_Listing {
         );
 
         // Create temp user entry in vof_temp_user_meta table
-        $vof_temp_user_meta = \VOF\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        $vof_temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_meta);
 
         // Store UUID in post meta for reference
@@ -536,9 +536,9 @@ class VOF_Listing {
 
 		// validate email
 		// Check the email address. wp function is_email() etc, can parse 'text/html' types.
-		$is_valid_email    = \VOF\Helpers\VOF_Helper_Functions::vof_validate_email($_POST['vof_email']);
-		$is_valid_phone    = \VOF\Helpers\VOF_Helper_Functions::vof_validate_phone($_POST['vof_phone']); 
-		$is_whatsapp_phone = \VOF\Helpers\VOF_Helper_Functions::vof_validate_whatsapp_number($_POST['vof_whatsapp_number']); 
+		$is_valid_email    = VOF_Helper_Functions::vof_validate_email($_POST['vof_email']);
+		$is_valid_phone    = VOF_Helper_Functions::vof_validate_phone($_POST['vof_phone']); 
+		$is_whatsapp_phone = VOF_Helper_Functions::vof_validate_whatsapp_number($_POST['vof_whatsapp_number']); 
 
 		// if validated stuff -> create temporary listing then maybe create temporary user 
 		// if not validated stuff -> add error message to the form
