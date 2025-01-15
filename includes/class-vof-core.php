@@ -3,18 +3,16 @@ namespace VOF;
 
 use VOF\Utils\Helpers\VOF_Helper_Functions;
 use VOF\Utils\Helpers\VOF_Temp_User_Meta;
+use VOF\API\VOF_API;
 
 class VOF_Core {
     private static $instance = null;
-    // private $api;
+    private $api;
     private $assets;
     private $listing;
     private $form_handler;
     private $temp_user_meta;
     private $vof_helper;
-    // private $vof_ajax;
-    // private $vof_stripe;
-    // private $vof_subscription;
 
 
     public static function instance() {
@@ -63,8 +61,8 @@ class VOF_Core {
         // Initialize components
         add_action('init', [$this, 'init_components'], 0);
         
-        // Initialize REST API
-        // add_action('rest_api_init', [$this, 'init_rest_api']);
+        // Initialize REST API with later priority
+        add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15); // higher (later) priority 
         
         // Load text domain
         add_action('init', [$this, 'load_textdomain']);
@@ -81,15 +79,11 @@ class VOF_Core {
     }
 
     public function init_components() {
-        // $this->api = new VOF_API();
         $this->assets = new VOF_Assets();
         $this->listing = new VOF_Listing();
         $this->form_handler = new VOF_Form_Handler();
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->vof_helper = new VOF_Helper_Functions();
-        // $this->vof_ajax = new VOF_Ajax();
-        // $this->vof_stripe = new VOF_Stripe();
-        // $this->vof_subscription = new VOF_Subscription();
         
         // Initialize only if needed
         if (is_admin()) {
@@ -100,9 +94,25 @@ class VOF_Core {
         }
     }
 
-    // public function init_rest_api() {
-    //     $this->api->register_routes();
-    // }
+    public function vof_init_rest_api() {
+        try {
+            error_log('VOF Debug: Initializing VOF API from Core');
+    
+            if (!class_exists('\VOF\API\VOF_API')) {
+                throw new \Exception('VOF API class not found');
+            }
+    
+            // Get API instance
+            $this->api = VOF_API::vof_get_instance();
+    
+            // Register Routes
+            $this->api->vof_register_routes();
+    
+            error_log('VOF Debug: VOF API initialization complete');
+        } catch (\Exception $e) {
+            error_log('VOF Error: Failed to initialize API - ' . $e->getMessage());
+        }
+    }
 
     public function load_textdomain() {
         load_plugin_textdomain(
@@ -113,41 +123,35 @@ class VOF_Core {
     }
 
     // Getters for components
-    // public function api() {
-    //     return $this->api;
-    // }
 
+    public function vof_get_vof_api() {
+        return $this->api;
+    }
+
+    // TODO: prepend 'vof_get_vof_' later
     public function assets() {
         return $this->assets;
     }
 
+    // TODO: prepend 'vof_get_vof_' later
     public function listing() {
         return $this->listing;
     }
 
+    // TODO: prepend 'vof_get_vof_' later
     public function form_handler() {
         return $this->form_handler;
     }
 
+    // TODO: prepend 'vof_get_' later    
     public function temp_user_meta() {
         return VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
     }
 
-    // public function vof_ajax() {
-    //     return $this->vof_ajax;
-    // }
-
+    // TODO: prepend 'vof_get_vof_' later    
     public function vof_helper() {
         return $this->vof_helper;
     }
-
-    // public function vof_stripe() {
-    //     return $this->vof_stripe;
-    // }
-
-    // public function vof_subscription() {
-    //     return $this->vof_subscription;
-    // }
 
     // ### DEBUG SECTION (admin menu) ###
 

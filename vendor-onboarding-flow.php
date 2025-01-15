@@ -25,6 +25,7 @@ require_once VOF_PLUGIN_DIR . 'includes/class-vof-dependencies.php';
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-helper-functions.php';
 // require_once VOF_PLUGIN_DIR . 'helpers/class-vof-temp-user-meta.php';
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-temp-user-meta.php';
+require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
 
 // Then load other classes
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-constants.php';
