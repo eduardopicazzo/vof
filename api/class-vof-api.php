@@ -28,7 +28,7 @@ class VOF_API {
     /**
      * Get the singleton instance
      */
-    public static function vof_get_instance() {
+    public static function vof_api_get_instance() {
         if (self::$instance === null) {
             self::$instance = new self();
         }

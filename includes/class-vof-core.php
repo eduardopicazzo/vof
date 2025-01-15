@@ -4,6 +4,8 @@ namespace VOF;
 use VOF\Utils\Helpers\VOF_Helper_Functions;
 use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 use VOF\API\VOF_API;
+use VOF\Utils\Stripe\VOF_Stripe_Config;
+use VOF\Utils\Stripe\VOF_Stripe_Settings;
 
 class VOF_Core {
     private static $instance = null;
@@ -13,6 +15,7 @@ class VOF_Core {
     private $form_handler;
     private $temp_user_meta;
     private $vof_helper;
+    private $stripe_config;
 
 
     public static function instance() {
@@ -84,13 +87,16 @@ class VOF_Core {
         $this->form_handler = new VOF_Form_Handler();
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->vof_helper = new VOF_Helper_Functions();
+        $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
         
         // Initialize only if needed
         if (is_admin()) {
             // Admin specific initializations
-
+            
             // Adds the vof_temp_post records view in admin
             add_action( 'admin_menu', [$this, 'vof_add_admin_menu'] );
+            // initialize vof-stripe adming dashboard
+            new VOF_Stripe_Settings();
         }
     }
 
@@ -103,7 +109,7 @@ class VOF_Core {
             }
     
             // Get API instance
-            $this->api = VOF_API::vof_get_instance();
+            $this->api = VOF_API::vof_api_get_instance();
     
             // Register Routes
             $this->api->vof_register_routes();
@@ -123,6 +129,9 @@ class VOF_Core {
     }
 
     // Getters for components
+    public function vof_get_stripe_config() {
+        return $this->stripe_config;
+    }
 
     public function vof_get_vof_api() {
         return $this->api;
