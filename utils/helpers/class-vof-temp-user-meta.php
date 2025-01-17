@@ -65,8 +65,10 @@ class VOF_Temp_User_Meta {
                 'vof_email' => $data['vof_email'],
                 'vof_phone' => $data['vof_phone'],
                 'vof_whatsapp' => $data['vof_whatsapp_number'] ?? null,
-                'post_status' => 'vof_temp',
-                'vof_tier' => null, // Will be set during checkout
+                'post_status' => $data['post_status'],
+                // 'post_status' => 'vof_temp',
+                // 'vof_tier' => null, // Will be set during checkout
+                'vof_tier' => $data['vof_tier'],
                 'post_parent_cat' => $data['post_parent_cat'] ?? 0,
                 'expires_at' => $expires_at
             ),
@@ -99,6 +101,167 @@ class VOF_Temp_User_Meta {
             return false;
         }
 
+        return $result;
+    }
+
+    public function vof_get_email_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT vof_email FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No email found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return $result;
+    }
+    
+    public function vof_get_phone_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT vof_phone FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No phone found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return $result;
+    }
+    
+    public function vof_get_whatsapp_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT vof_whatsapp FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        return $result; // Can be null/false as whatsapp is optional
+    }
+    
+    public function vof_get_post_status_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT post_status FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No status found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return $result;
+    }
+    
+    public function vof_get_tier_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT vof_tier FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        return $result; // Can be null as tier might not be set yet
+    }
+    
+    public function vof_get_parent_cat_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT post_parent_cat FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No parent category found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return absint($result);
+    }
+    
+    public function vof_get_post_id_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT post_id FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No post ID found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return absint($result);
+    }
+    
+    public function vof_get_created_at_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT created_at FROM {$this->table_name} 
+                WHERE uuid = %s AND expires_at > NOW()",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No creation date found for UUID: ' . $uuid);
+            return false;
+        }
+    
+        return $result;
+    }
+    
+    public function vof_get_expires_at_by_uuid($uuid) {
+        global $wpdb;
+        
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT expires_at FROM {$this->table_name} 
+                WHERE uuid = %s",
+                $uuid
+            )
+        );
+    
+        if ($result === null) {
+            error_log('VOF Debug: No expiration date found for UUID: ' . $uuid);
+            return false;
+        }
+    
         return $result;
     }
 

@@ -211,7 +211,9 @@ class VOF_Listing {
             'vof_email' => isset($_POST['vof_email']) ? sanitize_email($_POST['vof_email']) : '',
             'vof_phone' => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : '',
             'vof_whatsapp_number' => isset($_POST['vof_whatsapp_number']) ? sanitize_text_field($_POST['vof_whatsapp_number']) : '',
-            'post_parent_cat' => $parent_id
+            'post_parent_cat' => $parent_id,
+            'vof_tier' => sanitize_text_field(self::vof_get_available_tiers($parent_id)),
+            'post_status' => $post_data['post_status']
         ];
 
         // Create temp user entry with new schema
@@ -449,6 +451,23 @@ class VOF_Listing {
             foreach ( $meta as $key => $value ) {
                 update_post_meta( $post_id, $key, $value );
             }
+        }
+    }
+
+    public function vof_get_available_tiers($parent_cat_id) {
+        switch($parent_cat_id) {
+            case '415': // bicicletas
+            case '413': // autopartes, acc, refaccs
+                return 'all_tiers';
+                    break;
+            case '258': // inmuebles
+            case '242': // autos y vehiculos
+            case '480': // maquinaria
+                return 'limit_tiers';
+                break;
+            default:
+                return 'all_tiers';
+                break;
         }
     }
 }
