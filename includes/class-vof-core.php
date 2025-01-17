@@ -25,8 +25,30 @@ class VOF_Core {
         return self::$instance;
     }
 
+    /**
+     * Constructor
+     */
+    private function __construct() {
+        $this->init_hooks();
+    }
+
+    /**
+     * Prevent cloning
+     */
+    private function __clone() {}
+
+    /**
+     * Prevent unserialization
+     */
+    public function __wakeup() {
+        throw new \Exception("Cannot unserialize singleton");
+    }
+
     // Add activation method
     public static function vof_activate() {
+        // Run DB Updates (if needed)
+        add_action('vof_DB', 'vof_run_db_updates');
+
         // Create temp user meta table
         VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
 
@@ -42,7 +64,9 @@ class VOF_Core {
         do_action( 'vof_activated' );
     }
 
-    // Add deactivation method
+    /**
+     * Plugin deactivation
+     */
     public static function vof_deactivate() {
         // Clear scheduled cron
         wp_clear_scheduled_hook( 'vof_cleanup_temp_data' );
@@ -51,34 +75,29 @@ class VOF_Core {
         do_action( 'vof_deactivated' );
     }
 
-    private function __construct() {
-        $this->init_hooks();
-    }
-
+    /**
+     * Initialize hooks and dependencies
+     */
     private function init_hooks() {
         // Check dependencies first
         if (!VOF_Dependencies::check()) {
             return;
         }
 
-        // Initialize components
-        add_action('init', [$this, 'init_components'], 0);
-        
+        // Initialize API first since other components might need it
+        $this->api = VOF_API::vof_api_get_instance();
+
         // Initialize REST API with later priority
         add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15); // higher (later) priority 
-        
+
+        // Initialize components
+        add_action('init', [$this, 'init_components'], 0);
+          
         // Load text domain
         add_action('init', [$this, 'load_textdomain']);
 
         // Add cleanup hook
         add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] );
-    }
-
-    // Add cleanup method
-    public function vof_cleanup_temp_data() {
-        if ($this->temp_user_meta) {
-            $this->temp_user_meta->vof_delete_expired_data();
-        }
     }
 
     public function init_components() {
@@ -97,6 +116,19 @@ class VOF_Core {
             add_action( 'admin_menu', [$this, 'vof_add_admin_menu'] );
             // initialize vof-stripe adming dashboard
             new VOF_Stripe_Settings();
+        }
+    }
+
+    // uncomment in case need rebuild vof_temp_user_db
+    public function vof_run_db_updates() {
+        $this->temp_user_meta->vof_maybe_create_table();
+    }
+
+
+    // Add cleanup method
+    public function vof_cleanup_temp_data() {
+        if ($this->temp_user_meta) {
+            $this->temp_user_meta->vof_delete_expired_data();
         }
     }
 
@@ -129,11 +161,20 @@ class VOF_Core {
     }
 
     // Getters for components
+    /**
+     * Get Stripe config instance
+     */
     public function vof_get_stripe_config() {
         return $this->stripe_config;
     }
 
+    /**
+     * Get API instance
+     */
     public function vof_get_vof_api() {
+        if (!$this->api) {
+            $this->api = VOF_API::vof_api_get_instance();
+        }
         return $this->api;
     }
 
@@ -154,7 +195,8 @@ class VOF_Core {
 
     // TODO: prepend 'vof_get_' later    
     public function temp_user_meta() {
-        return VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        // return VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        return $this->temp_user_meta;
     }
 
     // TODO: prepend 'vof_get_vof_' later    
@@ -183,9 +225,13 @@ class VOF_Core {
         $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
     
         // Handle test record creation
-        if (isset($_POST['vof_create_test_record'])) {
+        if (isset($_POST['vof_create_test_record']) && check_admin_referer('vof_debug_actions')) {
             $uuid = $temp_user_meta->vof_create_test_record();
-            echo '<div class="notice notice-success"><p>Created test record with UUID: '. esc_html($uuid). '</p></div>';
+            if ($uuid) {
+                echo '<div class="notice notice-success"><p>Created test record with UUID: ' . esc_html($uuid) . '</p></div>';
+            } else {
+                echo '<div class="notice notice-error"><p>Failed to create test record</p></div>';
+            }
         }
     
         // Get all records 
@@ -195,61 +241,190 @@ class VOF_Core {
         ?>
         <div class="wrap">
             <h1>VOF Debug Panel</h1>
-        
+    
             <!-- Create test record form -->
             <div class="card">
                 <h2>Test Actions</h2>
                 <form method="post">
                     <?php wp_nonce_field('vof_debug_actions'); ?>
-                    <input type="submit" name="vof_create_test_record" 
+                    <input type="submit" 
+                           name="vof_create_test_record" 
                            class="button button-primary" 
                            value="Create Test Record">
                 </form>
             </div>
-        
+    
             <!-- Display records -->
             <div class="card" style="margin-top: 20px;">
                 <h2>Current Records</h2>
-                <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th>UUID</th>
-                            <th>Post ID</th>
-                            <th>Created</th>
-                            <th>Expires</th>
-                            <th>Meta Data</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($records)): ?>
+                
+                <?php if (empty($records)): ?>
+                    <p>No records found</p>
+                <?php else: ?>
+                    <table class="widefat striped">
+                        <thead>
                             <tr>
-                                <td colspan="5">No records found</td>
+                                <th>ID</th>
+                                <th>UUID</th>
+                                <th>Post ID</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>WhatsApp</th>
+                                <th>Status</th>
+                                <th>Tier</th>
+                                <th>Parent Category</th>
+                                <th>Created</th>
+                                <th>Expires</th>
+                                <th>Actions</th>
                             </tr>
-                        <?php else: ?>
+                        </thead>
+                        <tbody>
                             <?php foreach ($records as $record): ?>
                                 <tr>
-                                    <td><?php echo esc_html($record['uuid']); ?></td>
-                                    <td><?php echo esc_html($record['post_id']); ?></td>
-                                    <td><?php echo esc_html($record['created_at']); ?></td>
-                                    <td><?php echo esc_html($record['expires_at']); ?></td>
+                                    <td><?php echo esc_html($record['id']); ?></td>
                                     <td>
-                                        <pre><?php print_r($record['meta_data']); ?></pre>
+                                        <?php echo esc_html($record['uuid']); ?>
+                                        <button class="button button-small copy-to-clipboard" 
+                                                data-clipboard="<?php echo esc_attr($record['uuid']); ?>">
+                                            Copy
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $post = get_post($record['post_id']);
+                                        if ($post) {
+                                            echo '<a href="' . get_edit_post_link($record['post_id']) . '">' . 
+                                                 esc_html($record['post_id']) . '</a>';
+                                        } else {
+                                            echo esc_html($record['post_id']);
+                                        }
+                                        ?>
+                                    </td>
+                                    <td><?php echo esc_html($record['vof_email']); ?></td>
+                                    <td><?php echo esc_html($record['vof_phone']); ?></td>
+                                    <td><?php echo esc_html($record['vof_whatsapp']) ?: 'N/A'; ?></td>
+                                    <td>
+                                        <span class="status-badge status-<?php echo esc_attr($record['post_status']); ?>">
+                                            <?php echo esc_html($record['post_status']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($record['vof_tier']): ?>
+                                            <span class="tier-badge tier-<?php echo esc_attr($record['vof_tier']); ?>">
+                                                <?php echo esc_html($record['vof_tier']); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="tier-badge tier-none">Not Set</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $category = get_term($record['post_parent_cat'], rtcl()->category);
+                                        echo $category ? esc_html($category->name) : 'N/A';
+                                        ?>
+                                    </td>
+                                    <td><?php echo esc_html(human_time_diff(strtotime($record['created_at']))); ?> ago</td>
+                                    <td>
+                                        <?php 
+                                        $expires = strtotime($record['expires_at']);
+                                        $now = time();
+                                        $time_diff = $expires - $now;
+                                        
+                                        if ($time_diff < 0) {
+                                            echo '<span class="expired">Expired</span>';
+                                        } else {
+                                            echo 'Expires in ' . human_time_diff($now, $expires);
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <button class="button button-small view-details" 
+                                                data-uuid="<?php echo esc_attr($record['uuid']); ?>">
+                                            View Details
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
             </div>
-        
+    
+            <!-- Add inline styles -->
+            <style>
+                .status-badge {
+                    padding: 3px 8px;
+                    border-radius: 3px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+                .status-vof_temp {
+                    background: #ffd700;
+                    color: #000;
+                }
+                .status-publish {
+                    background: #46b450;
+                    color: #fff;
+                }
+                .tier-badge {
+                    padding: 3px 8px;
+                    border-radius: 3px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    background: #e0e0e0;
+                }
+                .tier-none {
+                    background: #f0f0f0;
+                    color: #666;
+                }
+                .copy-to-clipboard {
+                    margin-left: 5px !important;
+                    padding: 0 5px !important;
+                }
+                .expired {
+                    color: #dc3232;
+                    font-weight: 500;
+                }
+                /* Responsive table */
+                @media screen and (max-width: 782px) {
+                    .widefat td, .widefat th {
+                        padding: 8px 10px;
+                    }
+                }
+            </style>
+    
+            <!-- Add clipboard functionality -->
+            <script>
+            jQuery(document).ready(function($) {
+                // Copy UUID to clipboard
+                $('.copy-to-clipboard').click(function() {
+                    const uuid = $(this).data('clipboard');
+                    navigator.clipboard.writeText(uuid).then(function() {
+                        alert('UUID copied to clipboard!');
+                    }).catch(function(err) {
+                        console.error('Could not copy UUID:', err);
+                    });
+                });
+    
+                // View details button handler
+                $('.view-details').click(function() {
+                    const uuid = $(this).data('uuid');
+                    // TODO: Implement modal or expandable row with additional details
+                    alert('Viewing details for UUID: ' + uuid);
+                });
+            });
+            </script>
+    
             <!-- Database Info -->
             <div class="card" style="margin-top: 20px;">
                 <h2>Database Information</h2>
-                <p>Table Name: <?php echo esc_html($temp_user_meta->vof_get_table_name()); ?></p>
-                <pre>
-                CREATE TABLE Query:
-                <?php echo esc_html($temp_user_meta->vof_get_create_table_sql()); ?>
-                </pre>
+                <p><strong>Table Name:</strong> <?php echo esc_html($temp_user_meta->vof_get_table_name()); ?></p>
+                <div class="table-structure">
+                    <h3>Table Structure</h3>
+                    <pre style="background: #f6f7f7; padding: 15px; overflow-x: auto;">
+    <?php echo esc_html($temp_user_meta->vof_get_create_table_sql()); ?>
+                    </pre>
+                </div>
             </div>
         </div>
         <?php

@@ -1,22 +1,13 @@
 <?php
 namespace VOF\API;
+use VOF\Utils\Helpers\VOF_Temp_User_Meta;
+use VOF\VOF_Core;
 
 class VOF_API {
-    /**
-     * @var string The namespace for our REST API endpoints
-     */
     private $namespace = 'vof/v1';
-
-    /**
-     * @var VOF_API|null The single instance of this class
-     */
     private static $instance = null;
 
-    /**
-     * Initialize the API
-     */
     public function __construct() {
-        // Add CORS headers for API requests
         add_action('rest_api_init', function() {
             remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
             add_filter('rest_pre_serve_request', [$this, 'vof_add_cors_headers']);
@@ -25,9 +16,6 @@ class VOF_API {
         error_log('VOF Debug: API initialized');
     }
 
-    /**
-     * Get the singleton instance
-     */
     public static function vof_api_get_instance() {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -35,76 +23,56 @@ class VOF_API {
         return self::$instance;
     }
 
-    /**
-     * Register API routes
-     */
     public function vof_register_routes() {
-        error_log('VOF Debug: Registering VOF API routes with namespace: ' . $this->namespace);
+        error_log('VOF Debug: Registering VOF API routes');
 
         // Test endpoint
         register_rest_route($this->namespace, '/test', [
-            [
-                'methods'             => \WP_REST_Server::READABLE,
-                'callback'            => [$this, 'vof_test_endpoint'],
-                'permission_callback' => '__return_true'
-            ]
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [$this, 'vof_test_endpoint'],
+            'permission_callback' => '__return_true'
         ]);
 
-        // Checkout endpoint - GET available subscription tiers
-        register_rest_route($this->namespace, '/checkout', [
-            [
-                'methods'             => \WP_REST_Server::READABLE,
-                'callback'            => [$this, 'vof_get_checkout_options'],
-                'permission_callback' => [$this, 'vof_check_permissions'],
-                'args'               => [
-                    'listing_id' => [
-                        'required'          => true,
-                        'validate_callback' => function($param) {
-                            return is_numeric($param);
-                        }
-                    ]
+        // Get checkout options based on parent category
+        register_rest_route($this->namespace, '/checkout/options/(?P<uuid>[a-zA-Z0-9-]+)', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [$this, 'vof_get_checkout_options'],
+            'permission_callback' => [$this, 'vof_check_permissions'],
+            'args' => [
+                'uuid' => [
+                    'required' => true,
+                    'validate_callback' => [$this, 'vof_validate_uuid']
                 ]
             ]
         ]);
 
-        // Checkout endpoint - POST initiate checkout
+        // Process checkout
         register_rest_route($this->namespace, '/checkout', [
-            [
-                'methods'             => \WP_REST_Server::CREATABLE,
-                'callback'            => [$this, 'vof_process_checkout'],
-                'permission_callback' => [$this, 'vof_check_permissions'],
-                'args'               => [
-                    'listing_id' => [
-                        'required'          => true,
-                        'validate_callback' => function($param) {
-                            return is_numeric($param);
-                        }
-                    ],
-                    'tier_id' => [
-                        'required'          => true,
-                        'validate_callback' => function($param) {
-                            return is_numeric($param);
-                        }
-                    ]
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [$this, 'vof_process_checkout'],
+            'permission_callback' => [$this, 'vof_check_permissions'],
+            'args' => [
+                'uuid' => [
+                    'required' => true,
+                    'validate_callback' => [$this, 'vof_validate_uuid']
                 ]
             ]
         ]);
 
-        // Webhook endpoint
+        // Stripe webhook handler
         register_rest_route($this->namespace, '/webhook', [
-            [
-                'methods'             => \WP_REST_Server::CREATABLE,
-                'callback'            => [$this, 'vof_handle_webhook'],
-                'permission_callback' => [$this, 'vof_validate_webhook']
-            ]
+            'methods' => \WP_REST_Server::CREATABLE,
+            'callback' => [$this, 'vof_handle_webhook'],
+            'permission_callback' => [$this, 'vof_validate_webhook']
         ]);
 
-        error_log('VOF Debug: VOF API routes registered successfully');
+        error_log('VOF Debug: Routes registered successfully');
     }
 
-    /**
-     * Test endpoint callback
-     */
+    public function vof_validate_uuid($uuid) {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $uuid);
+    }
+
     public function vof_test_endpoint() {
         return rest_ensure_response([
             'success' => true,
@@ -113,18 +81,30 @@ class VOF_API {
         ]);
     }
 
-    /**
-     * Get available checkout options
-     */
     public function vof_get_checkout_options($request) {
         try {
-            $listing_id = $request->get_param('listing_id');
+            $uuid = $request->get_param('uuid');
             
+            // Get temp user data
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+            
+            if (!$user_data) {
+                return new \WP_Error(
+                    'invalid_uuid',
+                    'Invalid or expired UUID',
+                    ['status' => 400]
+                );
+            }
+
+            // Get available tiers for parent category
+            $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
+
             return rest_ensure_response([
                 'success' => true,
-                'data'    => [
-                    'listing_id' => $listing_id,
-                    'tiers'     => []
+                'data' => [
+                    'uuid' => $uuid,
+                    'tiers' => $tiers
                 ]
             ]);
 
@@ -138,37 +118,139 @@ class VOF_API {
         }
     }
 
-    /**
-     * Process checkout request
-     */
+    private function vof_get_tiers_for_category($parent_cat_id) {
+        // TODO: Implement tier fetching based on category
+        // This will be replaced with actual tier logic
+        return [
+            ['id' => 'basic', 'name' => 'Basic', 'price_id' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3'],
+            ['id' => 'premium', 'name' => 'Premium', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
+            ['id' => 'professional', 'name' => 'Professional', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
+        ];
+    }
+
     public function vof_process_checkout($request) {
         try {
-            $listing_id = $request->get_param('listing_id');
-            $tier_id = $request->get_param('tier_id');
+            $uuid = $request->get_param('uuid');
+            
+            // Get temp user data
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+            
+            if (!$user_data) {
+                return new \WP_Error(
+                    'invalid_uuid',
+                    'Invalid or expired UUID',
+                    ['status' => 400]
+                );
+            }
 
-            // For now return dummy response
+            // Get Stripe instance
+            $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+            
+            // Get tiers for category
+            $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
+            
+            // Create line items
+            $line_items = array_map(function($tier) {
+                return [
+                    'price' => $tier['price_id'],
+                    'quantity' => 1
+                ];
+            }, $tiers);
+
+            // Create checkout session
+            $session = $stripe->checkout->sessions->create([
+                'payment_method_types' => ['card'],
+                'customer_email' => $user_data['vof_email'],
+                'metadata' => [
+                    'uuid' => $uuid
+                ],
+                'line_items' => $line_items,
+                'mode' => 'subscription',
+                'success_url' => home_url('/my-account?checkout=success&session_id={CHECKOUT_SESSION_ID}'),
+                'cancel_url' => home_url('/my-account?checkout=cancelled')
+            ]);
+
             return rest_ensure_response([
                 'success' => true,
-                'data'    => [
-                    'checkout_url' => 'https://checkout.stripe.com/dummy-session'
+                'data' => [
+                    'checkout_url' => $session->url,
+                    'session_id' => $session->id
                 ]
             ]);
 
         } catch (\Exception $e) {
             error_log('VOF API Error: ' . $e->getMessage());
             return new \WP_Error(
-                'server_error',
-                'An error occurred processing your request',
+                'checkout_error',
+                'Error creating checkout session: ' . $e->getMessage(),
                 ['status' => 500]
             );
         }
     }
 
-    /**
-     * Handle Stripe webhook
-     */
     public function vof_handle_webhook($request) {
         try {
+            $stripe = VOF_Core::instance()->vof_get_stripe_config();
+            $endpoint_secret = $stripe->vof_get_stripe_webhook_secret();
+            
+            $payload = @file_get_contents('php://input');
+            $sig_header = $_SERVER['HTTP_STRIPE_SIGNATURE'];
+            $event = null;
+
+            try {
+                $event = \Stripe\Webhook::constructEvent(
+                    $payload, $sig_header, $endpoint_secret
+                );
+            } catch(\UnexpectedValueException $e) {
+                error_log('VOF Webhook Error: Invalid payload - ' . $e->getMessage());
+                return new \WP_Error('invalid_payload', 'Invalid payload', ['status' => 400]);
+            } catch(\Stripe\Exception\SignatureVerificationException $e) {
+                error_log('VOF Webhook Error: Invalid signature - ' . $e->getMessage());
+                return new \WP_Error('invalid_signature', 'Invalid signature', ['status' => 400]);
+            }
+
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+
+            switch ($event->type) {
+                case 'checkout.session.completed':
+                    $session = $event->data->object;
+                    $uuid = $session->metadata->uuid;
+                    
+                    // Get user data
+                    $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+                    if (!$user_data) {
+                        throw new \Exception('Invalid UUID in webhook: ' . $uuid);
+                    }
+
+                    // Create WordPress user
+                    $user_id = $this->vof_create_user($user_data);
+                    
+                    // Update post author and status
+                    wp_update_post([
+                        'ID' => $user_data['post_id'],
+                        'post_author' => $user_id,
+                        'post_status' => 'publish'
+                    ]);
+
+                    // Update temp user record
+                    $temp_user_meta->vof_update_post_status($uuid, 'publish');
+                    
+                    // Add subscription data
+                    update_user_meta($user_id, '_vof_stripe_customer_id', $session->customer);
+                    update_user_meta($user_id, '_vof_stripe_subscription_id', $session->subscription);
+
+                    break;
+
+                case 'customer.subscription.updated':
+                    // Handle subscription updates
+                    break;
+
+                case 'customer.subscription.deleted':
+                    // Handle subscription cancellation
+                    break;
+            }
+
             return rest_ensure_response([
                 'success' => true,
                 'message' => 'Webhook processed successfully'
@@ -178,15 +260,53 @@ class VOF_API {
             error_log('VOF Webhook Error: ' . $e->getMessage());
             return new \WP_Error(
                 'webhook_error',
-                'Error processing webhook',
+                'Error processing webhook: ' . $e->getMessage(),
                 ['status' => 400]
             );
         }
     }
 
-    /**
-     * Add CORS headers
-     */
+    private function vof_create_user($user_data) {
+        // Generate username from email
+        $username = explode('@', $user_data['vof_email'])[0];
+        $base_username = $username;
+        $counter = 1;
+        
+        while (username_exists($username)) {
+            $username = $base_username . $counter;
+            $counter++;
+        }
+
+        // Generate random password
+        $password = wp_generate_password();
+
+        // Create user
+        $user_id = wp_create_user($username, $password, $user_data['vof_email']);
+
+        if (is_wp_error($user_id)) {
+            throw new \Exception('Failed to create user: ' . $user_id->get_error_message());
+        }
+
+        // Update user meta
+        update_user_meta($user_id, 'vof_phone', $user_data['vof_phone']);
+        if (!empty($user_data['vof_whatsapp'])) {
+            update_user_meta($user_id, 'vof_whatsapp', $user_data['vof_whatsapp']);
+        }
+
+        // Send email with login credentials
+        wp_mail(
+            $user_data['vof_email'],
+            'Your Account Details',
+            sprintf(
+                'Username: %s\nPassword: %s\nPlease login and change your password.',
+                $username,
+                $password
+            )
+        );
+
+        return $user_id;
+    }
+
     public function vof_add_cors_headers($value) {
         $origin = get_http_origin();
         if ($origin) {
@@ -198,17 +318,11 @@ class VOF_API {
         return $value;
     }
 
-    /**
-     * Check API permissions
-     */
     public function vof_check_permissions() {
-        return true;
+        return true; // TODO: Implement proper permission checks
     }
 
-    /**
-     * Validate webhook request
-     */
     public function vof_validate_webhook() {
-        return true;
+        return true; // Signature is validated in handler
     }
 }

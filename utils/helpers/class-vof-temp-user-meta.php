@@ -1,44 +1,12 @@
 <?php
 namespace VOF\Utils\Helpers;
-// this class is used to store temporary user meta data during the onboarding process.
+
 class VOF_Temp_User_Meta {
-    /** 
-     * vof_temp_user_meta: 
-     * 
-     * proposed schema: 
-     * 
-     * CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}vof_temp_user_meta` (
-     * `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-     * `uuid` char(36) NOT NULL,                    # Unique identifier for the temp user
-     * `post_id` bigint(20) unsigned NOT NULL,      # ID of the temporary listing
-     * `meta_key` varchar(255) NOT NULL,            # Field name (e.g., 'vof_email')
-     * `meta_value` longtext,                       # Field value
-     * `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-     * `expires_at` datetime,                       # When this temp data should expire
-     * PRIMARY KEY (`id`),
-     * KEY `uuid` (`uuid`),
-     * KEY `post_id` (`post_id`),
-     * KEY `meta_key` (`meta_key`),
-     * KEY `expires_at` (`expires_at`)
-     * ) {$charset_collate};
-     * 
-     * A new table vof_temp_user_meta that will store temporary user data 
-     * and establish relationships between temp users, 
-     * their metadata, and their listings.
-     * 
-     * This table is used to store temporary user meta data during the onboarding process.
-     * It is used to store data that is not yet ready to be saved to the database, 
-     * but needs to be retained for the duration of the onboarding process.
-     * 
-     * @since 1.0.0
-     */ 
+    private static $instance = null;
+    private $table_name;
 
-     private static $instance = null;
-     private $table_name;
-
-    //  singleton
     public static function vof_get_temp_user_meta_instance() {
-       if ( self::$instance === null ) {
+       if (self::$instance === null) {
            self::$instance = new self();
        }
        return self::$instance;
@@ -46,28 +14,31 @@ class VOF_Temp_User_Meta {
     
     private function __construct() {
        global $wpdb;
-       $this->table_name = $wpdb->prefix. 'vof_temp_user_meta';
+       $this->table_name = $wpdb->prefix . 'vof_temp_user_meta';
        $this->vof_maybe_create_table();
     }
 
     private function vof_maybe_create_table() {
         global $wpdb;
-    
         $charset_collate = $wpdb->get_charset_collate();
     
-        // Notice removed space between { and $this
+        // Updated schema with normalized columns
         $sql = "CREATE TABLE IF NOT EXISTS `{$this->table_name}` (
             `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             `uuid` char(36) NOT NULL,
             `post_id` bigint(20) unsigned NOT NULL,
-            `meta_key` varchar(255) NOT NULL,
-            `meta_value` longtext,
+            `vof_email` varchar(255) NOT NULL,
+            `vof_phone` varchar(20) NOT NULL,
+            `vof_whatsapp` varchar(20) DEFAULT NULL,
+            `post_status` varchar(20) NOT NULL DEFAULT 'vof_temp',
+            `vof_tier` varchar(50) DEFAULT NULL,
+            `post_parent_cat` bigint(20) unsigned NOT NULL,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `expires_at` datetime,
-            PRIMARY KEY (`id`),
-            KEY `uuid` (`uuid`),
+            PRIMARY KEY (`uuid`),
+            UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
-            KEY `meta_key` (`meta_key`),
+            KEY `post_parent_cat` (`post_parent_cat`),
             KEY `expires_at` (`expires_at`)
         ) $charset_collate;";
     
@@ -75,7 +46,8 @@ class VOF_Temp_User_Meta {
         dbDelta($sql);     
     }
 
-    public function vof_create_temp_user( $post_id, $meta_data ) {
+    // Updated to work with normalized columns
+    public function vof_create_temp_user($post_id, $data) {
         global $wpdb;
 
         // Generate UUID v4
@@ -84,79 +56,128 @@ class VOF_Temp_User_Meta {
         // Set expiration (3 days from now) 
         $expires_at = date('Y-m-d H:i:s', strtotime('+3 days'));
 
-        // Store each piece of metadata
-        foreach ($meta_data as $key => $value) {
-            $wpdb->insert(
-                $this->table_name, 
-                array( 
-                    'uuid' => $uuid,
-                    'post_id' => $post_id,
-                    'meta_key' => $key,
-                    'meta_value' => $value,
-                    'expires_at' => $expires_at
-                ),
-                array('%s', '%d', '%s', '%s', '%s')
-            );
+        // Insert data into normalized columns
+        $result = $wpdb->insert(
+            $this->table_name, 
+            array( 
+                'uuid' => $uuid,
+                'post_id' => $post_id,
+                'vof_email' => $data['vof_email'],
+                'vof_phone' => $data['vof_phone'],
+                'vof_whatsapp' => $data['vof_whatsapp_number'] ?? null,
+                'post_status' => 'vof_temp',
+                'vof_tier' => null, // Will be set during checkout
+                'post_parent_cat' => $data['post_parent_cat'] ?? 0,
+                'expires_at' => $expires_at
+            ),
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to create temp user. MySQL Error: ' . $wpdb->last_error);
+            return false;
         }
+
         return $uuid;
     }
 
-    public function vof_get_temp_user_by_uuid( $uuid ) {
+    // Updated to work with normalized columns
+    public function vof_get_temp_user_by_uuid($uuid) {
         global $wpdb;
 
-        $results = $wpdb->get_results(
+        $result = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT meta_key, meta_value FROM {$this->table_name}
+                "SELECT * FROM {$this->table_name}
                 WHERE uuid = %s AND expires_at > NOW()",
                 $uuid
             ),
             ARRAY_A
         );
 
-        if (! $results) {
+        if (!$result) {
+            error_log('VOF Debug: No temp user found for UUID: ' . $uuid);
             return false;
         }
 
-        $meta_data = array();
-        foreach ($results as $row) {
-            $meta_data[$row['meta_key']] = $row['meta_value'];
-        }
-        return $meta_data;
+        return $result;
     }
 
-    public function vof_get_temp_user_by_post_id( $post_id ) {
+    // Updated to work with normalized columns
+    public function vof_get_temp_user_by_post_id($post_id) {
         global $wpdb;
 
-        $results = $wpdb->get_results(
-            $wpdb->prepare (
-                "SELECT meta_key, meta_value FROM {$this->table_name}
+        $result = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$this->table_name}
                 WHERE post_id = %d AND expires_at > NOW()",
                 $post_id
             ),
             ARRAY_A
         );
 
-        if (! $results) {
+        if (!$result) {
+            error_log('VOF Debug: No temp user found for post_id: ' . $post_id);
             return false;
         }
 
-        $meta_data = array();
-        foreach ($results as $row) {
-            $meta_data[$row['meta_key']] = $row['meta_value'];
+        return $result;
+    }
+
+    // Updated to handle tier assignment during checkout
+    public function vof_update_tier($uuid, $tier) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            ['vof_tier' => $tier],
+            ['uuid' => $uuid],
+            ['%s'],
+            ['%s']
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update tier for UUID: ' . $uuid);
+            return false;
         }
-        return $meta_data;
+
+        return true;
+    }
+
+    // Updated to handle post status updates
+    public function vof_update_post_status($uuid, $status) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            ['post_status' => $status],
+            ['uuid' => $uuid],
+            ['%s'],
+            ['%s']
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update post status for UUID: ' . $uuid);
+            return false;
+        }
+
+        return true;
     }
 
     public function vof_delete_expired_data() {
         global $wpdb;
 
-        $wpdb->query(
+        $result = $wpdb->query(
             "DELETE FROM {$this->table_name} WHERE expires_at <= NOW()"
-        );  
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to delete expired data. MySQL Error: ' . $wpdb->last_error);
+        }
+
+        return $result !== false;
     }
 
-    // ### DEBUG SECTION (admin menu) ###
-
+    // Debug methods
     public function vof_get_table_name() {
         return $this->table_name;
     }
@@ -165,18 +186,22 @@ class VOF_Temp_User_Meta {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
 
-        return "CREATE TABLE IF NOT EXISTS `{ $this->table_name }` (
+        return "CREATE TABLE IF NOT EXISTS `{$this->table_name}` (
             `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             `uuid` char(36) NOT NULL,
             `post_id` bigint(20) unsigned NOT NULL,
-            `meta_key` varchar(255) NOT NULL,
-            `meta_value` longtext,
+            `vof_email` varchar(255) NOT NULL,
+            `vof_phone` varchar(20) NOT NULL,
+            `vof_whatsapp` varchar(20) DEFAULT NULL,
+            `post_status` varchar(20) NOT NULL DEFAULT 'vof_temp',
+            `vof_tier` varchar(50) DEFAULT NULL,
+            `post_parent_cat` bigint(20) unsigned NOT NULL,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `expires_at` datetime,
-            PRIMARY KEY (`id`),
-            KEY `uuid` (`uuid`),
+            PRIMARY KEY (`uuid`),
+            UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
-            KEY `meta_key` (`meta_key`),
+            KEY `post_parent_cat` (`post_parent_cat`),
             KEY `expires_at` (`expires_at`)
         ) $charset_collate;";
     }
@@ -184,56 +209,39 @@ class VOF_Temp_User_Meta {
     public function vof_get_all_records() {
         global $wpdb;
     
-        $query = "SELECT * FROM {$this->table_name}";
+        $query = "SELECT * FROM {$this->table_name} ORDER BY created_at DESC";
         error_log('VOF Debug: Running query: ' . $query);
         
         $results = $wpdb->get_results($query, ARRAY_A);
-        error_log('VOF Debug: Query results: ' . print_r($results, true));
-    
+        
         if (!$results) {
-            error_log('VOF Debug: No records found');
+            error_log('VOF Debug: No records found or error occurred. MySQL Error: ' . $wpdb->last_error);
             return [];
         }
     
-        // Group results by UUID
-        $grouped_results = [];
-        foreach ($results as $row) {
-            $uuid = $row['uuid'];
-            if (!isset($grouped_results[$uuid])) {
-                $grouped_results[$uuid] = [
-                    'uuid' => $uuid,
-                    'post_id' => $row['post_id'],
-                    'created_at' => $row['created_at'],
-                    'expires_at' => $row['expires_at'],
-                    'meta_data' => []
-                ];
-            }
-            $grouped_results[$uuid]['meta_data'][$row['meta_key']] = $row['meta_value'];
-        }
-    
-        error_log('VOF Debug: Grouped results: ' . print_r($grouped_results, true));
-        return array_values($grouped_results);
+        error_log('VOF Debug: Found ' . count($results) . ' records');
+        return $results;
     }
 
     public function vof_create_test_record() {
-        // Sample data
-        $post_id = 123; // Use a real post ID from your system
-        $meta_data = array(
+        $post_id = 123; // Test post ID
+        $data = array(
             'vof_email' => 'test@example.com',
             'vof_phone' => '1234567890',
-            'vof_whatsapp_number' => '1234567890'
+            'vof_whatsapp_number' => '1234567890',
+            'post_parent_cat' => 1
         );
     
-        // Debug log before creation
-        error_log('VOF Debug: Creating test record with data: ' . print_r($meta_data, true));
+        error_log('VOF Debug: Creating test record with data: ' . print_r($data, true));
         
-        // Create record and return uuid
-        $uuid = $this->vof_create_temp_user($post_id, $meta_data);
+        $uuid = $this->vof_create_temp_user($post_id, $data);
         
-        // Debug log after creation
-        error_log('VOF Debug: Created test record with UUID: ' . $uuid);
+        if ($uuid) {
+            error_log('VOF Debug: Created test record with UUID: ' . $uuid);
+        } else {
+            error_log('VOF Debug: Failed to create test record');
+        }
         
         return $uuid;
     }
-
 }
