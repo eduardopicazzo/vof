@@ -170,16 +170,16 @@
                 $form.rtclBlock();
             },
             success: function(response) {
-                console.log('VOF: Submission response:', response);
+                console.log('VOF Debug: Response received:', response);
                 
                 // Log response
-                vof_logs.responses.success = {
-                    timestamp: new Date().toISOString(),
-                    response: response
-                };
+                // vof_logs.responses.success = {
+                //     timestamp: new Date().toISOString(),
+                //     response: response
+                // };
 
                 // Download logs 
-                vof_download_logs(vof_logs);
+                // vof_download_logs(vof_logs);
 
                 $form.find('button[type=submit], button[type=button]').prop("disabled", false);
                 $form.rtclUnblock();
@@ -191,32 +191,42 @@
                     });
                 }
 
-                if (response.success || (response.data && response.data.success)) {
-                    const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
+                // if (response.success || (response.data && response.data.success)) {
+                if (response.success) {
+                    // const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
                     
-                    $form[0].reset();
+                    const checkoutUrl = response.data?.data?.checkout_url;
+                    console.log('VOF Debug: Checkout URL:', checkoutUrl);
+
+                    // $form[0].reset();
                     if (msg) {
                         $msgHolder.removeClass('alert-danger')
-                                .addClass('alert-success')
-                                .html(msg)
-                                .appendTo($form);
+                                  .addClass('alert-success')
+                                  .html(msg)
+                                  .appendTo($form);
                     }
                     
-                    // Handle redirection with delay to ensure logs are downloaded
-                    if (redirectUrl) {
-                        console.log('VOF: Redirecting to:', redirectUrl);
+                    // Handle Stripe checkout redirect
+                    if (checkoutUrl) {
+                        console.log('VOF Debug: Redirecting to Stripe checkout:', checkoutUrl);
                         setTimeout(function() {
-                            window.location.href = redirectUrl;
+                            window.location.href = checkoutUrl;
                         }, 1000);
                     } else {
-                        console.error('VOF: No redirect URL found in response');
+                        console.error('VOF Debug: No checkout URL found in response');
+                        // Fallback to regular redirect
+                        // const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
+                        const redirectUrl = response.redirect_url || response.data?.redirect_url;
+                        if (redirectUrl) {
+                            window.location.href = redirectUrl;
+                        }
                     }
                 } else {
                     if (msg) {
                         $msgHolder.removeClass('alert-success')
-                                .addClass('alert-danger')
-                                .html(msg)
-                                .appendTo($form);
+                                  .addClass('alert-danger')
+                                  .html(msg)
+                                  .appendTo($form);
                     }
                 }
             },
@@ -236,9 +246,9 @@
                 $form.rtclUnblock();
                 
                 $msgHolder.removeClass('alert-success')
-                        .addClass('alert-danger')
-                        .html(e.responseText)
-                        .appendTo($form);
+                          .addClass('alert-danger')
+                          .html(e.responseText)
+                          .appendTo($form);
             }
         });
     };

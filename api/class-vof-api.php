@@ -98,7 +98,7 @@ class VOF_API {
             }
 
             // Get available tiers for parent category
-            $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
+            $tiers = $this->vof_get_tiers_for_category($user_data['vof_tier']);
 
             return rest_ensure_response([
                 'success' => true,
@@ -118,14 +118,25 @@ class VOF_API {
         }
     }
 
-    private function vof_get_tiers_for_category($parent_cat_id) {
+    // private function vof_get_tiers_for_category($parent_cat_id) {
+    private function vof_get_tiers_for_category($vof_tier) {
         // TODO: Implement tier fetching based on category
         // This will be replaced with actual tier logic
-        return [
-            ['id' => 'basic', 'name' => 'Basic', 'price_id' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3'],
-            ['id' => 'premium', 'name' => 'Premium', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
-            ['id' => 'professional', 'name' => 'Professional', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
-        ];
+        switch ($vof_tier) {
+            case 'limit_tiers':
+                return [
+                    ['id' => 'noise', 'name' => 'noise', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
+                    ['id' => 'noise_plus', 'name' => 'noise+', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
+                ];
+                break;
+            default:
+                return [
+                    ['id' => 'biz', 'name' => 'biz', 'price_id' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3'],
+                    ['id' => 'noise', 'name' => 'noise', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
+                    ['id' => 'noise_plus', 'name' => 'noise+', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
+                ];
+                break;
+        }
     }
 
     public function vof_process_checkout($request) {
@@ -148,7 +159,8 @@ class VOF_API {
             $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
             
             // Get tiers for category
-            $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
+            // $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
+            $tiers = $this->vof_get_tiers_for_category($user_data['vof_tier']);
             
             // Create line items
             $line_items = array_map(function($tier) {

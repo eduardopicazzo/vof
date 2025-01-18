@@ -202,6 +202,10 @@ class VOF_Listing {
         VOF_Listing::vof_get_set_extra_listing_fields($post_id);
         VOF_Listing::vof_handle_gallery_attachments($post_id);
         VOF_Listing::vof_set_ad_type($post_id, $listing_type, $category_id);
+        
+        // Initialize new listing metadata (test if need conditionals...)
+        update_post_meta( $post_id, 'featured', 0 ); 
+        update_post_meta( $post_id, '_views', 0 );
 
         // Set category
         wp_set_object_terms($post_id, [$category->term_id], rtcl()->category);

@@ -66,8 +66,6 @@ class VOF_Temp_User_Meta {
                 'vof_phone' => $data['vof_phone'],
                 'vof_whatsapp' => $data['vof_whatsapp_number'] ?? null,
                 'post_status' => $data['post_status'],
-                // 'post_status' => 'vof_temp',
-                // 'vof_tier' => null, // Will be set during checkout
                 'vof_tier' => $data['vof_tier'],
                 'post_parent_cat' => $data['post_parent_cat'] ?? 0,
                 'expires_at' => $expires_at
