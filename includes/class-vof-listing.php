@@ -34,8 +34,10 @@ class VOF_Listing {
     }
 
     public function vof_custom_submit_button($post_id) {
+        $form_handler = new \VOF\VOF_Form_Handler();
         if (!is_user_logged_in() && $this->vof_is_post_ad_page()) {
             $this->vof_render_guest_submit_button();
+            $form_handler->vof_show_pricing_modal();
             return;
         }
 

@@ -6,6 +6,9 @@ use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 use VOF\API\VOF_API;
 use VOF\Utils\Stripe\VOF_Stripe_Config;
 use VOF\Utils\Stripe\VOF_Stripe_Settings;
+// CHANGE: Added VOF_Pricing_Modal imports
+use VOF\VOF_Pricing_Modal as VOFVOF_Pricing_Modal;
+use VOF_Pricing_Modal;
 
 class VOF_Core {
     private static $instance = null;
@@ -16,6 +19,8 @@ class VOF_Core {
     private $temp_user_meta;
     private $vof_helper;
     private $stripe_config;
+    // Add property
+    private $vof_pricing_modal;
 
 
     public static function instance() {
@@ -107,6 +112,10 @@ class VOF_Core {
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->vof_helper = new VOF_Helper_Functions();
         $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
+        // Add initialization
+        $this->vof_pricing_modal = new \VOF\VOF_Pricing_Modal();
+        // Add this line to initialize pricing modal
+        $this->vof_init_pricing_modal();
         
         // Initialize only if needed
         if (is_admin()) {
@@ -150,6 +159,14 @@ class VOF_Core {
         } catch (\Exception $e) {
             error_log('VOF Error: Failed to initialize API - ' . $e->getMessage());
         }
+    }
+
+    // Add this method
+    public function vof_init_pricing_modal() {
+        // require_once plugin_dir_path(__FILE__) . 'class-vof-pricing-modal';
+        // require_once VOF_PLUGIN_DIR . 'class-vof-pricing-modal.php';
+        $pricing_modal = new \VOF\VOF_Pricing_Modal();
+        add_action('wp_footer', array($pricing_modal, 'vof_render_modal'));
     }
 
     public function load_textdomain() {

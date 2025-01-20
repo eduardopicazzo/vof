@@ -71,5 +71,39 @@ class VOF_Assets {
             'redirectUrl' => VOF_Constants::REDIRECT_URL,
             'security' => wp_create_nonce('vof_temp_listing_nonce')
         ]);
+
+        self::vof_enqueue_pricing_modal_assets();
+    }
+
+    public function vof_enqueue_pricing_modal_assets() {
+        error_log('VOF Debug: Enqueueing modal assets');
+
+        wp_enqueue_style(
+            'vof-pricing-modal-style', 
+            plugins_url('../assets/css/vof-pricing-modal-style.css', __FILE__),
+            array(),
+            VOF_VERSION,
+            'all' // add media type
+        );
+
+        wp_enqueue_script(
+            'vof-pricing-modal-script',
+            plugins_url('../assets/js/vof-pricing-modal-script.js', __FILE__), 
+            array('jquery'), 
+            VOF_VERSION,
+            true
+        );
+
+        // Add localization for modal JavaScript
+        wp_localize_script('vof-pricing-modal-script', 'vofPricingModal', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('vof-pricing-modal'),
+            'strings' => array(
+                'errorMessage' => __('Error loading pricing data', 'vendor-onboarding-flow'),
+                'successMessage' => __('Pricing data loaded successfully', 'vendor-onboarding-flow')
+            )
+        ));
+
+        error_log('VOF Debug: Modal assets enqueued');
     }
 }

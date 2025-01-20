@@ -276,6 +276,17 @@ class VOF_Form_Handler {
         // }
 	}
 
+	public function vof_show_pricing_modal() {
+		?>
+		<script>
+			function openPricingModal() {
+				window.openModal(false);
+			}
+		</script>
+		<button onclick="openPricingModal()">View Pricing Plans</button>
+		<?php
+	}
+
 	/**
 	 * Core listing submission handler for the RTCL (Real-Time Classified Listing) plugin
 	 * 

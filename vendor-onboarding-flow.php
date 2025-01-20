@@ -33,6 +33,7 @@ require_once VOF_PLUGIN_DIR . 'includes/class-vof-core.php';
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-assets.php';
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-form-handler.php';
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-listing.php';
+require_once VOF_PLUGIN_DIR . 'includes/class-vof-pricing-modal.php';
 
 // Initialize the plugin
 function vof() {
