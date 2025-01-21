@@ -6,9 +6,7 @@ use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 use VOF\API\VOF_API;
 use VOF\Utils\Stripe\VOF_Stripe_Config;
 use VOF\Utils\Stripe\VOF_Stripe_Settings;
-// CHANGE: Added VOF_Pricing_Modal imports
-use VOF\VOF_Pricing_Modal as VOFVOF_Pricing_Modal;
-use VOF_Pricing_Modal;
+use VOF\VOF_Pricing_Modal;
 
 class VOF_Core {
     private static $instance = null;
@@ -19,7 +17,6 @@ class VOF_Core {
     private $temp_user_meta;
     private $vof_helper;
     private $stripe_config;
-    // Add property
     private $vof_pricing_modal;
 
 
@@ -53,8 +50,6 @@ class VOF_Core {
     public static function vof_activate() {
         // Run DB Updates (if needed)
         add_action('vof_DB', 'vof_run_db_updates');
-
-        // Create temp user meta table
         VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
 
         // Schedule cleanup cron job
@@ -64,8 +59,6 @@ class VOF_Core {
 
         // Register post status for temporary listings
         VOF_Helper_Functions::vof_register_temp_post_status();
-
-        // Maybe add other activation tasks
         do_action( 'vof_activated' );
     }
 
@@ -75,7 +68,6 @@ class VOF_Core {
     public static function vof_deactivate() {
         // Clear scheduled cron
         wp_clear_scheduled_hook( 'vof_cleanup_temp_data' );
-
         // Maybe add other cleanup tasks
         do_action( 'vof_deactivated' );
     }
@@ -84,25 +76,15 @@ class VOF_Core {
      * Initialize hooks and dependencies
      */
     private function init_hooks() {
-        // Check dependencies first
         if (!VOF_Dependencies::check()) {
             return;
         }
 
-        // Initialize API first since other components might need it
-        $this->api = VOF_API::vof_api_get_instance();
-
-        // Initialize REST API with later priority
-        add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15); // higher (later) priority 
-
-        // Initialize components
+        $this->api = VOF_API::vof_api_get_instance(); // Initialize API first since other components might need it
+        add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15); // higher (later) priority (Initialize REST API with later priority)
         add_action('init', [$this, 'init_components'], 0);
-          
-        // Load text domain
-        add_action('init', [$this, 'load_textdomain']);
-
-        // Add cleanup hook
-        add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] );
+        add_action('init', [$this, 'load_textdomain']); // Load text domain
+        add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
     }
 
     public function init_components() {
@@ -112,20 +94,23 @@ class VOF_Core {
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->vof_helper = new VOF_Helper_Functions();
         $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
-        // Add initialization
-        $this->vof_pricing_modal = new \VOF\VOF_Pricing_Modal();
-        // Add this line to initialize pricing modal
-        $this->vof_init_pricing_modal();
+
+        // Initialize vof pricing modal only if needed 
+        if($this->vof_should_init_pricing_modal()) {
+            $this->vof_pricing_modal = new VOF_Pricing_Modal();
+        }
         
         // Initialize only if needed
         if (is_admin()) {
             // Admin specific initializations
-            
             // Adds the vof_temp_post records view in admin
             add_action( 'admin_menu', [$this, 'vof_add_admin_menu'] );
-            // initialize vof-stripe adming dashboard
-            new VOF_Stripe_Settings();
+            new VOF_Stripe_Settings(); // initialize vof-stripe admin dashboard
         }
+    }
+
+    public function vof_should_init_pricing_modal() {
+        return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
     }
 
     // uncomment in case need rebuild vof_temp_user_db
@@ -133,8 +118,6 @@ class VOF_Core {
         $this->temp_user_meta->vof_maybe_create_table();
     }
 
-
-    // Add cleanup method
     public function vof_cleanup_temp_data() {
         if ($this->temp_user_meta) {
             $this->temp_user_meta->vof_delete_expired_data();
@@ -161,14 +144,6 @@ class VOF_Core {
         }
     }
 
-    // Add this method
-    public function vof_init_pricing_modal() {
-        // require_once plugin_dir_path(__FILE__) . 'class-vof-pricing-modal';
-        // require_once VOF_PLUGIN_DIR . 'class-vof-pricing-modal.php';
-        $pricing_modal = new \VOF\VOF_Pricing_Modal();
-        add_action('wp_footer', array($pricing_modal, 'vof_render_modal'));
-    }
-
     public function load_textdomain() {
         load_plugin_textdomain(
             'vendor-onboarding-flow',
@@ -177,17 +152,11 @@ class VOF_Core {
         );
     }
 
-    // Getters for components
-    /**
-     * Get Stripe config instance
-     */
+    // Getters
     public function vof_get_stripe_config() {
         return $this->stripe_config;
     }
 
-    /**
-     * Get API instance
-     */
     public function vof_get_vof_api() {
         if (!$this->api) {
             $this->api = VOF_API::vof_api_get_instance();

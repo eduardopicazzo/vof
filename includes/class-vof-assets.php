@@ -8,7 +8,11 @@ class VOF_Assets {
 
     public function enqueue_scripts() {
         // Only load on listing submission page
-        if (!is_page('post-an-ad')) {
+        // if (!is_page('post-an-ad')) {
+        //     return;
+        // }
+
+        if(!$this->vof_is_post_ad_page()) {
             return;
         }
 
@@ -73,6 +77,11 @@ class VOF_Assets {
         ]);
 
         self::vof_enqueue_pricing_modal_assets();
+    }
+
+    private function vof_is_post_ad_page() {
+        // return only if true.
+        return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
     }
 
     public function vof_enqueue_pricing_modal_assets() {

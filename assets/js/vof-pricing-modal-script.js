@@ -1,5 +1,5 @@
 // At the top of your modal script
-console.log('VOF Debug: Modal script loaded');
+console.log('VOF Debug: Pricing Modal script loaded');
 
 // Global state
 let modalState = {
@@ -57,60 +57,60 @@ let modalState = {
 // Global function declarations
 function createTierElement(tier, index) {
     const tierElement = document.createElement('div');
-    tierElement.className = `tier ${tier.isRecommended ? 'recommended' : ''} ${tier.isGrayOut ? 'gray-out' : ''}`;
+    tierElement.className = `vof-pm-tier ${tier.isRecommended ? 'vof-pm-recommended' : ''} ${tier.isGrayOut ? 'vof-pm-gray-out' : ''}`;
     
     tierElement.innerHTML = `
-        <div class="tier-header">
-            ${tier.isRecommended && !tier.isGrayOut ? '<div class="recommended-badge">Recomendada</div>' : ''}
-            <h3 class="tier-name">${tier.name}</h3>
-            <p class="tier-description">${tier.description}</p>
+        <div class="vof-pm-tier-header">
+            ${tier.isRecommended && !tier.isGrayOut ? '<div class="vof-pm-recommended-badge">Recomendada</div>' : ''}
+            <h3 class="vof-pm-tier-name">${tier.name}</h3>
+            <p class="vof-pm-tier-description">${tier.description}</p>
         </div>
-        <div class="tier-price">
+        <div class="vof-pm-tier-price">
             MXN ${tier.price} <span>por mes</span>
         </div>
-        <button class="btn ${tier.isGrayOut ? 'btn-disabled' : 'btn-primary'}" ${tier.isGrayOut ? 'disabled' : ''}>
+        <button class="vof-pm-btn ${tier.isGrayOut ? 'vof-pm-btn-disabled' : 'vof-pm-btn-primary'}" ${tier.isGrayOut ? 'disabled' : ''}>
             <span>${tier.isGrayOut ? 'No disponible' : 'Suscribirse'}</span>
         </button>
-        <div class="tier-features">
+        <div class="vof-pm-tier-features">
             <h4>Esto incluye:</h4>
-            <ul class="feature-list">
+            <ul class="vof-pm-feature-list">
                 ${tier.features.map(feature => `<li>${feature}</li>`).join('')}
             </ul>
         </div>
     `;
     
     setTimeout(() => {
-        tierElement.classList.add('fade-in');
+        tierElement.classList.add('vof-pm-fade-in');
     }, index * 100);
     
     return tierElement;
 }
 
 function renderTabs() {
-    const tabsContainer = document.getElementById('tabsContainer');
+    const tabsContainer = document.getElementById('vof-pm-tabsContainer'); // missed
     if (!tabsContainer) return;
 
     if (modalState.isMultiPricingOn) {
-        tabsContainer.classList.remove('single-tab');
+        tabsContainer.classList.remove('vof-pm-single-tab');
         tabsContainer.innerHTML = `
-            <button class="tab-btn active" data-tab="monthly">Mensualmente</button>
-            <button class="tab-btn" data-tab="yearly">Anualmente</button>
+            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
+            <button class="vof-pm-tab-btn" data-tab="yearly">Anualmente</button>
         `;
     } else {
-        tabsContainer.classList.add('single-tab');
+        tabsContainer.classList.add('vof-pm-single-tab');
         tabsContainer.innerHTML = `
-            <button class="tab-btn active" data-tab="monthly">Mensualmente</button>
+            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
         `;
     }
 
-    const newTabBtns = document.querySelectorAll('.tab-btn');
+    const newTabBtns = document.querySelectorAll('.vof-pm-tab-btn');
     newTabBtns.forEach(btn => {
         btn.addEventListener('click', switchTab);
     });
 }
 
 function renderTiers() {
-    const tierContainer = document.querySelector('.tier-container');
+    const tierContainer = document.querySelector('.vof-pm-tier-container');
     if (!tierContainer) return;
 
     tierContainer.innerHTML = '';
@@ -123,14 +123,15 @@ function renderTiers() {
 function switchTab(event) {
     const tabName = event.target.getAttribute('data-tab');
     
-    const currentTabBtns = document.querySelectorAll('.tab-btn');
-    const currentTabContents = document.querySelectorAll('.tab-content');
+    const currentTabBtns = document.querySelectorAll('.vof-pm-tab-btn');
+    const currentTabContents = document.querySelectorAll('.vof-pm-tab-content');
     
-    currentTabBtns.forEach(btn => btn.classList.remove('active'));
-    currentTabContents.forEach(content => content.classList.remove('active'));
+    currentTabBtns.forEach(btn => btn.classList.remove('vof-pm-active'));
+    currentTabContents.forEach(content => content.classList.remove('vof-pm-active'));
     
-    event.target.classList.add('active');
-    document.getElementById(`${tabName}Content`).classList.add('active');
+    event.target.classList.add('vof-pm-active');
+    document.getElementById(`vof-pm-${tabName}Content`).classList.add('vof-pm-active');
+    // document.getElementById(`#vof-pm-${tabName}Content`).classList.add('vof-pm-active');
 }
 
 function updateModalState(newState) {
@@ -140,10 +141,10 @@ function updateModalState(newState) {
 }
 
 function closeModal() {
-    const modal = document.getElementById('pricingModal');
+    const modal = document.getElementById('vof-pm-pricingModal');
     if (!modal) return;
 
-    modal.classList.remove('open');
+    modal.classList.remove('vof-pm-open');
     document.body.style.overflow = 'auto';
 }
 
@@ -151,7 +152,7 @@ function openModal(useApiData = false) {
     // comment debug later
     console.log('VOF Debug: openModal called with:', useApiData);
 
-    const modal = document.getElementById('pricingModal');
+    const modal = document.getElementById('vof-pm-pricingModal');
     
     // comment debug later
     console.log('VOF Debug: Modal element:', modal);
@@ -217,7 +218,7 @@ function openModal(useApiData = false) {
         };
     }
     
-    modal.classList.add('open');
+    modal.classList.add('vof-pm-open');
     document.body.style.overflow = 'hidden';
     renderTabs();
     renderTiers();
@@ -227,13 +228,13 @@ function openModal(useApiData = false) {
 window.openModal = openModal;
 window.updateModalState = updateModalState;
 
-// Initialize event listeners when DOM is ready
+// Initialize event listeners when DOM is ready NEW
 document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('pricingModal');
-    const openModalBtn = document.getElementById('openModalBtn');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const contactSalesBtn = document.getElementById('contactSalesBtn');
+    const modal = document.getElementById('vof-pm-pricingModal');
+    const openModalBtn = document.getElementById('vof-pm-openModalBtn');
+    const closeModalBtn = document.getElementById('vof-pm-closeModalBtn');
+    const cancelBtn = document.getElementById('vof-pm-cancelBtn');
+    const contactSalesBtn = document.getElementById('vof-pm-contactSalesBtn');
 
     // Add event listeners if elements exist
     if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(false));
@@ -253,3 +254,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+
+////// OLD
+
+// Initialize event listeners when DOM is ready OLD
+// document.addEventListener('DOMContentLoaded', function() {
+//     const modal = document.getElementById('pricingModal');
+//     const openModalBtn = document.getElementById('openModalBtn'); // MAYBE ON JS FILE
+//     const closeModalBtn = document.getElementById('closeModalBtn');
+//     const cancelBtn = document.getElementById('cancelBtn');
+//     const contactSalesBtn = document.getElementById('contactSalesBtn');
+
+//     // Add event listeners if elements exist
+//     if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(false));
+//     if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+//     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+//     if (contactSalesBtn) {
+//         contactSalesBtn.addEventListener('click', () => {
+//             alert('Contactando a ventas...');
+//             closeModal();
+//         });
+//     }
+
+//     // Close on outside click
+//     window.addEventListener('click', (event) => {
+//         if (event.target === modal) {
+//             closeModal();
+//         }
+//     });
+// });

@@ -283,7 +283,7 @@ class VOF_Form_Handler {
 				window.openModal(false);
 			}
 		</script>
-		<button onclick="openPricingModal()">View Pricing Plans</button>
+		<button id="vof-pm-openModalBtn" class="vof-pm-btn-trigger" onclick="openPricingModal()">View Pricing Plans</button>
 		<?php
 	}
 
