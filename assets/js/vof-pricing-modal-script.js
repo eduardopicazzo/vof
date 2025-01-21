@@ -230,11 +230,17 @@ window.updateModalState = updateModalState;
 
 // Initialize event listeners when DOM is ready NEW
 document.addEventListener('DOMContentLoaded', function() {
+    const modalPreventClose = document.querySelector('.vof-pm-modal');
     const modal = document.getElementById('vof-pm-pricingModal');
     const openModalBtn = document.getElementById('vof-pm-openModalBtn');
     const closeModalBtn = document.getElementById('vof-pm-closeModalBtn');
     const cancelBtn = document.getElementById('vof-pm-cancelBtn');
     const contactSalesBtn = document.getElementById('vof-pm-contactSalesBtn');
+
+    // Prevent closing modal when clicking inside
+    modalPreventClose.addEventListener('click', (event) => {
+        event.stopPropagation();
+    });
 
     // Add event listeners if elements exist
     if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(false));

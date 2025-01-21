@@ -1,349 +1,375 @@
-    /* Import Schibsted Grotesk font */
-    @import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
-    .vof-pm-wrapper * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/* Import Schibsted Grotesk font */
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
+
+/* Reset and protect styles from theme interference */
+.vof-pm-wrapper.vof-pm-wrapper {
+    all: initial;
+    font-family: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body .vof-pm-wrapper,
+.vof-pm-wrapper * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    font-family: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* Button trigger styling */
+body .vof-pm-btn-trigger {
+    padding: 8px 16px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: white !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    color: #1a202c !important;
+}
+
+/* Modal base styling */
+body .vof-pm-modal {
+    display: none;
+    position: fixed !important;
+    z-index: 999999 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    padding: 16px !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+body .vof-pm-modal.vof-pm-open {
+    display: flex !important;
+}
+
+/* Modal content */
+body .vof-pm-modal-content {
+    background: white !important;
+    width: 100% !important;
+    max-width: 900px !important;
+    border-radius: 12px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    margin: auto !important;
+}
+
+/* Modal header */
+body .vof-pm-modal-header {
+    padding: 16px 24px !important;
+    position: relative !important;
+}
+
+body .vof-pm-modal-title {
+    padding-top: 27px !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #1a202c !important;
+}
+
+body .vof-pm-close-btn {
+    position: absolute !important;
+    right: 16px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: none !important;
+    border: none !important;
+    font-size: 20px !important;
+    cursor: pointer !important;
+    color: #4a5568 !important;
+    padding: 4px !important;
+}
+
+/* Tabs styling */
+body .vof-pm-tabs {
+    display: flex !important;
+    padding: 3px !important;
+    width: calc(100% - 48px) !important;
+    background: #F4F4F5 !important;
+    border-radius: 4px !important;
+    margin: 16px 24px !important;
+}
+
+body .vof-pm-tabs.vof-pm-single-tab {
+    justify-content: center !important;
+}
+
+body .vof-pm-tab-btn {
+    flex: 1 !important;
+    padding: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    color: #71717A !important;
+    transition: all 0.2s !important;
+}
+
+body .vof-pm-tab-btn.vof-pm-active {
+    background: white !important;
+    color: #18181B !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Tab content */
+body .vof-pm-tab-content {
+    display: none;
+    padding: 10px 24px 16px !important;
+}
+
+body .vof-pm-tab-content.vof-pm-active {
+    display: block !important;
+}
+
+/* Tier container */
+body .vof-pm-tier-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+    margin-bottom: 16px !important;
+}
+
+/* Individual tiers */
+body .vof-pm-tier {
+    border: 1px solid #E4E4E7 !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease !important;
+}
+
+body .vof-pm-tier.vof-pm-fade-in {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+}
+
+body .vof-pm-tier.vof-pm-recommended {
+    background-color: #FFF1F2 !important;
+}
+
+body .vof-pm-tier.vof-pm-gray-out {
+    background-color: #f7fafc !important;
+    opacity: 0.5 !important;
+}
+
+/* Recommended badge */
+body .vof-pm-recommended-badge {
+    background-color: #A94F4E !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    display: inline-block !important;
+    margin-bottom: 12px !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+body .vof-pm-recommended-badge::before {
+    /* content: '' !important; */
+    /* position: absolute !important; */
+    /* top: 0 !important; */
+    /* left: -100% !important; */
+    /* width: 100% !important; */
+    /* height: 100% !important; */
+    /* background: linear-gradient( */
+        /* 90deg, */
+        /* transparent, */
+        /* rgba(255, 255, 255, 0.5), */
+        /* transparent */
+    /* ) !important; */
+    /* animation: vof-pm-shimmer 3s infinite !important; */
+    /* transform: skewX(-30deg) !important; */
+
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.5),
+        transparent
+    ) !important;
+    animation: vof-pm-shimmer 3s infinite !important;
+    transform: skewX(-30deg) !important;
+}
+
+@keyframes vof-pm-shimmer {
+    0% { left: -100%; }
+    20% { left: 100%; }
+    100% { left: 100%; }
+}
+
+/* Tier content */
+body .vof-pm-tier-name {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1a202c !important;
+    margin-bottom: 6px !important;
+}
+
+body .vof-pm-tier-description {
+    font-size: 13px !important;
+    color: #4a5568 !important;
+    margin-bottom: 16px !important;
+    line-height: 1.4 !important;
+}
+
+body .vof-pm-tier-price {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    color: #1a202c !important;
+    margin-bottom: 16px !important;
+}
+
+body .vof-pm-tier-price span {
+    font-size: 13px !important;
+    font-weight: normal !important;
+    color: #4a5568 !important;
+}
+
+/* Buttons */
+body .vof-pm-btn {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    margin-bottom: 16px !important;
+}
+
+body .vof-pm-btn-primary {
+    background-color: #A94F4E !important;
+    color: white !important;
+}
+
+body .vof-pm-btn-primary span {
+    cursor: pointer !important;
+    display: inline-block !important;
+    position: relative !important;
+    transition: 0.5s !important;
+}
+
+body .vof-pm-btn-primary:hover {
+    background-color: #000000 !important;
+}
+
+body .vof-pm-btn-primary span:after {
+    content: '👉' !important;
+    position: absolute !important;
+    opacity: 0 !important;
+    top: -4px !important;
+    right: -20px !important;
+    transition: 0.5s !important;
+    font-size: 18px !important;
+}
+
+body .vof-pm-btn-primary:hover span {
+    padding-right: 30px !important;
+}
+
+body .vof-pm-btn-primary:hover span:after {
+    opacity: 1 !important;
+    right: 0 !important;
+}
+
+body .vof-pm-btn-disabled {
+    background-color: #ababab !important;
+    color: #FBFBFB !important;
+    cursor: not-allowed !important;
+}
+
+/* Features section */
+body .vof-pm-tier-features h4 {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #000000 !important;
+    margin-bottom: 12px !important;
+}
+
+body .vof-pm-feature-list {
+    list-style: none !important;
+}
+
+body .vof-pm-feature-list li {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    font-size: 13px !important;
+    color: #000000 !important;
+    margin-bottom: 8px !important;
+    line-height: 1.4 !important;
+}
+
+body .vof-pm-feature-list li::before {
+    content: "✓" !important;
+    color: #4a5568 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Yearly message */
+body .vof-pm-yearly-message {
+    text-align: center !important;
+    color: #4a5568 !important;
+    padding: 32px 0 !important;
+    font-size: 13px !important;
+}
+
+/* Modal footer */
+body .vof-pm-modal-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 16px 24px !important;
+}
+
+body .vof-pm-btn-footer {
+    padding: 8px 16px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+}
+
+body .vof-pm-btn-ghost {
+    background: none !important;
+    border: none !important;
+    color: #4a5568 !important;
+}
+
+body .vof-pm-btn-contact {
+    background: #000 !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    body .vof-pm-tier-container {
+        grid-template-columns: 1fr !important;
     }
 
-    .vof-pm-wrapper body {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #f7fafc;
+    body .vof-pm-modal-content {
+        height: 100% !important;
+        border-radius: 12px !important;
+        overflow-y: auto !important;
     }
 
-    .vof-pm-btn-trigger {
-        padding: 8px 16px;
-        border: 1px solid #e2e8f0;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        color: #1a202c;
+    body .vof-pm-modal-footer {
+        flex-direction: column !important;
+        gap: 8px !important;
     }
 
-    .vof-pm-modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 16px;
-        align-items: center;
-        justify-content: center;
+    body .vof-pm-btn-footer {
+        width: 100% !important;
+        text-align: center !important;
     }
-
-    .vof-pm-modal.vof-pm-open {
-        display: flex;
-    }
-
-    .vof-pm-modal-content {
-        background: white;
-        width: 100%;
-        max-width: 900px;
-        border-radius: 12px;
-        position: relative;
-        overflow: hidden;
-        margin: auto;
-    }
-
-    .vof-pm-modal-header {
-        padding: 16px 24px;
-        position: relative;
-    }
-
-    .vof-pm-modal-title {
-        padding-top: 27px;
-        font-size: 20px;
-        font-weight: 600;
-        color: #1a202c;
-    }
-
-    .vof-pm-close-btn {
-        position: absolute;
-        right: 16px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        font-size: 20px;
-        cursor: pointer;
-        color: #4a5568;
-        padding: 4px;
-    }
-
-    .vof-pm-tabs {
-        display: flex;
-        padding: 3px;
-        width: 100%;
-        background: #F4F4F5;
-        border-radius: 4px;
-        margin: 16px 24px;
-        width: calc(100% - 48px);
-    }
-
-    .vof-pm-tabs.vof-pm-single-tab {
-        justify-content: center;
-    }
-
-    .vof-pm-tab-btn {
-        flex: 1;
-        padding: 8px;
-        border: none;
-        background: transparent;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        color: #71717A;
-        transition: all 0.2s;
-    }
-
-    .vof-pm-tab-btn.vof-pm-active {
-        background: white;
-        color: #18181B;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    }
-
-    .vof-pm-tab-content {
-        display: none;
-        padding: 10px 24px 16px;
-    }
-
-    .vof-pm-tab-content.vof-pm-active {
-        display: block;
-    }
-
-    .vof-pm-tier-container {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-bottom: 16px;
-    }
-    
-    .vof-pm-tier {
-        border: 1px solid #E4E4E7;
-        border-radius: 8px;
-        padding: 16px;
-        opacity: 0;
-        transform: translateY(20px);
-        transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-
-    .vof-pm-tier.vof-pm-fade-in {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    .vof-pm-tier.vof-pm-recommended {
-        background-color: #FFF1F2;
-    }
-
-    .vof-pm-tier.vof-pm-gray-out {
-        background-color: #f7fafc;
-        opacity: 0.5;
-    }
-
-    .vof-pm-recommended-badge {
-        background-color: #A94F4E;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        display: inline-block;
-        margin-bottom: 12px;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .vof-pm-recommended-badge::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(255, 255, 255, 0.5),
-            transparent
-        );
-        animation: vof-pm-shimmer 3s infinite;
-        transform: skewX(-30deg);
-    }
-
-    @keyframes vof-pm-shimmer {
-        0% {
-            left: -100%;
-        }
-        20% {
-            left: 100%;
-        }
-        100% {
-            left: 100%;
-        }
-    }
-
-    .vof-pm-tier-name {
-        font-size: 18px;
-        font-weight: 600;
-        color: #1a202c;
-        margin-bottom: 6px;
-    }
-
-    .vof-pm-tier-description {
-        font-size: 13px;
-        color: #4a5568;
-        margin-bottom: 16px;
-        line-height: 1.4;
-    }
-
-    .vof-pm-tier-price {
-        font-size: 28px;
-        font-weight: 700;
-        color: #1a202c;
-        margin-bottom: 16px;
-    }
-
-    .vof-pm-tier-price span {
-        font-size: 13px;
-        font-weight: normal;
-        color: #4a5568;
-    }
-
-    .vof-pm-btn {
-        width: 100%;
-        padding: 8px 12px;
-        border: none;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        margin-bottom: 16px;
-    }
-
-    .vof-pm-btn-primary {
-        background-color: #A94F4E;
-        color: white;
-    }
-
-    .vof-pm-btn-primary span {
-        cursor: pointer;
-        display: inline-block;
-        position: relative;
-        transition: 0.5s;
-    }
-    
-    .vof-pm-btn-primary:hover {
-        background-color: #000000;
-    }
-
-    .vof-pm-btn-primary span:after {
-        content: '👉';
-        position: absolute;
-        opacity: 0;
-        top: -6px;
-        right: -20px;
-        transition: 0.5s;
-        font-size: 18px;
-    }
-    
-    .vof-pm-btn-primary:hover span{
-        padding-right: 30px;
-    }
-    
-    .vof-pm-btn-primary:hover span:after {
-        opacity: 1;
-        right:0;
-    }
-
-    .vof-pm-btn-disabled {
-        background-color: #ababab;
-        color: #FBFBFB;
-        cursor: not-allowed;
-    }
-
-    .vof-pm-tier-features h4 {
-        font-size: 13px;
-        font-weight: 500;
-        color: #000000;
-        margin-bottom: 12px;
-    }
-
-    .vof-pm-feature-list {
-        list-style: none;
-    }
-
-    .vof-pm-feature-list li {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        font-size: 13px;
-        color: #000000;
-        margin-bottom: 8px;
-        line-height: 1.4;
-    }
-
-    .vof-pm-feature-list li::before {
-        content: "✓";
-        color: #4a5568;
-        flex-shrink: 0;
-    }
-
-    .vof-pm-yearly-message {
-        text-align: center;
-        color: #4a5568;
-        padding: 32px 0;
-        font-size: 13px;
-    }
-
-    .vof-pm-modal-footer {
-        display: flex;
-        justify-content: space-between;
-        padding: 16px 24px;
-    }
-
-    .vof-pm-btn-footer {
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-    }
-
-    .vof-pm-btn-ghost {
-        background: none;
-        border: none;
-        color: #4a5568;
-    }
-
-    .vof-pm-btn-contact {
-        background: #000;
-        color: white;
-        border: none;
-    }
-
-    @media (max-width: 768px) {
-        .vof-pm-tier-container {
-            grid-template-columns: 1fr;
-        }
-        .vof-pm-modal-content {
-            height: 100%;
-            border-radius: 12px;
-            overflow-y: auto;
-        }
-        .vof-pm-modal-footer {
-            flex-direction: column;
-            gap: 8px;
-        }
-        .vof-pm-btn-footer {
-            width: 100%;
-            text-align: center;
-        }
-    }
+}

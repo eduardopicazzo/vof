@@ -45,7 +45,7 @@ class VOF_Pricing_Modal {
                     </div>
                     <div class="vof-pm-modal-footer">
                         <button id="vof-pm-cancelBtn" class="vof-pm-btn-footer vof-pm-btn-ghost">Cancelar</button>
-                        <button id="vof-pm-contactSalesBtn" class="vof-pm-btn-footer vof-pm-btn-contact">Contactar Ventas</button>
+                        <!-- <button id="vof-pm-contactSalesBtn" class="vof-pm-btn-footer vof-pm-btn-contact">Contactar Ventas</button> -->
                     </div>
                 </div>
             </div>
