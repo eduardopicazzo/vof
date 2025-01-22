@@ -1,4 +1,4 @@
-(function() {
+(function($) {
     'use strict';
 
     // Helper to sanitize gallery data for logging
@@ -62,7 +62,7 @@
         if (e) {
             e.preventDefault();
         }
-
+        
         // Log raw form data for debugging
         const debugFormData = function(formData) {
             const formDataObj = {};
@@ -72,11 +72,11 @@
             return formDataObj;
         };
 
-        // Get form reference
-        const button = e?.target || document.querySelector('.vof-guest-submit-btn, .vof-subscription-submit-btn');
-        const form = button.closest('form');
-
-        if (!form) {
+        // Get form reference using jQuery
+        const $button = $(e?.target || '.vof-guest-submit-btn, .vof-subscription-submit-btn');
+        const $form = $button.closest('form');
+        
+        if (!$form.length) {
             console.error('VOF: Form not found');
             return;
         }
@@ -86,7 +86,7 @@
         vofFlowInput.type = 'hidden';
         vofFlowInput.name = 'vof_flow';
         vofFlowInput.value = 'true';
-        form.appendChild(vofFlowInput);
+        $form.append(vofFlowInput);
 
         // Handle TinyMCE if active
         try {
@@ -103,7 +103,7 @@
         }
 
         // Handle gallery data
-        const formData = new FormData(form);
+        const formData = new FormData($form[0]); // Note: FormData needs DOM element
         let galleryInfo = { attachments: [], featured: null };
 
         if (RTCL.File.Registered && RTCL.File.Registered[0]) {
@@ -117,9 +117,9 @@
 
             if (galleryData.length) {
                 formData.set('rtcl_gallery_ids', galleryData.join(','));
-
+                
                 // Set featured image if available
-                const featuredImage = Object.values(RTCL.File.Registered[0].Item).find(item =>
+                const featuredImage = Object.values(RTCL.File.Registered[0].Item).find(item => 
                     item.result && item.result.featured
                 );
                 if (featuredImage) {
@@ -138,16 +138,15 @@
             timestamp: new Date().toISOString(),
             form_data: debugFormData(formData)
         };
-
+        
         vof_logs.gallery_data = {
             timestamp: new Date().toISOString(),
             gallery_info: galleryInfo,
             RTCL_File_Registered: RTCL.File.Registered
         };
 
-        const msgHolder = document.createElement('div');
-        msgHolder.className = 'alert rtcl-response';
-
+        const $msgHolder = $("<div class='alert rtcl-response'></div>");
+        
         // Set action
         formData.set('action', 'rtcl_post_new_listing');
 
@@ -157,60 +156,66 @@
         console.log('Submitting form data:', formData);
 
         // Make the AJAX request
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', rtcl.ajaxurl, true);
-        xhr.responseType = 'json';
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                const response = xhr.response;
+        $.ajax({
+            url: rtcl.ajaxurl,
+            type: "POST",
+            dataType: 'json',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: formData,
+            beforeSend: function() {
+                $form.find('.alert.rtcl-response').remove();
+                $form.find('button[type=submit], button[type=button]').prop("disabled", true);
+                $form.rtclBlock();
+            },
+            success: function(response) {
                 console.log('VOF Debug: Response received:', response);
+                
+                // Log response
+                // vof_logs.responses.success = {
+                //     timestamp: new Date().toISOString(),
+                //     response: response
+                // };
 
-                // Enable buttons and unblock form
-                form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {
-                    button.disabled = false;
-                });
-                form.classList.remove('rtcl-block');
+                // Download logs 
+                // vof_download_logs(vof_logs);
+
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
 
                 let msg = '';
                 if (response.message?.length) {
-                    response.message.forEach(message => {
+                    response.message.map(function(message) {
                         msg += "<p>" + message + "</p>";
                     });
                 }
 
+                // if (response.success || (response.data && response.data.success)) {
                 if (response.success) {
-                    // production:
-                    // const checkoutUrl = response.data?.data?.checkout_url;
-                    // stub paths:
-                    const checkoutUrl = response.data?.checkout_url; // directly under data
-                    const isStub = response.data?.stub_mode; // access via response.data
+                    // const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
+                    
+                    const checkoutUrl = response.data?.data?.checkout_url;
+                    console.log('VOF Debug: Checkout URL:', checkoutUrl);
 
-                    console.log('VOF Debug: Checkout URL:', checkoutUrl, 'Stub mode:', isStub);
-
+                    // $form[0].reset();
                     if (msg) {
-                        msgHolder.classList.remove('alert-danger');
-                        msgHolder.classList.add('alert-success');
-                        msgHolder.innerHTML = msg;
-                        form.appendChild(msgHolder);
+                        $msgHolder.removeClass('alert-danger')
+                                  .addClass('alert-success')
+                                  .html(msg)
+                                  .appendTo($form);
                     }
-
-                        // Modified handling
-                    if (isStub) {
-                        console.log('VOF Debug: calling handleTempListingSuccess');
-                                        // 🔥 Critical Change: Delegate to global handler
-                        if (typeof window.handleTempListingSuccess === 'function') {
-                            window.handleTempListingSuccess(response);
-                        } else {
-                            console.error('VOF: Submission error:', xhr.statusText);
-                        }
-                    } else if (checkoutUrl) { // Handle Stripe checkout redirect
+                    
+                    // Handle Stripe checkout redirect
+                    if (checkoutUrl) {
                         console.log('VOF Debug: Redirecting to Stripe checkout:', checkoutUrl);
                         setTimeout(function() {
                             window.location.href = checkoutUrl;
-                        }, 100000);
+                        }, 1000);
                     } else {
                         console.error('VOF Debug: No checkout URL found in response');
+                        // Fallback to regular redirect
+                        // const redirectUrl = response.redirect_url || (response.data && response.data.redirect_url);
                         const redirectUrl = response.redirect_url || response.data?.redirect_url;
                         if (redirectUrl) {
                             window.location.href = redirectUrl;
@@ -218,67 +223,33 @@
                     }
                 } else {
                     if (msg) {
-                        msgHolder.classList.remove('alert-success');
-                        msgHolder.classList.add('alert-danger');
-                        msgHolder.innerHTML = msg;
-                        form.appendChild(msgHolder);
+                        $msgHolder.removeClass('alert-success')
+                                  .addClass('alert-danger')
+                                  .html(msg)
+                                  .appendTo($form);
                     }
                 }
-            } else {
-                console.error('VOF: Submission error:', xhr.statusText);
-
+            },
+            error: function(e) {
+                console.error('VOF: Submission error:', e);
+                
                 // Log error
                 vof_logs.responses.error = {
                     timestamp: new Date().toISOString(),
-                    error: xhr.responseText
+                    error: e.responseText
                 };
 
                 // Download logs on error
                 vof_download_logs(vof_logs);
 
-                // Enable buttons and unblock form
-                form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {
-                    button.disabled = false;
-                });
-                form.classList.remove('rtcl-block');
-
-                msgHolder.classList.remove('alert-success');
-                msgHolder.classList.add('alert-danger');
-                msgHolder.innerHTML = xhr.responseText;
-                form.appendChild(msgHolder);
+                $form.find('button[type=submit], button[type=button]').prop("disabled", false);
+                $form.rtclUnblock();
+                
+                $msgHolder.removeClass('alert-success')
+                          .addClass('alert-danger')
+                          .html(e.responseText)
+                          .appendTo($form);
             }
-        };
-
-        xhr.onerror = function() {
-            console.error('VOF: Submission error:', xhr.statusText);
-
-            // Log error
-            vof_logs.responses.error = {
-                timestamp: new Date().toISOString(),
-                error: xhr.responseText
-            };
-
-            // Download logs on error
-            vof_download_logs(vof_logs);
-
-            // Enable buttons and unblock form
-            form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {
-                button.disabled = false;
-            });
-            form.classList.remove('rtcl-block');
-
-            msgHolder.classList.remove('alert-success');
-            msgHolder.classList.add('alert-danger');
-            msgHolder.innerHTML = xhr.responseText;
-            form.appendChild(msgHolder);
-        };
-
-        // Disable buttons and block form
-        form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {
-            button.disabled = true;
         });
-        form.classList.add('rtcl-block');
-
-        xhr.send(formData);
     };
-})();
+})(jQuery);

@@ -7,10 +7,6 @@ class VOF_Assets {
     }
 
     public function enqueue_scripts() {
-        // Only load on listing submission page
-        // if (!is_page('post-an-ad')) {
-        //     return;
-        // }
 
         if(!$this->vof_is_post_ad_page()) {
             return;
@@ -21,50 +17,41 @@ class VOF_Assets {
         wp_enqueue_script('public-add-post');
         wp_enqueue_script('rtcl-gallery');
 
-        // Add our custom gallery extension
-        // wp_enqueue_script(
-        //     'vof-gallery-extension',
-        //     plugins_url('../assets/js/vof-gallery-extension.js', __FILE__),
-        //     ['jquery', 'rtcl-common', 'rtcl-gallery', 'public-add-post'],
-        //     VOF_VERSION,
-        //     true
-        // );
-
         // Add form validation script
-        // wp_enqueue_script(
-        //     'vof-form-validation',
-        //     plugins_url('../assets/js/vof-form-validation.js', __FILE__),
-        //     ['jquery', 'vof-gallery-extension'],
-        //     VOF_VERSION,
-        //     true
-        // );
+        wp_enqueue_script(
+            'vof-form-validation',
+            plugins_url('../assets/js/vof-form-validation.js', __FILE__),
+            ['rtcl-gallery'],
+            VOF_VERSION,
+            true
+        );
 
         // Add listing submission script
         wp_enqueue_script(
             'vof-listing-submit',
             plugins_url('../assets/js/vof-listing-submit.js', __FILE__),
-            // ['jquery', 'vof-form-validation'],
-            // ['jquery', 'public-add-post'],
-            ['jquery'],
+            ['vof-form-validation'],
             VOF_VERSION,
             true
         );
 
-        // Add type="module" to scripts that need it
-        // add_filter('script_loader_tag', function($tag, $handle) {
-        //     if (in_array($handle, ['vof-form-validation', 'vof-listing-submit'])) {
-        //         return str_replace('<script', '<script type="module"', $tag);
-        //     }
-        //     return $tag;
-        // }, 10, 2);
+        // HIDING THIS FOR NOW
+            // Add type="module" to scripts that need it
+            // add_filter('script_loader_tag', function($tag, $handle) {
+            //     if (in_array($handle, ['vof-form-validation', 'vof-listing-submit'])) {
+            //         return str_replace('<script', '<script type="module"', $tag);
+            //     }
+            //     return $tag;
+            // }, 10, 2);
 
-        // Localize script with settings
-        // wp_localize_script('vof-gallery-extension', 'vofGallerySettings', [
-        //     'nonce' => wp_create_nonce('rtcl-gallery'),
-        //     'messages' => [
-        //         'uploadRequired' => __('Please upload at least one image to proceed.', 'vendor-onboarding-flow'),
-        //     ]
-        // ]);
+            // Localize script with settings
+            // wp_localize_script('vof-gallery-extension', 'vofGallerySettings', [
+            //     'nonce' => wp_create_nonce('rtcl-gallery'),
+            //     'messages' => [
+            //         'uploadRequired' => __('Please upload at least one image to proceed.', 'vendor-onboarding-flow'),
+            //     ]
+            // ]);
+        // HIDING THIS FOR NOW
 
         // Original vofSettings for form submission
         wp_localize_script('vof-listing-submit', 'vofSettings', [
@@ -77,6 +64,22 @@ class VOF_Assets {
         ]);
 
         self::vof_enqueue_pricing_modal_assets();
+
+        // Add Orchestrator script
+        // Ensure dependencies are ordered correctly:
+        wp_enqueue_script(
+            'vof-orchestrator',
+            plugins_url('../assets/js/vof-orchestrator.js', __FILE__),
+            ['vof-listing-submit', 'vof-pricing-modal-script'], // vof-listing-submit first
+            VOF_VERSION,
+            true
+        );
+
+        // Localize configuration for vof-Orchestrator
+        wp_localize_script('vof-orchestrator', 'vofConfig', [
+            'enableValidation' => false, // can be set conditionally
+            'stubMode' => true // control via wp-config.php later
+        ]);
     }
 
     private function vof_is_post_ad_page() {
@@ -98,7 +101,8 @@ class VOF_Assets {
         wp_enqueue_script(
             'vof-pricing-modal-script',
             plugins_url('../assets/js/vof-pricing-modal-script.js', __FILE__), 
-            array('jquery'), 
+            array('vof-listing-submit'), 
+            // array('jquery'), 
             VOF_VERSION,
             true
         );

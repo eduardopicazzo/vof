@@ -12,7 +12,8 @@ class VOF_Listing {
         add_action('wp_enqueue_scripts', [$this, 'vof_enqueue_scripts']);
 
         // Intercept the AJAX submission
-        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1);
+        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1); // commented for testing using STUB
+        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_STUB'], 1);
         
         // Custom submit button 
         remove_action('rtcl_listing_form_end', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
@@ -63,7 +64,8 @@ class VOF_Listing {
         <div class="form-group">
             <button type="button" 
                     class="vof-guest-submit-btn btn btn-primary" 
-                    onclick="handleTempListing()">
+                    >
+                    <!-- onclick="handleTempListing()"> -->
                 <?php esc_html_e('Continue to Create Account', 'vendor-onboarding-flow'); ?>
             </button>
         </div>
@@ -77,7 +79,8 @@ class VOF_Listing {
         <div class="form-group">
             <button type="button" 
                     class="vof-subscription-submit-btn btn btn-primary" 
-                    onclick="handleTempListing()">
+                    >
+                    <!-- onclick="handleTempListing()"> -->
                 <?php esc_html_e('Continue to Select Plan', 'vendor-onboarding-flow'); ?>
             </button>
         </div>
@@ -475,5 +478,26 @@ class VOF_Listing {
                 return 'all_tiers';
                 break;
         }
+    }
+
+    public function vof_cursor_handle_listing_submission_STUB() {
+        error_log('VOF Debug: Using STUB submission handler');
+        
+        // Simulate successful response with correct structure
+        wp_send_json_success([
+            'stub_mode' => true, // Directly under the main data object
+            'show_modal' => true, // Explicit modal trigger
+            'checkout_url' => null, // Prevent redirect
+            'message' => [__('STUB: Ready for pricing selection', 'vendor-onboarding-flow')]
+        ]);
+            // Nest stub_mode under 'data'
+        // wp_send_json_success([
+        //     'data' => [
+        //         'stub_mode' => true,
+        //         'show_modal' => true,
+        //         'checkout_url' => null
+        //     ],
+        //     'message' => [__('STUB: Ready for pricing selection', 'vendor-onboarding-flow')]
+        // ]);
     }
 }

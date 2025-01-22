@@ -149,6 +149,8 @@ function closeModal() {
 }
 
 function openModal(useApiData = false) {
+    console.log('VOF Debug: Modal function triggered'); //
+
     // comment debug later
     console.log('VOF Debug: openModal called with:', useApiData);
 
@@ -159,7 +161,7 @@ function openModal(useApiData = false) {
 
 
     if (!modal) {
-        console.error('Modal element not found');
+        console.error('VOF Debut: Modal element not found');
         return;
     }
     
