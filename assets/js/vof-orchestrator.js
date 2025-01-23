@@ -44,20 +44,17 @@
                     console.log('VOF Debug: Stub mode active - opening modal via orchestrator');
                     // Open the modal
                     window.openModal(false);
-                } else if (response.data?.uuid) {
-                    console.log('VOF Debug: Opening Pricing Modal on real data condition');
-                    // setTimeout(() => {
-                        // window.location.href = response.data.checkout_url;
-                        window.openModal(response);
-                    // }, 50000);
+                } else if (response.data?.customer_meta && response.data?.pricing_data) {
+                    console.log('VOF Debug: Opening Pricing Modal with API data');
+                        window.openModal({
+                            customer_meta: response.data.customer_meta,
+                            pricing_data: response.data.pricing_data
+                        });
                 } else {
-                    console.log('VOF Debug: no data found in response... please retry');
+                    console.log('VOF Debug: Invalid API response structure', response);
+                    // Won't open modal if fallback is disabled
+                    window.openModal(null);
                 }
-                
-                // // Call original success handler if exists
-                // if (typeof originalOnSuccess === 'function') {
-                //     originalOnSuccess(response);
-                // }
             };
 
             // Add temporary error handler for stub debugging

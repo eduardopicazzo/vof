@@ -1,12 +1,8 @@
 // File: vof-pricing-modal-script.js
 console.log('VOF Debug: Pricing Modal script loaded');
 
-const VOF_MODAL_CONFIG = {
-    enableFallback: false
-};
-
 // Global state with fallback data
-const defaultState = {
+let modalState = {
     isMultiPricingOn: false,
     isApiData: false,
     tiers: [
@@ -16,11 +12,11 @@ const defaultState = {
             price: 349,
             features: [
                 "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "8 listados/mes",
+                "8 listados /mes",
                 "Publica en la mayoría de categorías excepto autos e inmuebles",
-                "2 destacadores Top/mes",
-                "3 destacadores BumpUp/mes",
-                "2 destacadores Destacados/mes"
+                "2 destacadores Top /mes",
+                "3 destacadores BumpUp /mes",
+                "2 destacadores Destacados /mes"
             ],
             isRecommended: true,
             isGrayOut: false
@@ -31,14 +27,14 @@ const defaultState = {
             price: 549,
             features: [
                 "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "16 Listados/mes",
+                "16 Listados /mes",
                 "Publica en todas las categorías",
-                "5 destacadores Top/mes",
-                "3 destacadores BumpUp/mes",
-                "2 destacadores Destacados/mes"
+                "5 destacadores Top /mes",
+                "3 destacadores BumpUp /mes",
+                "2 destacadores Destacados /mes"
             ],
-            isRecommended: false,
-            isGrayOut: false
+            isRecommended: true,
+            isGrayOut: true
         },
         {
             name: "noise+",
@@ -46,19 +42,17 @@ const defaultState = {
             price: 1567,
             features: [
                 "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "30 listados/mes",
+                "30 listados /mes",
                 "Publica en todas las categorías",
-                "10 destacadores Top/mes",
-                "6 destacadores BumpUp/mes",
-                "6 destacadores Destacados/mes"
+                "10 destacadores Top /mes",
+                "6 destacadores BumpUp /mes",
+                "6 destacadores Destacados /mes"
             ],
             isRecommended: false,
-            isGrayOut: false
+            isGrayOut: true
         }
     ]
 };
-
-let modalState = { ...defaultState };
 
 // Helper Functions
 function createTierElement(tier, index) {
@@ -140,29 +134,30 @@ function switchTab(event) {
 }
 
 // Core Modal Functions
-function updateModalState(response) {
-    console.log('VOF Debug: Updating modal state with response:', response);
-
+function updateModalState(newState) {
     try {
-        if (response && response.pricing_data) {
-            // Extract pricing data from API response
-            const { is_multi_pricing_on, tiers } = response.pricing_data;
-            
-            modalState = {
-                isMultiPricingOn: is_multi_pricing_on,
-                isApiData: true,
-                tiers: tiers
-            };
-        } else {
-            console.warn('VOF Debug: Invalid API response format, using fallback data');
-            modalState = { ...defaultState };
+        if (!newState || !newState.pricing_data) {
+            console.error('VOF Debug: Invalid pricing data received');
+            return;
         }
+        
+        const pricingData = newState.pricing_data;
+        
+        // Update modal state with API data
+        modalState = {
+            isMultiPricingOn: pricingData.is_multi_pricing_on || false,
+            isApiData: true,
+            tiers: pricingData.tiers || modalState.tiers // Fallback to default if no tiers
+        };
 
+        console.log('VOF Debug: Modal state updated with API data', modalState);
+        
         renderTabs();
         renderTiers();
+        
     } catch (error) {
         console.error('VOF Debug: Error updating modal state:', error);
-        modalState = { ...defaultState };
+        // Keep existing state as fallback
         renderTabs();
         renderTiers();
     }
@@ -176,36 +171,39 @@ function closeModal() {
     document.body.style.overflow = 'auto';
 }
 
-function openModal(apiData = null) {
-    console.log('VOF Debug: Opening modal with data:', apiData);
-
+function openModal(useApiData = false) {
+    console.log('VOF Debug: Modal function triggered');
+    
     const modal = document.getElementById('vof-pm-pricingModal');
     if (!modal) {
         console.error('VOF Debug: Modal element not found');
         return;
     }
-
-    // Update state based on API data or use fallback
-    if (apiData) { // TODO: ENSURE DATA IS COMPLETE AND CORRECT STRUCTURE 
-        updateModalState(apiData);
-    } else if (VOF_MODAL_CONFIG.enableFallback) {
-        console.log('VOF Debug: Using fallback data');
-        modalState = { ...defaultState };
-        renderTabs();
-        renderTiers();
-    } else {
-        console.error('VOF Debug: No API data provided and fallback disabled');
-        return; // Don't open modal if no data and fallback disabled
+    
+    if (!useApiData) {
+        // Reset to original fallback state
+        modalState = {
+            isMultiPricingOn: false,
+            isApiData: false,
+            tiers: [...modalState.tiers] // Keep original fallback data
+        };
     }
     
     modal.classList.add('vof-pm-open');
     document.body.style.overflow = 'hidden';
+    renderTabs();
+    renderTiers();
 }
+
+// Expose functions to window object for orchestrator
+window.openModal = openModal;
+window.updateModalState = updateModalState;
 
 // Initialize event listeners
 document.addEventListener('DOMContentLoaded', function() {
     const modalPreventClose = document.querySelector('.vof-pm-modal');
     const modal = document.getElementById('vof-pm-pricingModal');
+    const openModalBtn = document.getElementById('vof-pm-openModalBtn');
     const closeModalBtn = document.getElementById('vof-pm-closeModalBtn');
     const cancelBtn = document.getElementById('vof-pm-cancelBtn');
     const contactSalesBtn = document.getElementById('vof-pm-contactSalesBtn');
@@ -218,6 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add event listeners if elements exist
+    if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(false));
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if (contactSalesBtn) {
@@ -228,15 +227,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Close on outside click
-    if (modal) {
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-    }
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
 });
-
-// Expose functions to window object for orchestrator
-window.openModal = openModal;
-window.updateModalState = updateModalState;

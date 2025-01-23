@@ -211,11 +211,9 @@ class VOF_API {
                     'is_multi_pricing_on' => false,
                     'tiers' => [ 
                         [ // tier biz
-                            'id' =>'biz', 
                             'name' => 'biz',
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
-                            // 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                            'price_id' => 44,
+                            'price' => 44,
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '8 listados/mes',
@@ -224,15 +222,13 @@ class VOF_API {
                                 '3 destacadores BumpUp/mes',
                                 '2 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => false,
-                            'is_gray_out' => true,
+                            'isRecommended' => false,
+                            'isGrayOut' => true,
                         ],
                         [ // tier noise
-                            'id' =>'noise', 
                             'name' => 'noise',
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
-                            // 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                            'price_id' => 444,
+                            'price' => 444,
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '16 Listados/mes',
@@ -241,15 +237,13 @@ class VOF_API {
                                 '3 destacadores BumpUp/mes',
                                 '2 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => true,
-                            'is_gray_out' => false,
+                            'isRecommended' => true,
+                            'isGrayOut' => false,
                         ],
                         [ // tier noise+
-                            'id' =>'noise_plus', 
                             'name' => 'noise+',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
-                            // 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2',
-                            'price_id' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
+                            'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '30 listados/mes',
@@ -258,8 +252,8 @@ class VOF_API {
                                 '6 destacadores BumpUp/mes',
                                 '6 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => false,
-                            'is_gray_out' => false,
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
                         ],
                     ]
                 ];
@@ -269,12 +263,10 @@ class VOF_API {
                 $pricing_data = [
                     'is_multi_pricing_on' => false,
                     'tiers' => [ 
-                        [ // tier biz
-                            'id' =>'biz', 
+                        [ // tier biz, 
                             'name' => 'biz',
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
-                            // 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                            'price_id' => 44,
+                            'price' => 44,
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '8 listados/mes',
@@ -283,15 +275,13 @@ class VOF_API {
                                 '3 destacadores BumpUp/mes',
                                 '2 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => true,
-                            'is_gray_out' => false,
+                            'isRecommended' => true,
+                            'isGrayOut' => false,
                         ],
                         [ // tier noise
-                            'id' =>'noise', 
                             'name' => 'noise',
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
-                            // 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                            'price_id' => 444,
+                            'price' => 444,
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '16 Listados/mes',
@@ -300,15 +290,13 @@ class VOF_API {
                                 '3 destacadores BumpUp/mes',
                                 '2 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => false,
-                            'is_gray_out' => false,
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
                         ],
                         [ // tier noise+
-                            'id' =>'noise_plus', 
                             'name' => 'noise+',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
-                            // 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2',
-                            'price_id' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
+                            'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '30 listados/mes',
@@ -317,8 +305,8 @@ class VOF_API {
                                 '6 destacadores BumpUp/mes',
                                 '6 destacadores Destacados/mes'
                             ],
-                            'is_recommended' => false,
-                            'is_gray_out' => false,
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
                         ],
                     ]
                 ];
