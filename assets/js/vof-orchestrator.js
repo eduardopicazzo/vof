@@ -45,10 +45,10 @@
                     // Open the modal
                     window.openModal(false);
                 } else if (response.data?.uuid) {
-                    console.log('VOF Debug: Opening Pricing Modal');
+                    console.log('VOF Debug: Opening Pricing Modal on real data condition');
                     // setTimeout(() => {
                         // window.location.href = response.data.checkout_url;
-                        window.openModal(false);
+                        window.openModal(response);
                     // }, 50000);
                 } else {
                     console.log('VOF Debug: no data found in response... please retry');

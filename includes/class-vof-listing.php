@@ -664,7 +664,9 @@ class VOF_Listing {
             wp_send_json_success([
                 'success' => true,
                 'listing_id' => $post_id,
-                'uuid' => $response_data['uuid'], // Validated UUID
+                'uuid' => $response_data['customer_meta']['uuid'],
+                'customer_meta' => $response_data['customer_meta'],
+                'pricing_data' => $response_data['pricing_data'],
                 'stub_mode' => false,
                 'show_modal' => true,
                 'message' => [__('Ready for pricing selection', 'vendor-onboarding-flow')]

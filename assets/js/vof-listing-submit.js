@@ -184,7 +184,7 @@
                     // const checkoutUrl = response.data?.data?.checkout_url;
                     // stub paths:
                     const responseUUID = response.data?.uuid; // directly under data
-                    const isStub = response.data?.stub_mode; // access via response.data
+                    const isStub = response.data?.stub_mode;  // access via response.data
 
                     console.log('VOF Debug: Validated UUID:', responseUUID, 'Stub mode:', isStub);
 
