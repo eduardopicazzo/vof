@@ -78,7 +78,7 @@ class VOF_Assets {
         // Localize configuration for vof-Orchestrator
         wp_localize_script('vof-orchestrator', 'vofConfig', [
             'enableValidation' => false, // can be set conditionally
-            'stubMode' => true // control via wp-config.php later
+            'stubMode' => false // control via wp-config.php later
         ]);
     }
 

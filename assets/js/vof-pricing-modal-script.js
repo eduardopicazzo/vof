@@ -262,33 +262,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-
-
-////// OLD
-
-// Initialize event listeners when DOM is ready OLD
-// document.addEventListener('DOMContentLoaded', function() {
-//     const modal = document.getElementById('pricingModal');
-//     const openModalBtn = document.getElementById('openModalBtn'); // MAYBE ON JS FILE
-//     const closeModalBtn = document.getElementById('closeModalBtn');
-//     const cancelBtn = document.getElementById('cancelBtn');
-//     const contactSalesBtn = document.getElementById('contactSalesBtn');
-
-//     // Add event listeners if elements exist
-//     if (openModalBtn) openModalBtn.addEventListener('click', () => openModal(false));
-//     if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-//     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-//     if (contactSalesBtn) {
-//         contactSalesBtn.addEventListener('click', () => {
-//             alert('Contactando a ventas...');
-//             closeModal();
-//         });
-//     }
-
-//     // Close on outside click
-//     window.addEventListener('click', (event) => {
-//         if (event.target === modal) {
-//             closeModal();
-//         }
-//     });
-// });

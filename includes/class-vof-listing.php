@@ -12,8 +12,9 @@ class VOF_Listing {
         add_action('wp_enqueue_scripts', [$this, 'vof_enqueue_scripts']);
 
         // Intercept the AJAX submission
-        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1); // commented for testing using STUB
-        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_STUB'], 1);
+        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1); // commented for testing using STUB or MODAL
+        // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_STUB'], 1);
+        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'], 1);
         
         // Custom submit button 
         remove_action('rtcl_listing_form_end', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
@@ -490,14 +491,193 @@ class VOF_Listing {
             'checkout_url' => null, // Prevent redirect
             'message' => [__('STUB: Ready for pricing selection', 'vendor-onboarding-flow')]
         ]);
-            // Nest stub_mode under 'data'
-        // wp_send_json_success([
-        //     'data' => [
-        //         'stub_mode' => true,
-        //         'show_modal' => true,
-        //         'checkout_url' => null
-        //     ],
-        //     'message' => [__('STUB: Ready for pricing selection', 'vendor-onboarding-flow')]
-        // ]);
+    }
+
+    public function vof_cursor_handle_listing_submission_MODAL() {
+        Functions::clear_notices();
+        $success = false;
+        $post_id = 0;
+        $type = 'new'; 
+
+        // Verify nonce and security checks
+        if (!apply_filters('rtcl_listing_form_remove_nonce', false) 
+            && !wp_verify_nonce(isset($_REQUEST[rtcl()->nonceId]) ? $_REQUEST[rtcl()->nonceId] : null, rtcl()->nonceText)) {
+            wp_send_json([
+                'success' => false,
+                'message' => [__('Session Expired!', 'classified-listing')]
+            ]);
+            return;
+        }
+
+        // Collect and validate basic data
+        $raw_cat_id = isset($_POST['_category_id']) ? absint($_POST['_category_id']) : 0;
+        $listing_type = isset($_POST['_ad_type']) && in_array($_POST['_ad_type'], array_keys(Functions::get_listing_types()))
+            ? esc_attr($_POST['_ad_type']) : '';
+        $post_id = isset($_POST['_post_id']) ? absint($_POST['_post_id']) : 0;
+
+        // Validate category selection
+        if (!$raw_cat_id && !$post_id) {
+            Functions::add_notice(
+                apply_filters(
+                    'rtcl_listing_form_category_not_select_responses',
+                    sprintf(
+                        esc_html__('Category not selected. <a href="%s">Click here to set category</a>', 'classified-listing'),
+                        \Rtcl\Helpers\Link::get_listing_form_page_link()
+                    )
+                ),
+                'error'
+            );
+            return;
+        }
+
+        // Validate required images
+        if (Functions::is_gallery_image_required() && (!$post_id || !count(Functions::get_listing_images($post_id)))) {
+            Functions::add_notice(
+                esc_html__('Image is required. Please select an image.', 'classified-listing'),
+                'error',
+                'rtcl_listing_gallery_image_required'
+            );
+            return;
+        }
+
+        // Process category and validation (REMOVE)
+        $category = get_term_by('id', $raw_cat_id, rtcl()->category);
+        if (!is_a($category, \WP_Term::class)) {
+            Functions::add_notice(esc_html__('Category is not valid', 'classified-listing'), 'error');
+            return;
+        }
+        // Add back the advanced category validation
+        if (!Functions::notice_count('error')) {
+            if ((!$post_id || (($post = get_post($post_id)) && $post->post_type == rtcl()->post_type) && $post->post_status = 'vof_temp') 
+                && $raw_cat_id
+            ) {
+                $category = get_term_by('id', $raw_cat_id, rtcl()->category);
+                if (is_a($category, \WP_Term::class)) {
+                    $category_id = $category->term_id;
+                    $parent_id = Functions::get_term_top_most_parent_id($category_id, rtcl()->category);
+
+                    // Validate category leaf node (no children allowed)
+                    if (Functions::term_has_children($category_id)) {
+                        Functions::add_notice(esc_html__('Please select ad type and category', 'classified-listing'), 'error');
+                    }
+
+                    // Ensure listing type is selected if required
+                    if (!Functions::is_ad_type_disabled() && !$listing_type) {
+                        Functions::add_notice(esc_html__('Please select an ad type', 'classified-listing'), 'error');
+                    }
+
+                    // Verify category compatibility with listing type
+                    $cats_on_type = wp_list_pluck(Functions::get_one_level_categories(0, $listing_type), 'term_id');
+                    if (!in_array($parent_id, $cats_on_type)) {
+                        Functions::add_notice(esc_html__('Please select correct type and category', 'classified-listing'), 'error');
+                    }
+
+                    do_action('rtcl_before_add_edit_listing_into_category_condition', $post_id, $category_id);
+                } else {
+                    Functions::add_notice(esc_html__('Category is not valid', 'classified-listing'), 'error');
+                }
+            }
+        
+            // Final category existence check
+            if (!$post_id && !$category_id) {
+                Functions::add_notice(__('Category not selected', 'classified-listing'), 'error');
+            }
+        }
+        
+        // Create or update post
+        $post_data = [
+            'post_title' => isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : '',
+            'post_name' => sanitize_title(isset($_POST['title']) ? Functions::sanitize($_POST['title'], 'title') : ''),
+            'post_content' => isset($_POST['description']) ? Functions::sanitize($_POST['description'], 'content') : '',
+            'post_excerpt' => isset($_POST['excerpt']) ? Functions::sanitize($_POST['excerpt'], 'excerpt') : '',
+            'post_status' => 'vof_temp',
+            'post_type' => rtcl()->post_type,
+        ];
+
+        if ($post_id) {
+            $post_data['ID'] = $post_id;
+            $post_id = wp_update_post($post_data);
+        } else {
+            $post_id = wp_insert_post($post_data);
+        }
+        
+        if (is_wp_error($post_id)) {
+            wp_send_json_error(['message' => $post_id->get_error_message()]);
+            return;
+        }
+        
+        VOF_Listing::vof_get_set_extra_listing_fields($post_id);
+        VOF_Listing::vof_handle_gallery_attachments($post_id);
+        VOF_Listing::vof_set_ad_type($post_id, $listing_type, $category_id);
+        
+        // Initialize new listing metadata (test if need conditionals...)
+        update_post_meta( $post_id, 'featured', 0 ); 
+        update_post_meta( $post_id, '_views', 0 );
+
+        // Set category
+        wp_set_object_terms($post_id, [$category->term_id], rtcl()->category);
+
+        // Collect user data for new schema
+        $vof_user_data = [
+            'vof_email' => isset($_POST['vof_email']) ? sanitize_email($_POST['vof_email']) : '',
+            'vof_phone' => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : '',
+            'vof_whatsapp_number' => isset($_POST['vof_whatsapp_number']) ? sanitize_text_field($_POST['vof_whatsapp_number']) : '',
+            'post_parent_cat' => $parent_id,
+            'vof_tier' => sanitize_text_field(self::vof_get_available_tiers($parent_id)),
+            'post_status' => $post_data['post_status']
+        ];
+
+        // Create temp user entry with new schema
+        $vof_temp_user_meta = VOF_Core::instance()->temp_user_meta();
+        $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_user_data);
+
+        if (!$uuid) {
+            wp_send_json_error([
+                'message' => [__('Failed to create temporary user record', 'vendor-onboarding-flow')]
+            ]);
+            return;
+        }
+
+        // Store temporary form data
+        set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS);
+
+        // ####################
+        try {
+            // Get API instance from VOF core
+            $api = VOF_Core::instance()->vof_get_vof_api();
+            
+            // Create validation request instead of checkout session
+            $request = new \WP_REST_Request('POST', '/vof/v1/checkout/start');
+            $request->set_param('uuid', $uuid);
+            $request->set_param('vof_email', $vof_user_data['vof_email']);
+            $request->set_param('vof_phone', $vof_user_data['vof_phone']);
+            $request->set_param('post_id', $post_id);
+            
+            $validation_response = $api->vof_validate_checkout_start($request);
+            
+            if (is_wp_error($validation_response)) {
+                throw new \Exception($validation_response->get_error_message());
+            }
+            
+            $response_data = $validation_response->get_data();
+            
+            wp_send_json_success([
+                'success' => true,
+                'listing_id' => $post_id,
+                'uuid' => $response_data['uuid'], // Validated UUID
+                'stub_mode' => false,
+                'show_modal' => true,
+                'message' => [__('Ready for pricing selection', 'vendor-onboarding-flow')]
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log('VOF Error: Validation process failed - ' . $e->getMessage());
+            
+            wp_send_json_error([
+                'success' => false,
+                'error' => true,
+                'message' => [__('Validation failed. Please try again.', 'vendor-onboarding-flow')]
+            ]);
+        }
     }
 }

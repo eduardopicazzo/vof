@@ -183,10 +183,10 @@
                     // production:
                     // const checkoutUrl = response.data?.data?.checkout_url;
                     // stub paths:
-                    const checkoutUrl = response.data?.checkout_url; // directly under data
+                    const responseUUID = response.data?.uuid; // directly under data
                     const isStub = response.data?.stub_mode; // access via response.data
 
-                    console.log('VOF Debug: Checkout URL:', checkoutUrl, 'Stub mode:', isStub);
+                    console.log('VOF Debug: Validated UUID:', responseUUID, 'Stub mode:', isStub);
 
                     if (msg) {
                         msgHolder.classList.remove('alert-danger');
@@ -198,23 +198,25 @@
                         // Modified handling
                     if (isStub) {
                         console.log('VOF Debug: calling handleTempListingSuccess');
-                                        // 🔥 Critical Change: Delegate to global handler
+                        // 🔥 Critical Change: Delegate to global handler
                         if (typeof window.handleTempListingSuccess === 'function') {
                             window.handleTempListingSuccess(response);
                         } else {
                             console.error('VOF: Submission error:', xhr.statusText);
                         }
-                    } else if (checkoutUrl) { // Handle Stripe checkout redirect
-                        console.log('VOF Debug: Redirecting to Stripe checkout:', checkoutUrl);
-                        setTimeout(function() {
-                            window.location.href = checkoutUrl;
-                        }, 100000);
+                    } else if (responseUUID) { // Handle vof API response
+                        console.log('VOF Debug: (on actual handle...) Validated UUID is:', responseUUID);
+                        window.handleTempListingSuccess(response);
+                        // setTimeout(function() {
+                        //     window.location.href = checkoutUrl;
+                        // }, 100000);
                     } else {
-                        console.error('VOF Debug: No checkout URL found in response');
-                        const redirectUrl = response.redirect_url || response.data?.redirect_url;
-                        if (redirectUrl) {
-                            window.location.href = redirectUrl;
-                        }
+                        console.error('VOF Debug: Error: No user UUID found in response please retry');
+                        // TODO: REMOVE THIS
+                        // const redirectUrl = response.redirect_url || response.data?.redirect_url;
+                        // if (redirectUrl) {
+                        //     window.location.href = redirectUrl;
+                        // }
                     }
                 } else {
                     if (msg) {
@@ -225,16 +227,16 @@
                     }
                 }
             } else {
-                console.error('VOF: Submission error:', xhr.statusText);
+                console.error('VOF: Submission error on xhr.status level:', xhr.statusText);
 
                 // Log error
-                vof_logs.responses.error = {
-                    timestamp: new Date().toISOString(),
-                    error: xhr.responseText
-                };
+                // vof_logs.responses.error = {
+                //     timestamp: new Date().toISOString(),
+                //     error: xhr.responseText
+                // };
 
                 // Download logs on error
-                vof_download_logs(vof_logs);
+                // vof_download_logs(vof_logs);
 
                 // Enable buttons and unblock form
                 form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {
@@ -253,13 +255,13 @@
             console.error('VOF: Submission error:', xhr.statusText);
 
             // Log error
-            vof_logs.responses.error = {
-                timestamp: new Date().toISOString(),
-                error: xhr.responseText
-            };
+            // vof_logs.responses.error = {
+            //     timestamp: new Date().toISOString(),
+            //     error: xhr.responseText
+            // };
 
             // Download logs on error
-            vof_download_logs(vof_logs);
+            // vof_download_logs(vof_logs);
 
             // Enable buttons and unblock form
             form.querySelectorAll('button[type=submit], button[type=button]').forEach(button => {

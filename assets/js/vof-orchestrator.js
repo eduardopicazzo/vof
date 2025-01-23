@@ -4,8 +4,8 @@
 
     // Configuration flags (set via PHP localization)
     window.vofConfig = {
-        enableValidation: true,
-        stubMode: true // Set this via PHP to toggle stub behavior
+        enableValidation: false,
+        stubMode: false // Set this via PHP to toggle stub behavior
     };
 
     // Initialize validation module
@@ -44,12 +44,14 @@
                     console.log('VOF Debug: Stub mode active - opening modal via orchestrator');
                     // Open the modal
                     window.openModal(false);
-
-                } else if (response.data?.checkout_url) {
-                    console.log('VOF Debug: Proceeding to checkout');
+                } else if (response.data?.uuid) {
+                    console.log('VOF Debug: Opening Pricing Modal');
                     // setTimeout(() => {
-                        window.location.href = response.data.checkout_url;
+                        // window.location.href = response.data.checkout_url;
+                        window.openModal(false);
                     // }, 50000);
+                } else {
+                    console.log('VOF Debug: no data found in response... please retry');
                 }
                 
                 // // Call original success handler if exists
