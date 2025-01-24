@@ -65,6 +65,9 @@ function createTierElement(tier, index) {
     const tierElement = document.createElement('div');
     tierElement.className = `vof-pm-tier ${tier.isRecommended ? 'vof-pm-recommended' : ''} ${tier.isGrayOut ? 'vof-pm-gray-out' : ''}`;
     
+    // Store the tier's data for the click handler
+    const subscribeBtnId = `vof-pm-subscribe-${tier.name.toLowerCase().replace('+', '_plus')}`;
+    
     tierElement.innerHTML = `
         <div class="vof-pm-tier-header">
             ${tier.isRecommended && !tier.isGrayOut ? '<div class="vof-pm-recommended-badge">Recomendada</div>' : ''}
@@ -74,8 +77,14 @@ function createTierElement(tier, index) {
         <div class="vof-pm-tier-price">
             MXN ${tier.price} <span>por mes</span>
         </div>
-        <button class="vof-pm-btn ${tier.isGrayOut ? 'vof-pm-btn-disabled' : 'vof-pm-btn-primary'}" ${tier.isGrayOut ? 'disabled' : ''}>
-            <span>${tier.isGrayOut ? 'No disponible' : 'Suscribirse'}</span>
+        <button 
+            id="${subscribeBtnId}"
+            class="vof-pm-btn ${tier.isGrayOut ? 'vof-pm-btn-disabled' : 'vof-pm-btn-primary'}" 
+            ${tier.isGrayOut ? 'disabled' : ''}
+            data-tier-name="${tier.name}"
+            data-tier-price="${tier.price}"
+        >
+            <span>${tier.isGrayOut ? 'No disponible' : `Continuar con ${tier.name}`}</span>
         </button>
         <div class="vof-pm-tier-features">
             <h4>Esto incluye:</h4>
@@ -85,11 +94,48 @@ function createTierElement(tier, index) {
         </div>
     `;
     
+    // Add button click handler after the element is created
     setTimeout(() => {
+        const subscribeBtn = tierElement.querySelector(`#${subscribeBtnId}`);
+        if (subscribeBtn && !tier.isGrayOut) {
+            subscribeBtn.addEventListener('click', () => {
+                console.log('VOF Debug: Tier button clicked:', {
+                    name: subscribeBtn.getAttribute('data-tier-name'),
+                    price: subscribeBtn.getAttribute('data-tier-price')
+                });
+                handleTierSelection(
+                    subscribeBtn.getAttribute('data-tier-name'),
+                    parseFloat(subscribeBtn.getAttribute('data-tier-price'))
+                );
+            });
+        }
         tierElement.classList.add('vof-pm-fade-in');
     }, index * 100);
     
     return tierElement;
+}
+
+function handleTierSelection(tierName, tierPrice) {
+    console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice);
+    
+    // Validate we have customer data
+    if (!modalState.customer_meta?.uuid) {
+        console.error('VOF Debug: No UUID found for customer');
+        return;
+    }
+
+    // Get VOF handler instance (from orchestrator)
+    if (window.handleCheckoutStart) {
+        window.handleCheckoutStart({
+            uuid: modalState.customer_meta.uuid,
+            tier_selected: {
+                name: tierName.replace('+', '_plus'),
+                price: tierPrice
+            }
+        });
+    } else {
+        console.error('VOF Debug: Checkout handler not found');
+    }
 }
 
 function renderTabs() {
@@ -151,8 +197,10 @@ function updateModalState(response) {
             modalState = {
                 isMultiPricingOn: is_multi_pricing_on,
                 isApiData: true,
-                tiers: tiers
+                tiers: tiers,
+                customer_meta: response.customer_meta // Make sure this exists
             };
+            console.log('VOF Debug: Updated modal state:', modalState);
         } else {
             console.warn('VOF Debug: Invalid API response format, using fallback data');
             modalState = { ...defaultState };

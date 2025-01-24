@@ -71,6 +71,42 @@
         }
     }
 
+    // Checkout flow handler
+    window.handleCheckoutStart = function(checkoutData) {
+        const formData = new FormData();
+        formData.append('action', 'vof_start_checkout');
+        formData.append('uuid', checkoutData.uuid);
+        formData.append('tier_name', checkoutData.tier_selected.name);
+        formData.append('tier_price', checkoutData.tier_selected.price);
+        formData.append('security', vofSettings.security); // From wp_localize_script
+    
+        // Submit to WordPress AJAX endpoint
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', vofSettings.ajaxurl, true);
+        xhr.responseType = 'json';
+    
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                const response = xhr.response;
+                
+                if (response.success && response.data?.data?.checkout_url) {
+                    console.log('VOF Debug: Redirecting to Stripe checkout');
+                    window.location.href = response.data.data.checkout_url;
+                } else {
+                    console.error('VOF Debug: Invalid checkout response', response);
+                }
+            } else {
+                console.error('VOF Debug: Checkout request failed');
+            }
+        };
+    
+        xhr.onerror = function() {
+            console.error('VOF Debug: Network error during checkout');
+        };
+    
+        xhr.send(formData);
+    };
+
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
         initializeValidation();
@@ -81,9 +117,9 @@
         });
 
         // Optional: Add debug button
-        // const debugHTML = `<div style="position:fixed;bottom:20px;right:20px;z-index:9999;background:#fff;padding:10px;border:1px solid #ccc;">
-            // <button onclick="window.openModal(false)">Test Modal</button>
-        // </div>`;
+        const debugHTML = `<div style="position:fixed;bottom:20px;right:20px;z-index:9999;background:#fff;padding:10px;border:1px solid #ccc;">
+            <button onclick="window.openModal(false)">Test Modal</button>
+        </div>`;
         document.body.insertAdjacentHTML('beforeend', debugHTML);
     });
 

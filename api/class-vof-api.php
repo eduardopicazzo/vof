@@ -89,50 +89,13 @@ class VOF_API {
         return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $uuid);
     }
 
-    public function vof_test_endpoint() {
+    public function vof_test_endpoint() { // CAN DELETE LATER
         return rest_ensure_response([
             'success' => true,
             'message' => 'VOF API is working!',
             'version' => VOF_VERSION
         ]);
     }
-
-    // public function vof_get_checkout_options_ON_REQUEST($request) {
-    //     try {
-    //         $uuid = $request->get_param('uuid');
-            
-    //         // Get temp user data
-    //         $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-    //         $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
-            
-    //         if (!$user_data) {
-    //             return new \WP_Error(
-    //                 'invalid_uuid',
-    //                 'Invalid or expired UUID',
-    //                 ['status' => 400]
-    //             );
-    //         }
-
-    //         // Get available tiers for parent category
-    //         // $tiers = $this->vof_get_tiers_for_category($user_data['vof_tier']);
-
-    //         return rest_ensure_response([
-    //             'success' => true,
-    //             'data' => [
-    //                 'uuid' => $uuid,
-    //                 // 'tiers' => $tiers
-    //             ]
-    //         ]);
-
-    //     } catch (\Exception $e) {
-    //         error_log('VOF API Error: ' . $e->getMessage());
-    //         return new \WP_Error(
-    //             'server_error',
-    //             'An error occurred processing your request',
-    //             ['status' => 500]
-    //         );
-    //     }
-    // }
 
     public function vof_validate_checkout_start($request) {
         try {
@@ -197,10 +160,6 @@ class VOF_API {
         }
     }
 
-    // public function vof_start_checkout($request) {
-    // }
-
-    // private function vof_get_tiers_for_category($vof_tier) { // <- used to be called
     private function vof_get_checkout_options($vof_tier) {
         $pricing_data = null;
 
@@ -314,155 +273,184 @@ class VOF_API {
         }
 
         return $pricing_data;
-
-        // for reference only;
-            // switch ($vof_tier) { // RETURN IN JSON... CHECK SUGGESTED V0 LOGIC
-            //     case 'limit_tiers': 
-            //         // GREY-OUT: BIZ
-            //         // RECOMMEND: NOISE
-            //         return [
-            //             ['id' => 'noise', 'name' => 'noise', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
-            //             ['id' => 'noise_plus', 'name' => 'noise+', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
-            //         ];
-            //         break;
-            //     default:
-            //         // GREY-OUT: NONE
-            //         // RECOMMEND: BIZ
-            //         return [
-            //             ['id' => 'biz', 'name' => 'biz', 'price_id' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3'],
-            //             ['id' => 'noise', 'name' => 'noise', 'price_id' => 'price_1QhSnRF1Da8bBQoXGxUNerFq'],
-            //             ['id' => 'noise_plus', 'name' => 'noise+', 'price_id' => 'price_1QhSsJF1Da8bBQoXzYViJiS2']
-            //         ];
-            //         break;
-            // }
-        // delete when ready
     }
 
     public function vof_process_checkout($request) {
-        // try {
-        //     $uuid = $request->get_param('uuid');
-            
-        //     // Get temp user data
-        //     $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-        //     $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
-            
-        //     if (!$user_data) {
-        //         return new \WP_Error(
-        //             'invalid_uuid',
-        //             'Invalid or expired UUID',
-        //             ['status' => 400]
-        //         );
-        //     }
+        try {
+            $uuid = $request->get_param('uuid');
+            $tier_selected = $request->get_param('tier_selected');
 
-            // Get Stripe instance
-            // $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
-            
-            // Get tiers for category
-            // $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
-            // $tiers = $this->vof_get_tiers_for_category($user_data['vof_tier']);
-            
-            // Create line items
-            // $line_items = array_map(function($tier) {
-            //     return [
-            //         'price' => $tier['price_id'],
-            //         'quantity' => 1
-            //     ];
-            // }, $tiers);
+            // Get user data with request UUID
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
 
-            // // Create checkout session
-            // $session = $stripe->checkout->sessions->create([
-            //     'payment_method_types' => ['card'],
-            //     'customer_email' => $user_data['vof_email'],
-            //     'metadata' => [
-            //         'uuid' => $uuid
-            //     ],
-            //     'line_items' => $line_items,
-            //     'mode' => 'subscription',
-            //     'success_url' => home_url('/my-account?checkout=success&session_id={CHECKOUT_SESSION_ID}'),
-            //     'cancel_url' => home_url('/my-account?checkout=cancelled')
-            // ]);
+            if (!$user_data) {
+                return new \WP_Error(
+                    'invalid_uuid',
+                    'Invalid or expired UUID',
+                    ['status' => 400]
+                );
+            }
 
-            // return rest_ensure_response([
-            //     'success' => true,
-            //     'data' => [
-            //         'checkout_url' => $session->url,
-            //         'session_id' => $session->id
-            //     ]
-            // ]);
+            // Get Stripe config from VOF core
+            $stripe_config = VOF_Core::instance()->vof_get_stripe_config();
+            if (!$stripe_config) {
+                throw new \Exception('Stripe configuration not available');
+            }
 
-        // } catch (\Exception $e) {
-        //     error_log('VOF API Error: ' . $e->getMessage());
-        //     return new \WP_Error(
-        //         'checkout_error',
-        //         'Error creating checkout session: ' . $e->getMessage(),
-        //         ['status' => 500]
-        //     );
-        // }
+            // Build checkout session
+            $session = $this->vof_build_stripe_checkout($tier_selected, $user_data);
+
+            if (!$session || !$session->url) {
+                throw new \Exception('Failed to create checkout session');
+            }
+
+            // Return successful response
+            return rest_ensure_response([
+                'success' => true,
+                'data' => [
+                    'checkout_url'=> $session->url,
+                    'session_id'=> $session->id
+                ]
+            ]);
+
+        } catch (\Exception $e){
+            error_log('VOF API Error: ' . $e->getMessage());
+            return new \WP_Error(
+                'checkout_error',
+                'Error creating checkout session: ' . $e->getMessage(),
+                ['status' => 500]
+            );
+        }
     }
 
-    // public function vof_process_checkout_OLD_W_STRIPE_REDIRECT($request) {
-    //     try {
-    //         $uuid = $request->get_param('uuid');
+    public function vof_build_stripe_checkout($tier_selected, $user_data) {
+        try {
+            // Get Stripe instance from config
+            $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+
+            // Get proper checkout data for selected tier
+            $checkout_data = $this->vof_get_stripe_checkout_data($tier_selected);
+
+            // Create Stripe checkout session
+            $session = $stripe->checkout->sessions->create([
+                'success_url' => site_url('/my-account?checkout=success&session_id={CHECKOUT_SESSION_ID}'),
+                'cancel_url' => site_url('/my-account?checkout=cancelled'),
+                'mode' => 'subscription',
+                'customer_email' => $user_data['vof_email'],
+                'metadata' => [
+                    'uuid' => $user_data['uuid'],
+                    'tier' => $tier_selected['name'],
+                    'post_id' => $user_data['post_id']
+                ],
+                'line_items' => [$checkout_data['line_items']],
+                'allow_promotion_codes' => true,
+                'billing_address_collection' => 'required',
+                'phone_number_collection' => [
+                    'enabled' => true,
+                ],
+                // 'customer_creation' => 'always', // available in payment mode only
+                'payment_method_types' => ['card'],
+                'locale' => 'es'
+            ]);
+
+            return $session;
+
+        } catch (\Exception $e) {
+            error_log('VOF API Error: Failed to build checkout - ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function vof_get_stripe_checkout_data($tier_selected) {
+        // Normalize tier name by reaplacing + with _plus
+        $tier_name = str_replace('+', '_plus', $tier_selected['name']);
+
+        // Get proper price ID and configuration based on tier
+        switch($tier_selected['name']) {
+            case 'biz':
+                return [
+                    'line_items' => [
+                        'price' => $this->vof_get_price_id('biz'),
+                        'quantity' => 1,
+                        'adjustable_quantity' => [
+                            'enabled' => false
+                        ]
+                    ],
+                    'features' => [
+                        'listing_limit' => 8,
+                        'top_promoters' => 2,
+                        'bump_promoters' => 3,
+                        'highlight_promoters' => 2,
+                        'category_access' => 'basic'
+                    ]
+                ];
             
-    //         // Get temp user data
-    //         $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-    //         $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+            case 'noise':
+                return [
+                    'line_items' => [
+                        'price' => $this->vof_get_price_id('noise'),
+                        'quantity' => 1,
+                        'adjustable_quantity' => [
+                            'enabled' => false
+                        ]
+                    ],
+                    'features' => [
+                        'listing_limit' => 16,
+                        'top_promoters' => 5,
+                        'bump_promoters' => 3,
+                        'highlight_promoters' => 2,
+                        'category_access' => 'all'
+                    ]
+                ];
             
-    //         if (!$user_data) {
-    //             return new \WP_Error(
-    //                 'invalid_uuid',
-    //                 'Invalid or expired UUID',
-    //                 ['status' => 400]
-    //             );
-    //         }
-
-    //         // Get Stripe instance
-    //         $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+            case 'noise_plus': // changed from noise+ to normalized name noise_plus
+                return [
+                    'line_items' => [
+                        'price' => $this->vof_get_price_id('noise_plus'),
+                        'quantity' => 1,
+                        'adjustable_quantity' => [
+                            'enabled' => false
+                        ]
+                    ],
+                    'features' => [
+                        'listing_limit' => 30,
+                        'top_promoters' => 10,
+                        'bump_promoters' => 6,
+                        'highlight_promoters' => 6,
+                        'category_access' => 'all',
+                        'landing_page' => true
+                    ]
+                ];
             
-    //         // Get tiers for category
-    //         // $tiers = $this->vof_get_tiers_for_category($user_data['post_parent_cat']);
-    //         // $tiers = $this->vof_get_tiers_for_category($user_data['vof_tier']);
-            
-    //         // Create line items
-    //         // $line_items = array_map(function($tier) {
-    //         //     return [
-    //         //         'price' => $tier['price_id'],
-    //         //         'quantity' => 1
-    //         //     ];
-    //         // }, $tiers);
+            default:
+                throw new \Exception('Invalid tier selected');
+        }
+    }
 
-    //         // Create checkout session
-    //         $session = $stripe->checkout->sessions->create([
-    //             'payment_method_types' => ['card'],
-    //             'customer_email' => $user_data['vof_email'],
-    //             'metadata' => [
-    //                 'uuid' => $uuid
-    //             ],
-    //             // 'line_items' => $line_items,
-    //             'mode' => 'subscription',
-    //             'success_url' => home_url('/my-account?checkout=success&session_id={CHECKOUT_SESSION_ID}'),
-    //             'cancel_url' => home_url('/my-account?checkout=cancelled')
-    //         ]);
+    // Helper to get price IDs based on environment
+    private function vof_get_price_id($tier) {
+        $is_test = VOF_Core::instance()->vof_get_stripe_config()->vof_is_stripe_test_mode();
+        
+        // Price IDs for each environment and tier
+        $price_ids = [
+            'test' => [
+                'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
+                'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
+                'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
+            ],
+            'live' => [
+                'biz' => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',
+                'noise' => 'price_1PPtRLF1Da8bBQoXsqXkk1XK',
+                'noise_plus' => 'price_1PPtUTF1Da8bBQoXhtr8xZnd'
+            ]
+        ];
 
-    //         return rest_ensure_response([
-    //             'success' => true,
-    //             'data' => [
-    //                 'checkout_url' => $session->url,
-    //                 'session_id' => $session->id
-    //             ]
-    //         ]);
+        $env = $is_test ? 'test' : 'live';
+        return $price_ids[$env][$tier] ?? throw new \Exception('Invalid tier or environment');
+    }
 
-    //     } catch (\Exception $e) {
-    //         error_log('VOF API Error: ' . $e->getMessage());
-    //         return new \WP_Error(
-    //             'checkout_error',
-    //             'Error creating checkout session: ' . $e->getMessage(),
-    //             ['status' => 500]
-    //         );
-    //     }
-    // }
-
-    public function vof_handle_webhook($request) {
+    public function vof_handle_webhook($request) { // KEEP TODO: develop
         try {
             $stripe = VOF_Core::instance()->vof_get_stripe_config();
             $endpoint_secret = $stripe->vof_get_stripe_webhook_secret();
@@ -539,7 +527,7 @@ class VOF_API {
         }
     }
 
-    private function vof_create_user($user_data) {
+    private function vof_create_user($user_data) { // Maybe KEEP TODO: develop
         // Generate username from email
         $username = explode('@', $user_data['vof_email'])[0];
         $base_username = $username;
@@ -580,7 +568,7 @@ class VOF_API {
         return $user_id;
     }
 
-    public function vof_add_cors_headers($value) {
+    public function vof_add_cors_headers($value) { // KEEP TODO: develop
         $origin = get_http_origin();
         if ($origin) {
             header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
@@ -591,11 +579,11 @@ class VOF_API {
         return $value;
     }
 
-    public function vof_check_permissions() {
+    public function vof_check_permissions() { // KEEP TODO: develop
         return true; // TODO: Implement proper permission checks
     }
 
-    public function vof_validate_webhook() {
+    public function vof_validate_webhook() { // KEEP TODO: develop
         return true; // Signature is validated in handler
     }
 }

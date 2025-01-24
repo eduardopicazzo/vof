@@ -10,12 +10,17 @@ namespace VOF;
 use Rtcl\Helpers\Functions;
 use RtclStore\Models\Membership;
 use VOF\Utils\Helpers\VOF_Helper_Functions;
+use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 
 class VOF_Form_Handler {
     
     public function __construct() { // TODO: CLEANUP
-		    // Move all hook registrations to init
-			add_action('init', [$this, 'vof_register_hooks']);
+		// Move all hook registrations to init
+		add_action('init', [$this, 'vof_register_hooks']);
+
+		// Add our new AJAX handler for checkout
+		add_action('wp_ajax_nopriv_vof_start_checkout', [$this, 'vof_handle_checkout_start']);
+		add_action('wp_ajax_vof_start_checkout', [$this, 'vof_handle_checkout_start']);
 
     	// // Add this filter early to prevent default registration
     	// // Intercept the AJAX action that handles form submission
@@ -61,6 +66,17 @@ class VOF_Form_Handler {
 		});
 	}
 
+	public function vof_show_pricing_modal() { // can remove
+		?>
+		<script>
+			function openPricingModal() {
+				window.openModal(false);
+			}
+		</script>
+		<button id="vof-pm-openModalBtn" class="vof-pm-btn-trigger" onclick="openPricingModal()">View Pricing Plans</button>
+		<?php
+	}
+
 	public function vof_intercept_listing_submission() { // TODO: CLEANUP ???
 		if (self::vof_is_vof_conditions()) {
 			error_log('VOF Debug: Form submission data: ' . print_r($_POST, true));
@@ -87,7 +103,6 @@ class VOF_Form_Handler {
 			exit;
 		}
 	}
-
 
 	public static function vof_listing_contact_details_fields( $fields ) { // KEEP SUPER IMPORTANT
 		error_log('VOF Debug: vof_listing_contact_details_fields ENTRY POINT');
@@ -276,473 +291,88 @@ class VOF_Form_Handler {
         // }
 	}
 
-	public function vof_show_pricing_modal() {
-		?>
-		<script>
-			function openPricingModal() {
-				window.openModal(false);
-			}
-		</script>
-		<button id="vof-pm-openModalBtn" class="vof-pm-btn-trigger" onclick="openPricingModal()">View Pricing Plans</button>
-		<?php
-	}
-
 	/**
-	 * Core listing submission handler for the RTCL (Real-Time Classified Listing) plugin
-	 * 
-	 * This comprehensive function manages the entire lifecycle of a classified listing submission,
-	 * from validation through creation/update to final response. It handles both new listings
-	 * and updates to existing ones.
-	 * 
-	 * Major Processing Steps:
-	 * 1. Form Validation & Security
-	 *    - Nonce verification for security
-	 *    - reCAPTCHA validation if enabled
-	 *    - Terms & conditions acceptance verification
-	 * 
-	 * 2. Data Collection & Validation
-	 *    - Category validation with hierarchy checks
-	 *    - Required fields validation (images, pricing, etc)
-	 *    - Location data processing (supports both geo and traditional)
-	 *    - Contact information validation
-	 * 
-	 * 3. User Management
-	 *    - Handles both logged-in and guest users
-	 *    - Automatic account creation for guests if enabled
-	 *    - Permission verification for post updates
-	 * 
-	 * 4. Content Processing
-	 *    - Handles post content and meta data
-	 *    - Processes custom fields
-	 *    - Manages taxonomies (categories, locations, tags)
-	 * 
-	 * 5. Post-Processing
-	 *    - Status management (pending/published)
-	 *    - Expiration date setting
-	 *    - User statistics updates
-	 *    - Notification handling
-	 * 
-	 * @return void Sends JSON response with status and redirect information
-	 */
-	
-	public function vof_do_rtcl_black_box() { // COMMENT WHEN NOT COPYING THIS CODE HAHA
-		// Initialize state and clear any existing notices
-		Functions::clear_notices();
-		$success = false;
-		$post_id = 0;
-		$type    = 'new';
+     * Handles the AJAX request to start the checkout process.
+     * This method acts as a bridge between the frontend modal selection
+     * and our VOF API that creates the Stripe checkout session.
+     */
+    public function vof_handle_checkout_start() { // KEEP super important
+        try {
+            // Verify nonce
+            if (!check_ajax_referer('vof_temp_listing_nonce', 'security', false)) {
+                wp_send_json_error([
+                    'message' => __('Security check failed', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
 
-		// SECTION: Security Validation
-		// Verify nonce unless explicitly disabled by filter
-		if ( apply_filters( 'rtcl_listing_form_remove_nonce', false )
-		     || wp_verify_nonce( isset( $_REQUEST[ rtcl()->nonceId ] ) ? $_REQUEST[ rtcl()->nonceId ] : null, rtcl()->nonceText )
-		) {
-			// SECTION: CAPTCHA Validation
-			// Verify human submission if CAPTCHA is enabled
-			if ( ! Functions::is_human( 'listing' ) ) {
-				Functions::add_notice(
-					apply_filters(
-						'rtcl_listing_form_recaptcha_error_text',
-						esc_html__( 'Invalid Captcha: Please try again.', 'classified-listing' ),
-						$_REQUEST
-					),
-					'error'
-				);
-			}
+            // Validate required data
+            $uuid = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
+            $tier_name = isset($_POST['tier_name']) ? sanitize_text_field($_POST['tier_name']) : '';
+            $tier_price = isset($_POST['tier_price']) ? floatval($_POST['tier_price']) : 0;
 
-			// SECTION: Terms & Conditions Validation
-			// Check if terms acceptance is required and provided
-			$agree = isset( $_POST['rtcl_agree'] ) ? 1 : null;
-			if ( Functions::is_enable_terms_conditions() && ! $agree ) {
-				Functions::add_notice(
-					apply_filters(
-						'rtcl_listing_form_terms_conditions_text_responses',
-						esc_html__( 'Please agree with the terms and conditions.', 'classified-listing' ),
-						$_REQUEST
-					),
-					'error'
-				);
-			} else { // Start validation logic and data collection
-				// SECTION: Basic Data Collection
-				// Extract and sanitize primary listing data
-				$raw_cat_id   = isset( $_POST['_category_id'] ) ? absint( $_POST['_category_id'] ) : 0;
-				$listing_type = isset( $_POST['_ad_type'] ) && in_array( $_POST['_ad_type'], array_keys( Functions::get_listing_types() ) )
-					? esc_attr( $_POST['_ad_type'] ) : '';
-				$post_id      = absint( Functions::request( '_post_id' ) );
+            if (!$uuid || !$tier_name || !$tier_price) {
+                wp_send_json_error([
+                    'message' => __('Missing required checkout data', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
 
-				// SECTION: Category Validation
-				// Ensure category is selected for new listings
-				if ( ! $raw_cat_id && ! $post_id ) {
-					Functions::add_notice(
-						apply_filters(
-							'rtcl_listing_form_category_not_select_responses',
-							sprintf(
-								esc_html__( 'Category not selected. <a href="%s">Click here to set category</a>', 'classified-listing' ),
-								\Rtcl\Helpers\Link::get_listing_form_page_link()
-							)
-						),
-						'error'
-					);
-				} else {
-					// Allow pre-processing hooks before category validation
-					do_action( 'rtcl_before_add_edit_listing_before_category_condition', $post_id );
-					$category_id = 0;
+            // Get temp user data to verify UUID
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
 
-					// SECTION: Required Images Check
-					// Verify gallery images if required by settings
-					if ( Functions::is_gallery_image_required() && ( ! $post_id || ! count( Functions::get_listing_images( $post_id ) ) ) ) {
-						Functions::add_notice(
-							esc_html__( 'Image is required. Please select an image.', 'classified-listing' ),
-							'error',
-							'rtcl_listing_gallery_image_required'
-						);
-					}
+            if (!$user_data) {
+                wp_send_json_error([
+                    'message' => __('Invalid or expired session', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
 
-					// Continue only if no errors encountered
-					if ( ! Functions::notice_count( 'error' ) ) {
-						// SECTION: Advanced Category Validation
-						// Complex validation for category hierarchy and listing type compatibility
-						if ( ( ! $post_id || ( ( $post = get_post( $post_id ) ) && $post->post_type == rtcl()->post_type ) && $post->post_status = 'rtcl-temp' )
-						     && $raw_cat_id
-						) {
-							$category = get_term_by( 'id', $raw_cat_id, rtcl()->category );
-							if ( is_a( $category, \WP_Term::class ) ) {
-								$category_id = $category->term_id;
-								$parent_id   = Functions::get_term_top_most_parent_id( $category_id, rtcl()->category );
-								
-								// Validate category leaf node (no children allowed)
-								if ( Functions::term_has_children( $category_id ) ) {
-									Functions::add_notice( esc_html__( 'Please select ad type and category', 'classified-listing' ), 'error' );
-								}
-								
-								// Ensure listing type is selected if required
-								if ( ! Functions::is_ad_type_disabled() && ! $listing_type ) {
-									Functions::add_notice( esc_html__( 'Please select an ad type', 'classified-listing' ), 'error' );
-								}
-								
-								// Verify category compatibility with listing type
-								$cats_on_type = wp_list_pluck( Functions::get_one_level_categories( 0, $listing_type ), 'term_id' );
-								if ( ! in_array( $parent_id, $cats_on_type ) ) {
-									Functions::add_notice( esc_html__( 'Please select correct type and category', 'classified-listing' ), 'error' );
-								}
-								
-								do_action( 'rtcl_before_add_edit_listing_into_category_condition', $post_id, $category_id );
-							} else {
-								Functions::add_notice( esc_html__( 'Category is not valid', 'classified-listing' ), 'error' );
-							}
-						}
+            // Create REST request to our API
+            $api = VOF_Core::instance()->vof_get_vof_api();
+            $request = new \WP_REST_Request('POST', '/vof/v1/checkout');
+            
+            // Pass all necessary data for checkout session creation
+            $request->set_param('uuid', $uuid);
+            $request->set_param('tier_selected', [
+                'name' => $tier_name,
+                'price' => $tier_price
+            ]);
 
-						// Final category existence check
-						if ( ! $post_id && ! $category_id ) {
-							Functions::add_notice( __( 'Category not selected', 'classified-listing' ), 'error' );
-						}
-					}
+            // Process the request through our API
+            $response = $api->vof_process_checkout($request);
 
-					// SECTION: Listing Data Processing
-					// Process all listing data if validation passed
-					if ( ! Functions::notice_count( 'error' ) ) {
-						$cats = [ $category_id ];
-						$meta = [];
+            // Handle API response
+            if (is_wp_error($response)) {
+                throw new \Exception($response->get_error_message());
+            }
 
-						// SECTION: Meta Data Collection
-						// Build comprehensive meta array for all listing details
-						
-						// Terms acceptance meta
-						if ( Functions::is_enable_terms_conditions() && $agree ) {
-							$meta['rtcl_agree'] = 1;
-						}
+            $response_data = $response->get_data();
 
-						// Pricing information meta
-						if ( isset( $_POST['_rtcl_listing_pricing'] ) && $listing_pricing_type = sanitize_text_field( $_POST['_rtcl_listing_pricing'] ) ) {
-							$meta['_rtcl_listing_pricing'] = in_array( $listing_pricing_type, array_keys( \Rtcl\Resources\Options::get_listing_pricing_types() ) )
-								? $listing_pricing_type : 'price';
-							// Handle range pricing if applicable
-							if ( isset( $_POST['_rtcl_max_price'] ) && 'range' === $listing_pricing_type ) {
-								$meta['_rtcl_max_price'] = Functions::format_decimal( $_POST['_rtcl_max_price'] );
-							}
-						}
+            // Validate response contains checkout URL
+            if (empty($response_data['data']['checkout_url'])) {
+                throw new \Exception('No checkout URL returned from Stripe');
+            }
 
-						// SECTION: Location Processing
-						// Handle location data based on configured location type
-						if ( 'geo' === Functions::location_type() ) {
-							// Geo-location data
-							if ( isset( $_POST['rtcl_geo_address'] ) ) {
-								$meta['_rtcl_geo_address'] = Functions::sanitize( $_POST['rtcl_geo_address'] );
-							}
-						} else {
-							// Traditional location data
-							if ( isset( $_POST['zipcode'] ) ) {
-								$meta['zipcode'] = Functions::sanitize( $_POST['zipcode'] );
-							}
-							if ( isset( $_POST['address'] ) ) {
-								$meta['address'] = Functions::sanitize( $_POST['address'] );
-							}
-						}
+            // Return successful response with checkout URL
+            wp_send_json_success([
+                'message' => __('Checkout session created successfully', 'vendor-onboarding-flow'),
+                'data' => [
+                    'checkout_url' => $response_data['data']['checkout_url'],
+                    'session_id' => $response_data['data']['session_id']
+                ]
+            ]);
 
-						// SECTION: Contact Information
-						// Process all contact-related fields
-						if ( isset( $_POST['phone'] ) ) {
-							$meta['phone'] = Functions::sanitize( $_POST['phone'] );
-						}
-						if ( isset( $_POST['_rtcl_whatsapp_number'] ) ) {
-							$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['_rtcl_whatsapp_number'] );
-						}
-						if ( isset( $_POST['_rtcl_telegram'] ) ) {
-							$meta['_rtcl_telegram'] = Functions::sanitize( $_POST['_rtcl_telegram'] );
-						}
-						if ( isset( $_POST['email'] ) ) {
-							$meta['email'] = Functions::sanitize( $_POST['email'], 'email' );
-						}
-
-						// SECTION: Post Content Preparation
-						// Prepare main post content data
-						$title               = isset( $_POST['title'] ) ? Functions::sanitize( $_POST['title'], 'title' ) : '';
-						$post_arg            = [
-							'post_title'   => $title,
-							'post_content' => isset( $_POST['description'] ) ? Functions::sanitize( $_POST['description'], 'content' ) : '',
-						];
-
-						// SECTION: User Management
-						// Handle user authentication and possible registration
-						$post                = get_post( $post_id );
-						$user_id             = get_current_user_id();
-						$post_for_unregister = Functions::is_enable_post_for_unregister();
-						
-						// Create account for unregistered users if enabled (BYPASSED REGISTRATION WITH CUSTOM CODE VOF LISTING)
-						if ( ! is_user_logged_in() && $post_for_unregister ) {
-							$new_user_id = Functions::do_registration_from_listing_form( [ 'email' => $meta['email'] ] );
-							if ( $new_user_id && is_numeric( $new_user_id ) ) {
-								$user_id = $new_user_id;
-								Functions::add_notice(
-									apply_filters(
-										'rtcl_listing_new_registration_success_message',
-										sprintf(
-											esc_html__( 'A new account is registered, password is sent to your email(%s).', 'classified-listing' ),
-											$meta['email']
-										),
-										$meta['email']
-									)
-								);
-							}
-						}
-
-						// SECTION: Listing Creation/Update (BYPASSED WITH CUSTOM CODE VOF LISTING)
-						// Process the actual listing creation or update
-						if ( $user_id ) {
-							$new_listing_status = Functions::get_option_item( 'rtcl_moderation_settings', 'new_listing_status', 'pending' );
-							
-							// Update existing listing (BYPASSED WITH CUSTOM CODE VOF LISTING)
-							if ( $post_id && is_object( $post ) && $post->post_type == rtcl()->post_type ) {
-								// Verify user has permission to update
-								if ( ( $post->post_author > 0 && in_array($post->post_author, [ apply_filters( 'rtcl_listing_post_user_id', get_current_user_id() ), get_current_user_id() ] ) )
-								     || ( $post->post_author == 0 && $post_for_unregister )
-								) {
-									// Handle temporary vs published status
-									if ( $post->post_status === 'rtcl-temp' ) {
-										$post_arg['post_name']   = $title;
-										$post_arg['post_status'] = $new_listing_status;
-									} else {
-										$type              = 'update';
-										$status_after_edit = Functions::get_option_item( 'rtcl_moderation_settings', 'edited_listing_status' );
-										if ( 'publish' === $post->post_status && $status_after_edit && $post->post_status !== $status_after_edit ) {
-											$post_arg['post_status'] = $status_after_edit;
-										}
-									}
-
-									// Update author for guest posts if needed
-									if ( $post->post_author == 0 && $post_for_unregister ) {
-										$post_arg['post_author'] = $user_id;
-									}
-									$post_arg['ID'] = $post_id;
-									$success        = wp_update_post( apply_filters( 'rtcl_listing_save_update_args', $post_arg, $type ) );
-								}
-							} else { // ELSE CREATE NEW LISTING (BYPASSED WITH CUSTOM CODE VOF LISTING)
-								// Create new listing
-								$post_arg['post_status'] = $new_listing_status;
-								$post_arg['post_author'] = $user_id;
-								$post_arg['post_type']   = rtcl()->post_type;
-								$post_id                 = $success = wp_insert_post( apply_filters( 'rtcl_listing_save_update_args', $post_arg, $type ) );
-							} // END OF CREATE NEW LISTING (BYPASSED WITH CUSTOM CODE VOF LISTING)
-
-							// SECTION: Additional Data Processing
-							// Process additional listing data if creation/update was successful
-							if ( $post_id ) { // START OF ADDITIONAL DATA PROCESSING
-								// Process tags
-								if ( isset( $_POST['rtcl_listing_tag'] ) ) {
-									$tags          = Functions::sanitize( $_POST['rtcl_listing_tag'] );
-									$tags_as_array = ! empty( $tags ) ? explode( ',', $tags ) : [];
-									wp_set_object_terms( $post_id, $tags_as_array, rtcl()->tag );
-								}
-
-								// Set initial categories and type for new listings [ DISREGARD THIS SECTION FOR NOW - CHECK IF THIS IS NEEDED AFTER TESTING ]
-								if ( $type == 'new' && $post_id ) {
-									wp_set_object_terms( $post_id, $cats, rtcl()->category );
-									$meta['ad_type'] = $listing_type;
-								}
-
-								// Process hierarchical location data
-								if ( 'local' === Functions::location_type() ) {
-									$locations = [];
-									if ( $loc = Functions::request( 'location' ) ) {
-										$locations[] = absint( $loc );
-									}
-									if ( $loc = Functions::request( 'sub_location' ) ) {
-										$locations[] = absint( $loc );
-									}
-									if ( $loc = Functions::request( 'sub_sub_location' ) ) {
-										$locations[] = absint( $loc );
-									}
-									wp_set_object_terms( $post_id, $locations, rtcl()->location );
-								}
-
-								/**
-								 * 
-								 * Process custom fields (most likely the changing fields given the category selected or ad type selected)
-								 * 
-								 * Yes, you're correct. This comment section precedes code that processes custom fields which are dynamically 
-								 * loaded based on:
-								 * 	- Selected category (category-specific fields)
-								 * 	- Ad type (type-specific fields)
-								 * 	- Other conditional form logic
-								 * 
-								 * Process custom fields that dynamically change based on:
-								 * 	- The category selected (different categories can have different fields)
-								 * 	- The ad type chosen (different ad types can have different fields)
-								 * 	- Other conditional form logic (fields that depend on other form inputs)
-								 * 
-								 * This is evident from the code that follows it (rtcl_fields) which processes these dynamic custom 
-								 * fields and saves their values to the database.
-								 * 
-								 */
-								if ( isset( $_POST['rtcl_fields'] ) && $post_id ) {
-									foreach ( $_POST['rtcl_fields'] as $key => $value ) {
-										$field_id = (int) str_replace( '_field_', '', $key );
-										if ( $field = rtcl()->factory->get_custom_field( $field_id ) ) {
-											$field->saveSanitizedValue( $post_id, $value );
-										}
-									}
-								}
-
-
-								/**
-								 * 
-								 * This code block saves all the metadata that was collected earlier in the $meta array 
-								 * to the database using WordPress's update_post_meta() function. 
-								 * Yes, it's part of the larger form processing section above, specifically after processing custom fields. 
-								 * It's the final step that persists all collected metadata (like prices, contact info, locations) 
-								 * to the database for this listing.
-								 * 
-								 * Reason: The code's position and context show it's the culmination of all the metadata collection 
-								 * that happened in previous sections.
-								 * 
-								 */
-
-								// Save all collected meta data
-								if ( ! empty( $meta ) && $post_id ) {
-									foreach ( $meta as $key => $value ) {
-										update_post_meta( $post_id, $key, $value );
-									}
-								}
-
-								// SECTION: Post-Processing [ TODO: IMPLEMENT PARTS OF THIS SECTION ]
-								// Handle successful listing creation/update
-								if ( $success && $post_id && ( $listing = rtcl()->factory->get_listing( $post_id ) ) ) {
-									if ( $type == 'new' ) {
-										// Initialize new listing metadata
-										update_post_meta( $post_id, 'featured', 0 ); 
-										update_post_meta( $post_id, '_views', 0 );
-										
-										// Update user's ad count
-										$current_user_id = get_current_user_id();
-										$ads             = absint( get_user_meta( $current_user_id, '_rtcl_ads', true ) );
-										update_user_meta( $current_user_id, '_rtcl_ads', $ads + 1 );
-										
-										// Set expiration for published listings [ DISREGARD THIS SECTION FOR NOW]
-										if ( 'publish' === $new_listing_status ) {
-											Functions::add_default_expiry_date( $post_id );
-										}
-										
-										Functions::add_notice(
-											apply_filters(
-												'rtcl_listing_success_message',
-												esc_html__( 'Thank you for submitting your ad!', 'classified-listing' ),
-												$post_id,
-												$type,
-												$_REQUEST
-											)
-										);
-									} elseif ( $type == 'update' ) {
-										Functions::add_notice(
-											apply_filters(
-												'rtcl_listing_success_message',
-												esc_html__( 'Successfully updated !!!', 'classified-listing' ),
-												$post_id,
-												$type,
-												$_REQUEST
-											)
-										);
-									}
-
-									// Final processing hook
-									do_action(
-										'rtcl_listing_form_after_save_or_update',
-										$listing,
-										$type,
-										$category_id,
-										$new_listing_status,
-										[
-											'data'  => $_REQUEST,
-											'files' => $_FILES,
-										]
-									);
-								} else {
-									Functions::add_notice(
-										apply_filters( 'rtcl_listing_error_message', esc_html__( 'Error!!', 'classified-listing' ), $_REQUEST ),
-										'error'
-									);
-								}
-							} // END OF ADDITIONAL DATA PROCESSING
-						}
-					}
-				} // END OF BUILDING THE POST
-			}
-		} else {
-			Functions::add_notice(
-				apply_filters( 'rtcl_listing_session_error_message', esc_html__( 'Session Error !!', 'classified-listing' ), $_REQUEST ),
-				'error'
-			);
-		}
-
-		// SECTION: Response Preparation
-		// Prepare final response data
-		$message = Functions::get_notices( 'error' );
-		if ( $success ) {
-			$message = Functions::get_notices( 'success' );
-		}
-		Functions::clear_notices(); // Clear all notices
-
-		// Send JSON response with complete status information
-		wp_send_json(
-			apply_filters(
-				'rtcl_listing_form_after_save_or_update_responses',
-				[
-					'message'      => $message,
-					'success'      => $success,
-					'post_id'      => $post_id,
-					'type'         => $type,
-					'redirect_url' => apply_filters(
-						'rtcl_listing_form_after_save_or_update_responses_redirect_url',
-						Functions::get_listing_redirect_url_after_edit_post( $type, $post_id, $success ),
-						$type,
-						$post_id,
-						$success,
-						$message
-					),
-				]
-			)
-		);
-	}
-	
+        } catch (\Exception $e) {
+            error_log('VOF Error: Checkout process failed - ' . $e->getMessage());
+            
+            wp_send_json_error([
+                'message' => __('Failed to create checkout session. Please try again.', 'vendor-onboarding-flow'),
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 }
 
 // Initialize the form handler
