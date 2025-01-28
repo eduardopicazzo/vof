@@ -450,7 +450,13 @@ class VOF_API {
         return $price_ids[$env][$tier] ?? throw new \Exception('Invalid tier or environment');
     }
 
-    public function vof_handle_webhook($request) { // KEEP TODO: develop
+    public function vof_handle_webhook(\WP_REST_Request $request) {
+        $webhook_handler = VOF_Webhook_Handler::getInstance();
+        return $webhook_handler->vof_handle_webhook($request);
+    }
+    
+
+    public function vof_handle_webhookOLD($request) { // KEEP FOR REFERENCE (or fallback)
         try {
             $stripe = VOF_Core::instance()->vof_get_stripe_config();
             $endpoint_secret = $stripe->vof_get_stripe_webhook_secret();

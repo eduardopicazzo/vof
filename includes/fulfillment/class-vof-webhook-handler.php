@@ -9,19 +9,10 @@ use Stripe\Webhook;
 use Stripe\Exception\SignatureVerificationException;
 
 class VOF_Webhook_Handler {
-
     private static $instance = null;
     private $secret;
     private $fulfillment_handler;
     private $subscription_handler;
-
-    // Webhook verification constants
-    const VALIDATION_SUCCEEDED = 'succeeded';
-    const VALIDATION_FAILED_EMPTY_HEADERS = 'empty_headers';
-    const VALIDATION_FAILED_EMPTY_BODY = 'empty_body';
-    const VALIDATION_FAILED_SIGNATURE_INVALID = 'signature_invalid';
-    const VALIDATION_FAILED_TIMESTAMP_MISMATCH = 'timestamp_mismatch';
-    const VALIDATION_FAILED_SIGNATURE_MISMATCH = 'signature_mismatch';
 
     public static function getInstance() {
         if (self::$instance === null) {
@@ -34,269 +25,199 @@ class VOF_Webhook_Handler {
         $this->secret = get_option('vof_stripe_webhook_secret');
         $this->fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
-
-        // Register webhook endpoint
-        add_action('rest_api_init', [$this, 'vof_register_webhook_endpoint']);
     }
 
-    /**
-     * Register webhook endpoint
-     */
-    public function vof_register_webhook_endpoint() {
-        register_rest_route('vof/v1', '/webhook/stripe', [
-            'methods' => 'POST',
-            'callback' => [$this, 'vof_handle_webhook'],
-            'permission_callback' => '__return_true'
-        ]);
-    }
-
-    /**
-     * Main webhook handler
-     */
     public function vof_handle_webhook(\WP_REST_Request $request) {
         try {
             $payload = $request->get_body();
             $sig_header = $request->get_header('stripe-signature');
-
+            
             // Validate webhook
-            $validation_result = $this->vof_validate_webhook($sig_header, $payload);
-            if ($validation_result !== self::VALIDATION_SUCCEEDED) {
-                $this->vof_log_webhook_error('Webhook validation failed: ' . $validation_result);
-                return new \WP_REST_Response(['status' => 'invalid'], 400);
+            $event = $this->vof_validate_and_construct_event($payload, $sig_header);
+            if (is_wp_error($event)) {
+                return $event;
             }
 
-            $event = Event::constructFrom(json_decode($payload, true));
-            
-            // Process the event
-            $processed = $this->vof_process_webhook_event($event);
-            
-            if (is_wp_error($processed)) {
-                $this->vof_log_webhook_error($processed->get_error_message());
-                return new \WP_REST_Response(['status' => 'error'], 400);
+            // Process webhook event
+            $result = $this->vof_process_webhook_event($event);
+            if (is_wp_error($result)) {
+                return $result;
             }
 
             return new \WP_REST_Response(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
-            $this->vof_log_webhook_error($e->getMessage());
-            return new \WP_REST_Response(['status' => 'error'], 400);
+            return new \WP_REST_Response([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 
-    /**
-     * Process webhook event
-     */
+    private function vof_validate_and_construct_event($payload, $sig_header) {
+        try {
+            if (empty($sig_header) || empty($payload)) {
+                return new WP_Error(
+                    'invalid_webhook',
+                    'Missing signature or payload',
+                    ['status' => 400]
+                );
+            }
+
+            return Webhook::constructEvent(
+                $payload,
+                $sig_header,
+                $this->secret
+            );
+
+        } catch (SignatureVerificationException $e) {
+            return new WP_Error(
+                'invalid_signature',
+                'Invalid signature',
+                ['status' => 400]
+            );
+        } catch (\Exception $e) {
+            return new WP_Error(
+                'webhook_error',
+                $e->getMessage(),
+                ['status' => 400]
+            );
+        }
+    }
+
     private function vof_process_webhook_event($event) {
         switch ($event->type) {
             case 'checkout.session.completed':
                 return $this->vof_handle_checkout_completed($event->data->object);
 
             case 'customer.subscription.created':
+                return $this->vof_handle_subscription_created($event->data->object);
+
             case 'customer.subscription.updated':
-                return $this->vof_handle_subscription_update($event->data->object);
+                return $this->vof_handle_subscription_updated($event->data->object);
 
             case 'customer.subscription.deleted':
-                return $this->vof_handle_subscription_cancelled($event->data->object);
+                return $this->vof_handle_subscription_deleted($event->data->object);
 
             case 'invoice.payment_succeeded':
-                return $this->vof_handle_invoice_payment($event->data->object);
+                return $this->vof_handle_invoice_payment_succeeded($event->data->object);
 
             case 'invoice.payment_failed':
-                return $this->vof_handle_invoice_failed($event->data->object);
+                return $this->vof_handle_invoice_payment_failed($event->data->object);
 
             default:
-                // Log unhandled event type
-                $this->vof_log_webhook_error('Unhandled event type: ' . $event->type);
-                return new WP_Error('unhandled_event', 'Unhandled event type');
+                return new WP_Error(
+                    'unhandled_event',
+                    'Unhandled webhook event type: ' . $event->type,
+                    ['status' => 400]
+                );
         }
     }
 
-    /**
-     * Handle checkout.session.completed
-     */
     private function vof_handle_checkout_completed($session) {
         try {
-            // Get VOF order data
-            $order_id = $session->metadata->vof_order_id ?? null;
-            if (!$order_id) {
-                throw new \Exception('No VOF order ID found in session metadata');
+            // Extract metadata
+            $uuid = $session->metadata->uuid ?? null;
+            $post_id = $session->metadata->post_id ?? null;
+
+            if (!$uuid || !$post_id) {
+                throw new \Exception('Missing required metadata');
             }
 
-            // Process subscription if exists
-            if ($session->subscription) {
-                $this->vof_process_subscription_creation(
-                    $session->subscription,
-                    $session->customer,
-                    $order_id
-                );
-            }
-
-            // Trigger fulfillment
+            // Create payment record
             $payment_data = [
-                'transaction_id' => $session->payment_intent,
                 'amount' => $session->amount_total,
                 'currency' => $session->currency,
-                'price_id' => $session->metadata->price_id ?? null
+                'customer' => $session->customer,
+                'subscription' => $session->subscription,
+                'payment_intent' => $session->payment_intent
             ];
 
-            return $this->fulfillment_handler->vof_process_fulfillment(
-                $order_id, 
+            // Process fulfillment
+            $result = $this->fulfillment_handler->vof_process_fulfillment(
+                $post_id,
                 $payment_data
             );
 
+            if (is_wp_error($result)) {
+                throw new \Exception($result->get_error_message());
+            }
+
+            do_action('vof_checkout_completed', $session, $uuid);
+            return true;
+
         } catch (\Exception $e) {
-            return new WP_Error('checkout_processing_error', $e->getMessage());
+            return new WP_Error('checkout_error', $e->getMessage());
         }
     }
 
-    /**
-     * Handle subscription updates
-     */
-    private function vof_handle_subscription_update($subscription) {
+    private function vof_handle_subscription_created($subscription) {
         try {
-            return $this->subscription_handler->vof_handle_subscription_updated(
-                $subscription->id,
-                [
-                    'status' => $subscription->status,
-                    'current_period_end' => $subscription->current_period_end,
-                    'cancel_at_period_end' => $subscription->cancel_at_period_end
-                ]
+            do_action('vof_subscription_created', 
+                $subscription->customer,
+                $subscription,
+                ['initial_setup' => true]
             );
+            return true;
         } catch (\Exception $e) {
-            return new WP_Error('subscription_update_error', $e->getMessage());
+            return new WP_Error('subscription_error', $e->getMessage());
         }
     }
 
-    /**
-     * Handle subscription cancellation
-     */
-    private function vof_handle_subscription_cancelled($subscription) {
+    private function vof_handle_subscription_updated($subscription) {
         try {
-            $reason = $subscription->cancellation_details->reason ?? 'Unknown';
-            
-            return $this->subscription_handler->vof_handle_subscription_cancelled(
+            do_action('vof_subscription_updated', 
                 $subscription->id,
-                $reason
+                $subscription
             );
+            return true;
         } catch (\Exception $e) {
-            return new WP_Error('subscription_cancel_error', $e->getMessage());
+            return new WP_Error('subscription_error', $e->getMessage());
         }
     }
 
-    /**
-     * Handle successful invoice payment
-     */
-    private function vof_handle_invoice_payment($invoice) {
+    private function vof_handle_subscription_deleted($subscription) {
+        try {
+            do_action('vof_subscription_cancelled', 
+                $subscription->id,
+                $subscription
+            );
+            return true;
+        } catch (\Exception $e) {
+            return new WP_Error('subscription_error', $e->getMessage());
+        }
+    }
+
+    private function vof_handle_invoice_payment_succeeded($invoice) {
         try {
             if ($invoice->subscription) {
-                // Update subscription status
-                return $this->subscription_handler->vof_handle_subscription_updated(
+                do_action('vof_subscription_updated', 
                     $invoice->subscription,
-                    [
-                        'status' => 'active',
-                        'current_period_end' => $invoice->period_end
-                    ]
+                    ['status' => 'active']
                 );
             }
             return true;
         } catch (\Exception $e) {
-            return new WP_Error('invoice_processing_error', $e->getMessage());
+            return new WP_Error('invoice_error', $e->getMessage());
         }
     }
 
-    /**
-     * Handle failed invoice payment
-     */
-    private function vof_handle_invoice_failed($invoice) {
+    private function vof_handle_invoice_payment_failed($invoice) {
         try {
             if ($invoice->subscription) {
-                return $this->subscription_handler->vof_handle_subscription_updated(
+                do_action('vof_subscription_updated', 
                     $invoice->subscription,
-                    [
-                        'status' => 'past_due'
-                    ]
+                    ['status' => 'past_due']
                 );
             }
             return true;
         } catch (\Exception $e) {
-            return new WP_Error('invoice_processing_error', $e->getMessage());
+            return new WP_Error('invoice_error', $e->getMessage());
         }
     }
 
-    /**
-     * Process new subscription creation
-     */
-    private function vof_process_subscription_creation($subscription_id, $customer_id, $order_id) {
-        try {
-            // Get Stripe subscription
-            $stripe = \Stripe\Stripe::setApiKey(get_option('vof_stripe_secret_key'));
-            $subscription = \Stripe\Subscription::retrieve($subscription_id);
-
-            // Get WordPress user ID from customer metadata
-            $user_id = $this->vof_get_user_id_from_customer($customer_id);
-            if (!$user_id) {
-                throw new \Exception('No WordPress user found for Stripe customer');
-            }
-
-            // Process subscription
-            return $this->subscription_handler->vof_process_subscription(
-                $user_id,
-                $subscription->toArray(),
-                [
-                    'vof_order_id' => $order_id,
-                    'customer_id' => $customer_id
-                ]
-            );
-
-        } catch (\Exception $e) {
-            return new WP_Error('subscription_creation_error', $e->getMessage());
-        }
-    }
-
-    /**
-     * Validate webhook signature
-     */
-    private function vof_validate_webhook($sig_header, $payload) {
-        if (empty($sig_header)) {
-            return self::VALIDATION_FAILED_EMPTY_HEADERS;
-        }
-
-        if (empty($payload)) {
-            return self::VALIDATION_FAILED_EMPTY_BODY;
-        }
-
-        try {
-            Webhook::constructEvent(
-                $payload, $sig_header, $this->secret
-            );
-            return self::VALIDATION_SUCCEEDED;
-        } catch (SignatureVerificationException $e) {
-            return self::VALIDATION_FAILED_SIGNATURE_MISMATCH;
-        } catch (\Exception $e) {
-            return self::VALIDATION_FAILED_SIGNATURE_INVALID;
-        }
-    }
-
-    /**
-     * Get WordPress user ID from Stripe customer
-     */
-    private function vof_get_user_id_from_customer($customer_id) {
-        global $wpdb;
-        
-        return $wpdb->get_var($wpdb->prepare(
-            "SELECT user_id FROM {$wpdb->prefix}vof_customer_meta 
-            WHERE stripe_customer_id = %s",
-            $customer_id
-        ));
-    }
-
-    /**
-     * Log webhook error
-     */
     private function vof_log_webhook_error($message) {
         error_log('VOF Webhook Error: ' . $message);
-        
-        // Maybe store in database for admin viewing
         do_action('vof_webhook_error', $message);
     }
 }
