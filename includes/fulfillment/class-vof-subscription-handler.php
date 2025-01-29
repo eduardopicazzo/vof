@@ -6,6 +6,7 @@ use RtclPro\Models\Subscription;
 use RtclPro\Models\Subscriptions;
 use WP_Error;
 use RtclPro\Helpers\Options;
+use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 
 class VOF_Subscription_Handler {
     private static $instance = null;
@@ -24,7 +25,8 @@ class VOF_Subscription_Handler {
         global $wpdb;
         $this->table = $wpdb->prefix . 'rtcl_subscriptions'; // should it indirectly (with stripe helper methods) write the data instead???
         $this->table_meta = $wpdb->prefix . 'rtcl_subscription_meta'; // should it inderectly (with stripe helper methods) write the data instead???
-        $this->temp_user_meta = new VOF_Temp_User_Meta();
+        // should instatiate using static method due to singleton pattern
+        $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         
         add_action('vof_subscription_created', [$this, 'vof_process_subscription'], 10, 3);
         add_action('vof_subscription_cancelled', [$this, 'vof_handle_subscription_cancelled'], 10, 2);

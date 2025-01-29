@@ -29,7 +29,7 @@ require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
 
 // Then load fulfillment handlers
 require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-webhook-handler.php';
-require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-subcription-handler.php';
+require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-subscription-handler.php';
 require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-fulfillment-handler.php';
 
 // Then load other classes

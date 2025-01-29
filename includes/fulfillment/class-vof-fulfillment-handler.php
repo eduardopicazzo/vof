@@ -5,7 +5,7 @@ use Rtcl\Helpers\Functions;
 use Rtcl\Models\Payment;
 use RtclStore\Models\Membership;
 use VOF\Includes\VOF_Core;
-use VOF\Includes\Utils\Helpers\VOF_Temp_User_Meta;
+use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 
 class VOF_Fulfillment_Handler {
     private static $instance = null;
@@ -19,7 +19,8 @@ class VOF_Fulfillment_Handler {
     }
 
     private function __construct() {
-        $this->temp_user_meta = new VOF_Temp_User_Meta();
+        // $this->temp_user_meta = new VOF_Temp_User_Meta();
+        $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         
         add_action('vof_payment_success', [$this, 'vof_process_fulfillment'], 10, 2);
         add_action('vof_before_membership_grant', [$this, 'vof_validate_membership_data'], 10, 2);
