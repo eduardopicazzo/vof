@@ -164,6 +164,7 @@ class VOF_Webhook_Handler {
         }
     }
 
+    // TODO: probably update expiration date every time on renewal for "monthly"
     private function vof_handle_subscription_updated($subscription) {
         try {
             do_action('vof_subscription_updated', 

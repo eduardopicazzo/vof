@@ -152,8 +152,9 @@ class VOF_Subscription_Handler {
 
             // TODO: DOUBLE CHECK THIS TABLE...
             // Create subscription using RTCL's model
-            $subscription = new Subscription();
+            $subscription = new Subscriptions();
             $subscription_data = [
+                'name' => $stripe_subscription['plan']['product']['name'], // Required field missing
                 'sub_id' => $stripe_subscription['id'],
                 'user_id' => $user_id,
                 'product_id' => $rtcl_membership_tier_id,

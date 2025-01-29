@@ -27,6 +27,11 @@ require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-config.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
 
+// Then load fulfillment handlers
+require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-webhook-handler.php';
+require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-subcription-handler.php';
+require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-fulfillment-handler.php';
+
 // Then load other classes
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-constants.php';
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-core.php';

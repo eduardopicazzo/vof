@@ -7,6 +7,9 @@ use VOF\API\VOF_API;
 use VOF\Utils\Stripe\VOF_Stripe_Config;
 use VOF\Utils\Stripe\VOF_Stripe_Settings;
 use VOF\VOF_Pricing_Modal;
+use VOF\Includes\Fulfillment\VOF_Webhook_Handler;
+use VOF\Includes\Fulfillment\VOF_Subscription_Handler;
+use VOF\Includes\Fulfillment\VOF_Fulfillment_Handler;
 
 class VOF_Core {
     private static $instance = null;
@@ -18,6 +21,9 @@ class VOF_Core {
     private $vof_helper;
     private $stripe_config;
     private $vof_pricing_modal;
+    private $webhook_handler;
+    private $fulfillment_handler;
+    private $subscription_handler;
 
 
     public static function instance() {
@@ -100,6 +106,11 @@ class VOF_Core {
             $this->vof_pricing_modal = new VOF_Pricing_Modal();
         }
         
+        // Initialize fulfillment handlers
+        $this->subscription_handler = VOF_Subscription_Handler::getInstance();
+        $this->fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
+        $this->webhook_handler = VOF_Webhook_Handler::getInstance();
+
         // Initialize only if needed
         if (is_admin()) {
             // Admin specific initializations
@@ -153,6 +164,18 @@ class VOF_Core {
     }
 
     // Getters
+    public function vof_get_webhook_handler() {
+        return $this->webhook_handler;
+    }
+
+    public function vof_get_fulfillment_handler() {
+        return $this->fulfillment_handler;
+    }
+
+    public function vof_get_subscription_handler() {
+        return $this->subscription_handler;
+    }
+
     public function vof_get_stripe_config() {
         return $this->stripe_config;
     }
