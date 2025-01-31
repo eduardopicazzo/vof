@@ -37,6 +37,10 @@ class VOF_Stripe_Config {
 
         // Log configuration status (not the keys themselves)
         error_log('VOF Debug: Stripe config loaded. Test mode: ' . ($this->is_test_mode ? 'Yes' : 'No'));
+
+        error_log('VOF Debug: Stripe config loaded. Test mode PUBLISHABLE KEY: ' . $this->publishable_key);
+        error_log('VOF Debug: Stripe config loaded. Test mode SECRET KEY:' . $this->secret_key);
+        error_log('VOF Debug: Stripe config loaded. Test mode WEBHOOK SECRET:' . $this->webhook_secret);
     }
 
     private function vof_init_stripe() {

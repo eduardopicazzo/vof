@@ -60,13 +60,23 @@ const defaultState = {
 
 let modalState = { ...defaultState };
 
+function sanitizeId(input) {
+    return input
+      .toLowerCase() // Convert to lowercase
+      .replace(/\s+/g, '_') // Replace whitespace with underscores
+      .replace(/\+/g, '_plus') // Replace "+" with "_plus"
+      .replace(/-/g, '_') // Replace "-" with "_"
+      .replace(/[\[\]]/g, ''); // Remove "[" and "]"
+  }
+
 // Helper Functions
 function createTierElement(tier, index) {
     const tierElement = document.createElement('div');
     tierElement.className = `vof-pm-tier ${tier.isRecommended ? 'vof-pm-recommended' : ''} ${tier.isGrayOut ? 'vof-pm-gray-out' : ''}`;
     
     // Store the tier's data for the click handler
-    const subscribeBtnId = `vof-pm-subscribe-${tier.name.toLowerCase().replace('+', '_plus')}`;
+    // const subscribeBtnId = `vof-pm-subscribe-${tier.name.toLowerCase().replace('+', '_plus')}`;
+    const subscribeBtnId = `vof-pm-subscribe-${sanitizeId(tier.name)}`;
     
     tierElement.innerHTML = `
         <div class="vof-pm-tier-header">

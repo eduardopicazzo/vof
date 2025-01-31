@@ -2,6 +2,7 @@
 namespace VOF\API;
 use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 use VOF\VOF_Core;
+use VOF\Includes\Fulfillment\VOF_Webhook_Handler;
 
 class VOF_API {
     private $namespace = 'vof/v1';
@@ -336,7 +337,7 @@ class VOF_API {
             $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
             // debug
             if ($stripe) {
-                error_log('VOF DEBUG API: Stripe Instance OK', $stripe);
+                error_log('VOF DEBUG API: Stripe Instance OK ' . print_r($stripe, true));
             }
 
             // Get proper checkout data for selected tier
@@ -451,11 +452,11 @@ class VOF_API {
         $price_ids = [
             'test' => [
                 // 'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
-                'biz Test Subscription Handler' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
+                'biz Test Subscription Handler' => 'price_1QmxGTF1Da8bBQoX1HE9BMLC',
                 // 'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                'noise Test Subscription Handler' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
+                'noise Test Subscription Handler' => 'price_1QmxHwF1Da8bBQoX4DKhUcD8',
                 // 'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
-                'noise_plus Test Subscription Handler' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
+                'noise_plus Test Subscription Handler' => 'price_1QmxJtF1Da8bBQoXO0GNjQHu'
             ],
             'live' => [
                 'biz' => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',

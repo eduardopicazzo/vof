@@ -63,7 +63,7 @@ class VOF_Stripe_Settings {
                     <tr>
                         <th scope="row">Test Secret Key</th>
                         <td>
-                            <input type="password" name="vof_stripe_test_secret_key" 
+                            <input type="text" name="vof_stripe_test_secret_key" 
                                    value="<?php echo esc_attr(get_option('vof_stripe_test_secret_key')); ?>" 
                                    class="regular-text" />
                         </td>
@@ -71,7 +71,7 @@ class VOF_Stripe_Settings {
                     <tr>
                         <th scope="row">Test Webhook Secret</th>
                         <td>
-                            <input type="password" name="vof_stripe_test_webhook_secret" 
+                            <input type="text" name="vof_stripe_test_webhook_secret" 
                                    value="<?php echo esc_attr(get_option('vof_stripe_test_webhook_secret')); ?>" 
                                    class="regular-text" />
                         </td>

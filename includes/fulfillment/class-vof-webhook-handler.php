@@ -2,17 +2,19 @@
 namespace VOF\Includes\Fulfillment;
 
 use Rtcl\Helpers\Functions;
-use VOF\Includes\VOF_Core;
+use VOF\VOF_Core;
 use WP_Error;
 use Stripe\Event;
 use Stripe\Webhook;
 use Stripe\Exception\SignatureVerificationException;
+use VOF\Utils\Stripe\VOF_Stripe_Config;
 
 class VOF_Webhook_Handler {
     private static $instance = null;
     private $secret;
     private $fulfillment_handler;
     private $subscription_handler;
+    private $stripe_config;
 
     public static function getInstance() {
         if (self::$instance === null) {
@@ -22,7 +24,10 @@ class VOF_Webhook_Handler {
     }
 
     private function __construct() {
-        $this->secret = get_option('vof_stripe_webhook_secret');
+        $config = VOF_Stripe_Config::vof_get_stripe_config_instance();
+        $this->secret = $config->vof_get_stripe_webhook_secret();
+        error_log('Webhook Secret: ' . ($this->secret ? 'exists' : 'missing'));
+
         $this->fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
     }
@@ -32,6 +37,9 @@ class VOF_Webhook_Handler {
             $payload = $request->get_body();
             $sig_header = $request->get_header('stripe-signature');
             
+            error_log('Webhook received - Signature: ' . ($sig_header ? 'exists' : 'missing'));
+            error_log('Webhook payload: ' . substr($payload, 0, 100) . '...'); // Log first 100 chars
+
             // Validate webhook
             $event = $this->vof_validate_and_construct_event($payload, $sig_header);
             if (is_wp_error($event)) {
@@ -47,6 +55,7 @@ class VOF_Webhook_Handler {
             return new \WP_REST_Response(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
+            error_log('Webhook Error: ' . $e->getMessage());
             return new \WP_REST_Response([
                 'status' => 'error',
                 'message' => $e->getMessage()
@@ -89,16 +98,16 @@ class VOF_Webhook_Handler {
         switch ($event->type) {
             case 'checkout.session.completed': //Occurs when a Checkout Session has been successfully completed.
                 // return $this->vof_handle_checkout_completed($event->data->object); // COMMENT FOR QUICK TESTING
-                debug_log($event->data->object);
-                break;
+                error_log($event->data->object);
+                return true; // Return true to indicate success
 
             case 'checkout.session.expired': // TODO
                 // SEND PERIODIC EMAIL TO CUSTOMER
                 break;
             case 'customer.subscription.created': //Occurs whenever a customer is signed up for a new plan.
                 // return $this->vof_handle_subscription_created($event->data->object); // COMMENTED FOR TESTING
-                debug_log($event->data->object);
-                break;
+                error_log($event->data->object);
+                return true; // Return true to indicate success
 
             case 'customer.subscription.updated': // Occurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active).
                 return $this->vof_handle_subscription_updated($event->data->object);
