@@ -87,13 +87,20 @@ class VOF_Webhook_Handler {
 
     private function vof_process_webhook_event($event) {
         switch ($event->type) {
-            case 'checkout.session.completed':
-                return $this->vof_handle_checkout_completed($event->data->object);
+            case 'checkout.session.completed': //Occurs when a Checkout Session has been successfully completed.
+                // return $this->vof_handle_checkout_completed($event->data->object); // COMMENT FOR QUICK TESTING
+                debug_log($event->data->object);
+                break;
 
-            case 'customer.subscription.created':
-                return $this->vof_handle_subscription_created($event->data->object);
+            case 'checkout.session.expired': // TODO
+                // SEND PERIODIC EMAIL TO CUSTOMER
+                break;
+            case 'customer.subscription.created': //Occurs whenever a customer is signed up for a new plan.
+                // return $this->vof_handle_subscription_created($event->data->object); // COMMENTED FOR TESTING
+                debug_log($event->data->object);
+                break;
 
-            case 'customer.subscription.updated':
+            case 'customer.subscription.updated': // Occurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active).
                 return $this->vof_handle_subscription_updated($event->data->object);
 
             case 'customer.subscription.deleted':

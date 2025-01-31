@@ -298,6 +298,8 @@ class VOF_Form_Handler {
      */
     public function vof_handle_checkout_start() { // KEEP super important
         try {
+			error_log('VOF Debug: Checkout started with POST data: ' . print_r($_POST, true));
+
             // Verify nonce
             if (!check_ajax_referer('vof_temp_listing_nonce', 'security', false)) {
                 wp_send_json_error([
@@ -305,6 +307,9 @@ class VOF_Form_Handler {
                 ]);
                 return;
             }
+
+        	// Add more logging
+        	error_log('VOF Debug: Security check passed at vof_handle_checkout_start()');			
 
             // Validate required data
             $uuid = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';

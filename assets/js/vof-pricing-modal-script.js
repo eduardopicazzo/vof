@@ -117,12 +117,25 @@ function createTierElement(tier, index) {
 
 function handleTierSelection(tierName, tierPrice) {
     console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice);
-    
+    console.log('VOF Debug: Modal state:', modalState);
+    console.log('VOF Debug: handleTierSelection called with:', {
+        tierName,
+        tierPrice,
+        modalState: modalState
+    });
+
     // Validate we have customer data
     if (!modalState.customer_meta?.uuid) {
         console.error('VOF Debug: No UUID found for customer');
         return;
     }
+
+    // Validate checkout handler exists
+    if (!window.handleCheckoutStart) {
+        console.error('VOF Debug: handleCheckoutStart not found');
+        return;
+    }
+
 
     // Get VOF handler instance (from orchestrator)
     if (window.handleCheckoutStart) {

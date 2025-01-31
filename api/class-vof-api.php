@@ -76,7 +76,7 @@ class VOF_API {
         ]);
 
         // Stripe webhook handler
-        register_rest_route($this->namespace, '/webhook', [
+        register_rest_route($this->namespace, '/webhook/gateway/stripe', [
             'methods' => \WP_REST_Server::CREATABLE,
             'callback' => [$this, 'vof_handle_webhook'],
             'permission_callback' => [$this, 'vof_validate_webhook']
@@ -170,7 +170,8 @@ class VOF_API {
                     'is_multi_pricing_on' => false,
                     'tiers' => [ 
                         [ // tier biz
-                            'name' => 'biz',
+                            // 'name' => 'biz',
+                            'name' => 'biz Test Subscription Handler',
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 44,
                             'features' => [
@@ -185,7 +186,8 @@ class VOF_API {
                             'isGrayOut' => true,
                         ],
                         [ // tier noise
-                            'name' => 'noise',
+                            // 'name' => 'noise',
+                            'name' => 'noise Test Subscription Handler',
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 444,
                             'features' => [
@@ -200,7 +202,8 @@ class VOF_API {
                             'isGrayOut' => false,
                         ],
                         [ // tier noise+
-                            'name' => 'noise+',
+                            // 'name' => 'noise+',
+                            'name' => 'noise+ Test Subscription Handler',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
                             'features' => [
@@ -223,7 +226,8 @@ class VOF_API {
                     'is_multi_pricing_on' => false,
                     'tiers' => [ 
                         [ // tier biz, 
-                            'name' => 'biz',
+                            // 'name' => 'biz',
+                            'name' => 'biz Test Subscription Handler',
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 44,
                             'features' => [
@@ -238,7 +242,8 @@ class VOF_API {
                             'isGrayOut' => false,
                         ],
                         [ // tier noise
-                            'name' => 'noise',
+                            // 'name' => 'noise',
+                            'name' => 'noise Test Subscription Handler',
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 444,
                             'features' => [
@@ -253,7 +258,8 @@ class VOF_API {
                             'isGrayOut' => false,
                         ],
                         [ // tier noise+
-                            'name' => 'noise+',
+                            // 'name' => 'noise+',
+                            'name' => 'noise+ Test Subscription Handler',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
                             'features' => [
@@ -328,6 +334,10 @@ class VOF_API {
         try {
             // Get Stripe instance from config
             $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+            // debug
+            if ($stripe) {
+                error_log('VOF DEBUG API: Stripe Instance OK', $stripe);
+            }
 
             // Get proper checkout data for selected tier
             $checkout_data = $this->vof_get_stripe_checkout_data($tier_selected);
@@ -368,10 +378,12 @@ class VOF_API {
 
         // Get proper price ID and configuration based on tier
         switch($tier_selected['name']) {
-            case 'biz':
+            // case 'biz':
+            case 'biz Test Subscription Handler':
                 return [
                     'line_items' => [
-                        'price' => $this->vof_get_price_id('biz'),
+                        // 'price' => $this->vof_get_price_id('biz'),
+                        'price' => $this->vof_get_price_id('biz Test Subscription Handler'),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -386,10 +398,12 @@ class VOF_API {
                     ]
                 ];
             
-            case 'noise':
+            // case 'noise':
+            case 'noise Test Subscription Handler':
                 return [
                     'line_items' => [
-                        'price' => $this->vof_get_price_id('noise'),
+                        // 'price' => $this->vof_get_price_id('noise'),
+                        'price' => $this->vof_get_price_id('noise Test Subscription Handler'),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -404,10 +418,11 @@ class VOF_API {
                     ]
                 ];
             
-            case 'noise_plus': // changed from noise+ to normalized name noise_plus
+            // case 'noise_plus': // changed from noise+ to normalized name noise_plus
+            case 'noise_plus Test Subscription Handler': // changed from noise+ to normalized name noise_plus
                 return [
                     'line_items' => [
-                        'price' => $this->vof_get_price_id('noise_plus'),
+                        'price' => $this->vof_get_price_id('noise_plus Test Subscription Handler'),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -435,9 +450,12 @@ class VOF_API {
         // Price IDs for each environment and tier
         $price_ids = [
             'test' => [
-                'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
-                'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
+                // 'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
+                'biz Test Subscription Handler' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
+                // 'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
+                'noise Test Subscription Handler' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
+                // 'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
+                'noise_plus Test Subscription Handler' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
             ],
             'live' => [
                 'biz' => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',

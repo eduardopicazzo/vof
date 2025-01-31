@@ -41,6 +41,8 @@ class VOF_Stripe_Config {
 
     private function vof_init_stripe() {
         try {
+            error_log('VOF Debug: Initializing Stripe with test mode: ' . ($this->is_test_mode ? 'Yes' : 'No'));
+
             // Initialize Stripe with secret key
             $this->stripe = new \Stripe\StripeClient([
                 'api_key' => $this->secret_key,

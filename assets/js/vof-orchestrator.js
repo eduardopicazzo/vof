@@ -73,30 +73,46 @@
 
     // Checkout flow handler
     window.handleCheckoutStart = function(checkoutData) {
+        console.log('VOF Debug: Starting checkout with data:', checkoutData);
+
         const formData = new FormData();
         formData.append('action', 'vof_start_checkout');
         formData.append('uuid', checkoutData.uuid);
         formData.append('tier_name', checkoutData.tier_selected.name);
         formData.append('tier_price', checkoutData.tier_selected.price);
         formData.append('security', vofSettings.security); // From wp_localize_script
+
+        console.log('VOF Debug: Sending AJAX request with formData:', {
+            action: formData.get('action'),
+            uuid: formData.get('uuid'),
+            tier_name: formData.get('tier_name'),
+            tier_price: formData.get('tier_price')
+        });
     
         // Submit to WordPress AJAX endpoint
         const xhr = new XMLHttpRequest();
         xhr.open('POST', vofSettings.ajaxurl, true);
         xhr.responseType = 'json';
+
+        // Adding more detailed error handling
+        xhr.onerror = function() {
+            console.error('VOF Debug: Network error during checkout', xhr.statusText);
+        };
     
         xhr.onload = function() {
+            console.log('VOF Debug: Checkout response:', xhr.response);            
             if (xhr.status === 200) {
                 const response = xhr.response;
                 
                 if (response.success && response.data?.data?.checkout_url) {
-                    console.log('VOF Debug: Redirecting to Stripe checkout');
+                    console.log('VOF Debug: Redirecting to:', response.data.data.checkout_url);                  
+                    // console.log('VOF Debug: Redirecting to Stripe checkout');
                     window.location.href = response.data.data.checkout_url;
                 } else {
                     console.error('VOF Debug: Invalid checkout response', response);
                 }
             } else {
-                console.error('VOF Debug: Checkout request failed');
+                console.error('VOF Debug: Checkout request failed with status', xhr.status);
             }
         };
     
