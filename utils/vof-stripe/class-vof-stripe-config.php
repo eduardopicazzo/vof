@@ -43,7 +43,7 @@ class VOF_Stripe_Config {
         error_log('VOF Debug: Stripe config loaded. Test mode WEBHOOK SECRET:' . $this->webhook_secret);
     }
 
-    private function vof_init_stripe() {
+    private function vof_init_stripeOLD() {
         try {
             error_log('VOF Debug: Initializing Stripe with test mode: ' . ($this->is_test_mode ? 'Yes' : 'No'));
 
@@ -59,10 +59,47 @@ class VOF_Stripe_Config {
         }
     }
 
+    private function vof_init_stripe() {
+        try {
+            // Debug logging
+            error_log('VOF Debug: Initializing Stripe with key: ' . ($this->secret_key ? 'exists' : 'missing'));
+            
+            // Validate secret key exists
+            if (!$this->secret_key) {
+                throw new \Exception('Stripe secret key is missing');
+            }
+    
+            // Initialize Stripe client
+            $this->stripe = new \Stripe\StripeClient([
+                'api_key' => $this->secret_key,
+                'stripe_version' => '2023-10-16'
+            ]);
+            
+            // Verify initialization
+            if (!$this->stripe) {
+                throw new \Exception('Failed to initialize Stripe client');
+            }
+            
+            error_log('VOF Debug: Stripe client initialized successfully');
+            
+        } catch (\Exception $e) {
+            error_log('VOF Error: Failed to initialize Stripe - ' . $e->getMessage());
+            throw $e;  // Rethrow to handle at caller level
+        }
+    }
+
     /**
      * Get Stripe client instance
      */
+    public function vof_get_stripeOLD() {
+        return $this->stripe;
+    }
+
     public function vof_get_stripe() {
+        if (!$this->stripe) {
+            error_log('VOF Debug: Reinitializing Stripe client');
+            $this->vof_init_stripe();
+        }
         return $this->stripe;
     }
 

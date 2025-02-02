@@ -352,16 +352,22 @@ class VOF_API {
                 'metadata' => [
                     'uuid' => $user_data['uuid'],
                     'tier' => $tier_selected['name'],
-                    'post_id' => $user_data['post_id']
+                    'post_id' => $user_data['post_id'],
+                    'phone' => $user_data['vof_phone'], // Pre-fill the customer's phone number
                 ],
                 'line_items' => [$checkout_data['line_items']],
                 'allow_promotion_codes' => true,
-                'billing_address_collection' => 'required',
-                'phone_number_collection' => [
-                    'enabled' => true,
-                ],
+                // 'billing_address_collection' => 'required',
+                // 'phone_number_collection' => [
+                //     'enabled' => true,
+                // ],
                 // 'customer_creation' => 'always', // available in payment mode only
+                'payment_method_types' => ['card', 'apple_pay', 'google_pay'],
                 'payment_method_types' => ['card'],
+                // 'custom_fields' => [
+                //     'applePay'=> true,
+                //     'googlePay'=> true
+                // ],
                 'locale' => 'es'
             ]);
 
