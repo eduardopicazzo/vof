@@ -1,6 +1,6 @@
 <?php
 namespace VOF\Utils\Helpers;
-
+// path: wp-content/plugins/vendor-onboarding-flow/utils/helpers/class-vof-temp-user-meta.php
 class VOF_Temp_User_Meta {
     private static $instance = null;
     private $table_name;

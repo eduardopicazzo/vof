@@ -1,4 +1,7 @@
 <?php
+
+// path: wp-content/plugins/vendor-onboarding-flow/includes/fulfillment/class-vof-subscription-handler.php
+
 /**
  * Handles the synchronization between Stripe subscriptions and RTCL membership tiers.
  * 
