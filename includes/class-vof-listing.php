@@ -609,7 +609,7 @@ class VOF_Listing {
         VOF_Listing::vof_get_set_extra_listing_fields($post_id);
         VOF_Listing::vof_handle_gallery_attachments($post_id);
         VOF_Listing::vof_set_ad_type($post_id, $listing_type, $category_id);
-        
+
         // Initialize new listing metadata (test if need conditionals...)
         update_post_meta( $post_id, 'featured', 0 ); 
         update_post_meta( $post_id, '_views', 0 );
@@ -630,6 +630,9 @@ class VOF_Listing {
         // Create temp user entry with new schema
         $vof_temp_user_meta = VOF_Core::instance()->temp_user_meta();
         $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_user_data);
+        // $this->vof_handle_user_creation($_POST['vof_email'], $post_id);
+        // VOF_Listing::vof_handle_user_creation($_POST['vof_email'], $post_id);
+        VOF_Listing::vof_handle_user_creation($vof_user_data['vof_email'], $post_id, $uuid);
 
         if (!$uuid) {
             wp_send_json_error([
@@ -681,5 +684,212 @@ class VOF_Listing {
                 'message' => [__('Validation failed. Please try again.', 'vendor-onboarding-flow')]
             ]);
         }
+    }
+
+    private function vof_handle_user_creation($email, $post_id, $uuid) {
+        // Get temp user meta instance
+        $temp_user_meta = VOF_Core::instance()->temp_user_meta();
+
+        // Check if user exists by email
+        $existing_user = email_exists($email);
+
+        if ($existing_user) {
+            // Check membership status
+            $has_active_membership = VOF_Helper_Functions::vof_has_active_subscription($existing_user);
+
+            if (!$has_active_membership) {
+                // Existing user with inactive membership
+                $temp_data = [
+                    'user_type' => 'returning',
+                    'true_user_id' => $existing_user,
+                    // 'password' => '',
+                    'vof_flow_status' => 'started'
+                ];
+
+                // pass uuid to be found by uuid best
+                // $temp_user_meta->vof_update_temp_user_data_credentials($post_id, $temp_data);
+                $temp_user_meta->vof_set_temp_user_data_credentials_by_uuid($uuid, $temp_data);
+
+                return $existing_user;
+            } else {
+                // User exists with active membership
+                throw new \Exception(__('You already have an account with an active membership. Please log in to continue.', 'vendor-onboarding-flow'));
+            }
+        } else {
+            // Create new user
+            $password = wp_generate_password();
+
+            $user_data = [
+                'email' => $email,
+                'password' => $password,
+                'first_name' => '', // Can be updated later
+                'last_name' => '',  // Can be updated later
+                'phone' => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : ''
+            ];
+
+            // Create user using adapted RTCL method
+            $new_user_id = $this->vof_create_new_user($user_data);
+
+            if (is_wp_error($new_user_id)) {
+                throw new \Exception($new_user_id->get_error_message());
+            }
+
+            // Store temp user data
+            $temp_data = [
+                'user_type' => 'newcomer',
+                'true_user_id' => $new_user_id,
+                'password' => $password,
+                'vof_flow_status' => 'started'
+            ];
+
+            // $temp_user_meta->vof_update_temp_user_data($post_id, $temp_data);
+            $temp_user_meta->vof_set_temp_user_data_credentials_by_uuid($uuid, $temp_data);
+
+            // Send welcome email with credentials
+            $this->vof_send_new_user_notification($email, $password);
+
+            return $new_user_id;
+        }
+    }
+
+    private function vof_create_new_user($user_data) {
+        // Adapted from RTCL's create_new_user method
+        $email = $user_data['email'];
+        $password = $user_data['password'];
+
+        // Build args array for username creation
+        $new_user_args = [
+        'first_name' => isset($user_data['first_name']) ? $user_data['first_name'] : '',
+        'last_name' => isset($user_data['last_name']) ? $user_data['last_name'] : '',
+        'phone' => isset($user_data['phone']) ? $user_data['phone'] : ''
+        ];
+
+        // Generate username from email (or use \RTCL\Helpers\Functions::create_new_user_username)
+        $username = VOF_Helper_Functions::vof_create_username(
+            $email,
+            $new_user_args
+        );
+
+        // Basic validation
+        if (empty($email) || !is_email($email)) {
+            return new \WP_Error('registration-error-invalid-email', __('Please provide a valid email address.', 'vendor-onboarding-flow'));
+        }
+
+        // Create user with minimal data
+        $user_id = wp_insert_user([
+            'user_login' => $username,
+            'user_pass' => $password,
+            'user_email' => $email,
+            'first_name' => $new_user_args['first_name'],
+            'last_name' => $new_user_args['last_name'],
+            'role' => 'subscriber' // Base role - can be upgraded later
+        ]);
+
+        if (!is_wp_error($user_id)) {
+            // Add phone if provided
+            if (!empty($user_data['phone'])) {
+                update_user_meta($user_id, '_vof_phone', $user_data['phone']);
+            }
+
+            do_action('vof_new_user_created', $user_id, $user_data);
+        }
+
+        return $user_id;
+    }
+    
+    private function vof_send_new_user_notificationOLD($email, $password) {
+        $mailer = rtcl()->mailer();
+        
+        // Use RTCL's mailer with custom template
+        $email_data = apply_filters(
+            'vof_new_user_email_notification',
+            [
+                'to' => $email,
+                'subject' => __('Your new account information', 'vendor-onboarding-flow'),
+                'message' => $this->vof_get_new_user_email_content($email, $password),
+                'headers' => ''
+            ]
+        );
+        
+        // Send the email with proper parameters
+        $mailer->send(
+            $email_data['to'], 
+            $email_data['subject'],
+            $email_data['message'],
+            $email_data['headers']
+        );
+    }
+
+    private function vof_get_new_user_email_contentOLD($email, $password) {
+        $message = sprintf(
+            /* translators: %s: Customer username */
+            esc_html__('Hi %s,', 'vendor-onboarding-flow'), 
+            esc_html($email)
+        ) . "\n\n";
+        
+        $message .= sprintf(
+            /* translators: %1$s: Site title, %2$s: Username, %3$s: Password */
+            esc_html__('Thanks for creating an account on %1$s. Your account has been created with the following credentials:', 'vendor-onboarding-flow'),
+            esc_html(get_bloginfo('name'))
+        ) . "\n\n";
+        
+        $message .= sprintf(
+            /* translators: %s: Username */
+            esc_html__('Username: %s', 'vendor-onboarding-flow'),
+            esc_html($email)
+        ) . "\n";
+        
+        $message .= sprintf(
+            /* translators: %s: Password */
+            esc_html__('Password: %s', 'vendor-onboarding-flow'),
+            esc_html($password)
+        ) . "\n\n";
+    
+        $message .= sprintf(
+            /* translators: %s: Password change link */
+            esc_html__('Click here to change your password: %s', 'vendor-onboarding-flow'),
+            esc_url(add_query_arg('action', 'lostpassword', wp_login_url()))
+        ) . "\n\n";
+    
+        return apply_filters('vof_new_user_email_content', $message, $email, $password);
+    }
+
+    private function vof_send_new_user_notification($email, $password) {
+        // Set up email content
+        $subject = 'Your new account information';
+        $message = sprintf(
+            "Hi %s,\n\n" .
+            "Thanks for creating an account on %s. Your account has been created with the following credentials:\n\n" .
+            "Username: %s\n" .
+            "Password: %s\n\n" .
+            "Click here to change your password: %s\n",
+            $email,
+            get_bloginfo('name'),
+            $email,
+            $password,
+            wp_login_url() . "?action=lostpassword"
+        );
+    
+        // Set up email headers
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . get_bloginfo('name') . ' <' . get_bloginfo('admin_email') . '>',
+            'Reply-To: ' . get_bloginfo('admin_email')
+        );
+    
+        // Send email and log result
+        $sent = wp_mail($email, $subject, $message, $headers);
+        
+        if (!$sent) {
+            error_log('VOF Debug: Failed to send new user notification email to ' . $email);
+            global $phpmailer;
+            if (isset($phpmailer)) {
+                error_log('VOF Debug: Mailer Error: ' . $phpmailer->ErrorInfo);
+            }
+        } else {
+            error_log('VOF Debug: Successfully sent new user notification email to ' . $email);
+        }
+    
+        return $sent;
     }
 }

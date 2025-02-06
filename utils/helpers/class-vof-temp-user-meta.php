@@ -4,6 +4,7 @@ namespace VOF\Utils\Helpers;
 class VOF_Temp_User_Meta {
     private static $instance = null;
     private $table_name;
+    private static $table_created = false;
 
     public static function vof_get_temp_user_meta_instance() {
        if (self::$instance === null) {
@@ -13,9 +14,12 @@ class VOF_Temp_User_Meta {
     }
     
     private function __construct() {
-       global $wpdb;
-       $this->table_name = $wpdb->prefix . 'vof_temp_user_meta';
-       $this->vof_maybe_create_table();
+        global $wpdb;
+        $this->table_name = $wpdb->prefix . 'vof_temp_user_meta';
+        if (!self::$table_created) {
+            $this->vof_maybe_create_table();
+            self::$table_created = true;
+        }
     }
 
     private function vof_maybe_create_table() {
@@ -33,55 +37,38 @@ class VOF_Temp_User_Meta {
             `post_status` varchar(20) NOT NULL DEFAULT 'vof_temp',
             `vof_tier` varchar(50) DEFAULT NULL,
             `post_parent_cat` bigint(20) unsigned NOT NULL,
+            `user_type` enum('returning', 'newcomer') DEFAULT NULL,
+            `true_user_id` bigint(20) unsigned DEFAULT NULL,
+            `password` varchar(255) DEFAULT NULL,
+            `vof_flow_status` enum('started', 'completed') DEFAULT NULL,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `expires_at` datetime,
+            `days_elapsed` int(11),
             PRIMARY KEY (`uuid`),
             UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
             KEY `post_parent_cat` (`post_parent_cat`),
-            KEY `expires_at` (`expires_at`)
+            KEY `expires_at` (`expires_at`),
+            KEY `true_user_id` (`true_user_id`)
         ) $charset_collate;";
     
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);     
+        dbDelta($sql);
+        
+        // Create trigger to update days_elapsed
+        // Drop existing trigger if it exists
+        $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
+        
+        // Create new trigger
+        $trigger_sql = "CREATE TRIGGER update_days_elapsed 
+            BEFORE INSERT ON {$this->table_name}
+            FOR EACH ROW
+            SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
+        
+        $wpdb->query($trigger_sql);
     }
 
-    // Updated to work with normalized columns
-    public function vof_create_temp_user($post_id, $data) {
-        global $wpdb;
-
-        // Generate UUID v4
-        $uuid = wp_generate_uuid4();
-
-        // Set expiration (3 days from now) 
-        $expires_at = date('Y-m-d H:i:s', strtotime('+3 days'));
-
-        // Insert data into normalized columns
-        $result = $wpdb->insert(
-            $this->table_name, 
-            array( 
-                'uuid' => $uuid,
-                'post_id' => $post_id,
-                'vof_email' => $data['vof_email'],
-                'vof_phone' => $data['vof_phone'],
-                'vof_whatsapp' => $data['vof_whatsapp_number'] ?? null,
-                'post_status' => $data['post_status'],
-                'vof_tier' => $data['vof_tier'],
-                'post_parent_cat' => $data['post_parent_cat'] ?? 0,
-                'expires_at' => $expires_at
-            ),
-            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
-        );
-
-        if ($result === false) {
-            error_log('VOF Debug: Failed to create temp user. MySQL Error: ' . $wpdb->last_error);
-            return false;
-        }
-
-        return $uuid;
-    }
-
-    // Updated to work with normalized columns
+    // GETTERS
     public function vof_get_temp_user_by_uuid($uuid) {
         global $wpdb;
 
@@ -263,7 +250,6 @@ class VOF_Temp_User_Meta {
         return $result;
     }
 
-    // Updated to work with normalized columns
     public function vof_get_temp_user_by_post_id($post_id) {
         global $wpdb;
 
@@ -284,61 +270,6 @@ class VOF_Temp_User_Meta {
         return $result;
     }
 
-    // Updated to handle tier assignment during checkout
-    public function vof_update_tier($uuid, $tier) {
-        global $wpdb;
-        
-        $result = $wpdb->update(
-            $this->table_name,
-            ['vof_tier' => $tier],
-            ['uuid' => $uuid],
-            ['%s'],
-            ['%s']
-        );
-
-        if ($result === false) {
-            error_log('VOF Debug: Failed to update tier for UUID: ' . $uuid);
-            return false;
-        }
-
-        return true;
-    }
-
-    // Updated to handle post status updates
-    public function vof_update_post_status($uuid, $status) {
-        global $wpdb;
-        
-        $result = $wpdb->update(
-            $this->table_name,
-            ['post_status' => $status],
-            ['uuid' => $uuid],
-            ['%s'],
-            ['%s']
-        );
-
-        if ($result === false) {
-            error_log('VOF Debug: Failed to update post status for UUID: ' . $uuid);
-            return false;
-        }
-
-        return true;
-    }
-
-    public function vof_delete_expired_data() {
-        global $wpdb;
-
-        $result = $wpdb->query(
-            "DELETE FROM {$this->table_name} WHERE expires_at <= NOW()"
-        );
-
-        if ($result === false) {
-            error_log('VOF Debug: Failed to delete expired data. MySQL Error: ' . $wpdb->last_error);
-        }
-
-        return $result !== false;
-    }
-
-    // Debug methods
     public function vof_get_table_name() {
         return $this->table_name;
     }
@@ -357,14 +288,32 @@ class VOF_Temp_User_Meta {
             `post_status` varchar(20) NOT NULL DEFAULT 'vof_temp',
             `vof_tier` varchar(50) DEFAULT NULL,
             `post_parent_cat` bigint(20) unsigned NOT NULL,
+            `user_type` enum('returning', 'newcomer') DEFAULT NULL,
+            `true_user_id` bigint(20) unsigned DEFAULT NULL,
+            `password` varchar(255) DEFAULT NULL,
+            `vof_flow_status` enum('started', 'completed') DEFAULT NULL,
+            `days_elapsed` int(11),
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `expires_at` datetime,
             PRIMARY KEY (`uuid`),
             UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
             KEY `post_parent_cat` (`post_parent_cat`),
-            KEY `expires_at` (`expires_at`)
+            KEY `expires_at` (`expires_at`),
+            KEY `true_user_id` (`true_user_id`)
         ) $charset_collate;";
+
+        // Create trigger to update days_elapsed
+        // Drop existing trigger if it exists
+        $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
+        
+        // Create new trigger
+        $trigger_sql = "CREATE TRIGGER update_days_elapsed 
+            BEFORE INSERT ON {$this->table_name}
+            FOR EACH ROW
+            SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
+        
+        $wpdb->query($trigger_sql);
     }
 
     public function vof_get_all_records() {
@@ -384,13 +333,54 @@ class VOF_Temp_User_Meta {
         return $results;
     }
 
+    // SETTERS / MODIFIERS
+    public function vof_update_tier($uuid, $tier) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            ['vof_tier' => $tier],
+            ['uuid' => $uuid],
+            ['%s'],
+            ['%s']
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update tier for UUID: ' . $uuid);
+            return false;
+        }
+
+        return true;
+    }
+
+    public function vof_update_post_status($uuid, $status) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            ['post_status' => $status],
+            ['uuid' => $uuid],
+            ['%s'],
+            ['%s']
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update post status for UUID: ' . $uuid);
+            return false;
+        }
+
+        return true;
+    }
+
     public function vof_create_test_record() {
         $post_id = 123; // Test post ID
         $data = array(
             'vof_email' => 'test@example.com',
             'vof_phone' => '1234567890',
             'vof_whatsapp_number' => '1234567890',
-            'post_parent_cat' => 1
+            'post_parent_cat' => 1,
+            'post_status' => 'vof_temp',
+            'vof_tier' => null  // Optional but good to include
         );
     
         error_log('VOF Debug: Creating test record with data: ' . print_r($data, true));
@@ -404,5 +394,77 @@ class VOF_Temp_User_Meta {
         }
         
         return $uuid;
+    }
+
+    public function vof_create_temp_user($post_id, $data) {
+        global $wpdb;
+
+        // Generate UUID v4
+        $uuid = wp_generate_uuid4();
+
+        // Set expiration (3 days from now) 
+        $expires_at = date('Y-m-d H:i:s', strtotime('+3 days'));
+
+        // Insert data into normalized columns
+        $result = $wpdb->insert(
+            $this->table_name, 
+            array( 
+                'uuid' => $uuid,
+                'post_id' => $post_id,
+                'vof_email' => $data['vof_email'],
+                'vof_phone' => $data['vof_phone'],
+                'vof_whatsapp' => $data['vof_whatsapp_number'] ?? null,
+                'post_status' => $data['post_status'],
+                'vof_tier' => $data['vof_tier'],
+                'post_parent_cat' => $data['post_parent_cat'] ?? 0,
+                'expires_at' => $expires_at
+            ),
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to create temp user. MySQL Error: ' . $wpdb->last_error);
+            return false;
+        }
+
+        return $uuid;
+    }
+
+    public function vof_set_temp_user_data_credentials_by_uuid($uuid, $temp_data) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            array(
+                'user_type'       => $temp_data['user_type'],
+                'true_user_id'    => $temp_data['true_user_id'],
+                'password'        => $temp_data['password'],
+                'vof_flow_status' => $temp_data['vof_flow_status']
+            ),
+            array('uuid' => $uuid),
+            array('%s', '%d', '%s', '%s'),
+            array('%s')
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update credentials for UUID: ' . $uuid);
+            return false;
+        }
+
+        return true;
+    }
+
+    public function vof_delete_expired_data() {
+        global $wpdb;
+
+        $result = $wpdb->query(
+            "DELETE FROM {$this->table_name} WHERE expires_at <= NOW()"
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to delete expired data. MySQL Error: ' . $wpdb->last_error);
+        }
+
+        return $result !== false;
     }
 }

@@ -55,7 +55,7 @@ class VOF_Core {
     // Add activation method
     public static function vof_activate() {
         // Run DB Updates (if needed)
-        add_action('vof_DB', 'vof_run_db_updates');
+        // add_action('vof_DB', 'vof_run_db_updates');
         VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
 
         // Schedule cleanup cron job
@@ -97,7 +97,7 @@ class VOF_Core {
         $this->assets = new VOF_Assets();
         $this->listing = new VOF_Listing();
         $this->form_handler = new VOF_Form_Handler();
-        $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance(); // commenting this will break the modal
         $this->vof_helper = new VOF_Helper_Functions();
         $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
 

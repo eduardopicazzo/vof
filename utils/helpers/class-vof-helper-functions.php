@@ -193,7 +193,68 @@ class VOF_Helper_Functions {
 	        }
 	    }
     }
-	
+
+    public static function vof_create_username($email, $args = [], $suffix = '') {
+        // Try to use RTCL's function if available
+        if (class_exists('\Rtcl\Helpers\Functions')) {
+            try {
+                return \Rtcl\Helpers\Functions::create_new_user_username($email, $args, $suffix);
+            } catch (\Exception $e) {
+                error_log('VOF: Failed to use RTCL username creation, falling back to internal method: ' . $e->getMessage());
+            }
+        }
+
+        // Fallback implementation if RTCL's function is not available
+        $username_parts = [];
+
+        // Get email parts
+        $email_parts = explode('@', $email);
+        $email_username = $email_parts[0];
+
+        // Filter out common prefixes
+        $common_prefixes = [
+            'sales',
+            'hello',
+            'mail',
+            'contact',
+            'info',
+        ];
+
+        if (in_array($email_username, $common_prefixes, true)) {
+            // Use domain part instead
+            $email_username = $email_parts[1];
+        }
+
+        $username_parts[] = sanitize_user($email_username, true);
+
+        // Create base username
+        $username = strtolower(implode('_', $username_parts));
+        
+        if ($suffix) {
+            $username .= $suffix;
+        }
+        
+        $username = sanitize_user($username, true);
+
+        // Handle illegal usernames
+        $illegal_logins = (array) apply_filters('illegal_user_logins', []);
+        if (in_array(strtolower($username), array_map('strtolower', $illegal_logins), true)) {
+            // Generate a random username instead
+            $random_suffix = '_' . zeroise(wp_rand(0, 9999), 4);
+            return self::vof_create_username(
+                $email, 
+                ['first_name' => 'vof_user' . $random_suffix]
+            );
+        }
+
+        // Ensure uniqueness
+        if (username_exists($username)) {
+            $suffix = '-' . zeroise(wp_rand(0, 9999), 4);
+            return self::vof_create_username($email, $args, $suffix);
+        }
+
+        return apply_filters('vof_new_user_username', $username, $email, $args, $suffix);
+    }
 }
 
 new VOF_Helper_Functions();
