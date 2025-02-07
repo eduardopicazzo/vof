@@ -130,21 +130,57 @@ class VOF_Webhook_Handler {
             );
         }
     }
+    
+    private function vof_set_auth_cookie($uuid) {
+        error_log('VOF Debug: Attempting to set auth cookie for UUID: ' . $uuid);
+        
+        $temp_user_meta = VOF_Core::instance()->temp_user_meta();
+        $temp_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+    
+        if ($temp_data && !empty($temp_data['true_user_id'])) {
+            if (!apply_filters('rtcl_registration_need_auth_new_user', false, $temp_data['true_user_id'])) {
+                \RTCL\Helpers\Functions::set_customer_auth_cookie($temp_data['true_user_id']);
+                error_log('VOF Debug: Successfully set auth cookie for user ID: ' . $temp_data['true_user_id']);
+                return true;
+            } else {
+                error_log('VOF Debug: Auth cookie blocked by rtcl_registration_need_auth_new_user filter');
+            }
+        } else {
+            error_log('VOF Debug: Failed to find user data for UUID: ' . $uuid);
+        }
+        
+        return false;
+    }
 
     private function vof_process_webhook_event($event) {
-        switch ($event->type) {
-            case 'checkout.session.completed': //Occurs when a Checkout Session has been successfully completed.
-                // return $this->vof_handle_checkout_completed($event->data->object); // COMMENT FOR QUICK TESTING
-                return true; // Return true to indicate success
+        $result = null;
 
-            case 'checkout.session.expired': // TODO
-                // SEND PERIODIC EMAIL TO CUSTOMER
+        switch ($event->type) {
+            // case 'checkout.session.completed': //Occurs when a Checkout Session has been successfully completed.
+            //     // return $this->vof_handle_checkout_completed($event->data->object); // COMMENT FOR QUICK TESTING
+            //     return true; // Return true to indicate success
+
+            // case 'checkout.session.expired': // TODO
+            //     // SEND PERIODIC EMAIL TO CUSTOMER
+            //     break;
+            // case 'customer.subscription.created': //Occurs whenever a customer is signed up for a new plan.
+            //     error_log($event->data->object);
+            //     return $this->vof_handle_subscription_created($event->data->object); // COMMENTED FOR TESTING
+            //     // create / sync subscription rtcl <-> stripe (call subscription handler)
+            //     return true; // Return true to indicate success
+            case 'checkout.session.completed':
+                $session = $event->data->object;
+                error_log('VOF Debug: Checkout completed');
+                // $result = $this->vof_handle_checkout_completed($session);
+                $result = true;
                 break;
-            case 'customer.subscription.created': //Occurs whenever a customer is signed up for a new plan.
-                error_log($event->data->object);
-                return $this->vof_handle_subscription_created($event->data->object); // COMMENTED FOR TESTING
-                // create / sync subscription rtcl <-> stripe (call subscription handler)
-                return true; // Return true to indicate success
+    
+            case 'customer.subscription.created':
+                $subscription = $event->data->object;
+                error_log('VOF Debug: Subscription created');
+                // $result = $this->vof_handle_subscription_created($subscription);
+                $result = true;
+                break;
 
             case 'customer.subscription.updated': // Occurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active).
                 return $this->vof_handle_subscription_updated($event->data->object);
@@ -165,6 +201,18 @@ class VOF_Webhook_Handler {
                     ['status' => 400]
                 );
         }
+        
+        // Handle authentication after successful event processing
+        if ($result === true) {
+            $metadata = $event->data->object->metadata ?? null;
+            if ($metadata && isset($metadata->uuid)) {
+                error_log('VOF Debug: Setting auth cookie for UUID: ' . $metadata->uuid);
+                $this->vof_set_auth_cookie($metadata->uuid);
+            }
+        }
+
+        return $result;
+
     }
 
     private function vof_handle_checkout_completed($session) {

@@ -3,6 +3,8 @@ namespace VOF;
 
 use Rtcl\Helpers\Functions;                 
 use VOF\Utils\Helpers\VOF_Helper_Functions;
+use Rtcl\Models\RtclEmails;
+use Rtcl\Emails\UserNewRegistrationEmailToUser;
 
 class VOF_Listing {
     public function __construct() {
@@ -687,6 +689,8 @@ class VOF_Listing {
     }
 
     private function vof_handle_user_creation($email, $post_id, $uuid) {
+        error_log('VOF Debug: Starting user creation for email: ' . $email);
+
         // Get temp user meta instance
         $temp_user_meta = VOF_Core::instance()->temp_user_meta();
 
@@ -706,18 +710,18 @@ class VOF_Listing {
                     'vof_flow_status' => 'started'
                 ];
 
-                // pass uuid to be found by uuid best
-                // $temp_user_meta->vof_update_temp_user_data_credentials($post_id, $temp_data);
                 $temp_user_meta->vof_set_temp_user_data_credentials_by_uuid($uuid, $temp_data);
 
                 return $existing_user;
-            } else {
+            } else { // TEST FOR THIS CASE
                 // User exists with active membership
                 throw new \Exception(__('You already have an account with an active membership. Please log in to continue.', 'vendor-onboarding-flow'));
             }
         } else {
             // Create new user
             $password = wp_generate_password();
+
+            error_log('VOF Debug: Temp password generated: ' . $password);
 
             $user_data = [
                 'email' => $email,
@@ -733,6 +737,19 @@ class VOF_Listing {
             if (is_wp_error($new_user_id)) {
                 throw new \Exception($new_user_id->get_error_message());
             }
+            
+            error_log('VOF Debug: New user created with ID: ' . $new_user_id);
+
+            // Get the user data object with the newly created user id
+            $new_user_data = get_userdata($new_user_id);
+            
+            if (!$new_user_data) {
+                error_log('VOF Error: Failed to get user data for new user ID: ' . $new_user_id);
+                throw new \Exception(__('Failed to retrieve user data.', 'vendor-onboarding-flow'));
+            }
+            
+            error_log('VOF Debug: New-user user data retrieved: ' . print_r($new_user_data, true));
+
 
             // Store temp user data
             $temp_data = [
@@ -742,11 +759,14 @@ class VOF_Listing {
                 'vof_flow_status' => 'started'
             ];
 
-            // $temp_user_meta->vof_update_temp_user_data($post_id, $temp_data);
             $temp_user_meta->vof_set_temp_user_data_credentials_by_uuid($uuid, $temp_data);
 
             // Send welcome email with credentials
-            $this->vof_send_new_user_notification($email, $password);
+            error_log('VOF Debug: Attempting to send email to: ' . $email);
+            $email_result = $this->vof_send_new_user_notification($new_user_data, $password);
+            if (!$email_result) {
+                error_log('VOF Warning: Failed to send welcome email to new user: ' . $email);
+            }
 
             return $new_user_id;
         }
@@ -797,99 +817,79 @@ class VOF_Listing {
         return $user_id;
     }
     
-    private function vof_send_new_user_notificationOLD($email, $password) {
+    private function vof_send_new_user_notification($new_user_data, $password) {
+        if (!is_a($new_user_data, 'WP_User')) {
+            error_log('VOF Error: Invalid user object passed to vof_send_new_user_notification');
+            return false;
+        }
+
         $mailer = rtcl()->mailer();
+
+        if (!$mailer) {
+            error_log('VOF Error: RTCL mailer not initialized');
+            return false;
+        }
+
+        // Set HTML headers
+        $headers = array('Content-Type: text/html; charset=UTF-8');
         
         // Use RTCL's mailer with custom template
-        $email_data = apply_filters(
+        $email_content = apply_filters(
             'vof_new_user_email_notification',
             [
-                'to' => $email,
+                'to' => $new_user_data->user_email,
                 'subject' => __('Your new account information', 'vendor-onboarding-flow'),
-                'message' => $this->vof_get_new_user_email_content($email, $password),
-                'headers' => ''
+                'message' => $this->vof_get_new_user_email_content($new_user_data, $password),
+                'headers' => $headers
             ]
         );
         
         // Send the email with proper parameters
-        $mailer->send(
-            $email_data['to'], 
-            $email_data['subject'],
-            $email_data['message'],
-            $email_data['headers']
+        $result = $mailer->send(
+            $email_content['to'], 
+            $email_content['subject'],
+            $email_content['message'],
+            $email_content['headers']
         );
+    
+        // Log the result
+        error_log('VOF Debug: Email send attempt to ' . $new_user_data->user_email . ' result: ' . ($result ? 'success' : 'failed'));
+        
+        return $result;
     }
-
-    private function vof_get_new_user_email_contentOLD($email, $password) {
+    
+    private function vof_get_new_user_email_content($new_user_data, $password) {
         $message = sprintf(
             /* translators: %s: Customer username */
-            esc_html__('Hi %s,', 'vendor-onboarding-flow'), 
-            esc_html($email)
-        ) . "\n\n";
+            '<p>' . esc_html__('Hi %s,', 'vendor-onboarding-flow') . '</p>', 
+            esc_html($new_user_data->display_name)
+        );
         
         $message .= sprintf(
-            /* translators: %1$s: Site title, %2$s: Username, %3$s: Password */
-            esc_html__('Thanks for creating an account on %1$s. Your account has been created with the following credentials:', 'vendor-onboarding-flow'),
+            /* translators: %1$s: Site title */
+            '<p>' . esc_html__('Thanks for creating an account on %1$s. Your account has been created with the following credentials:', 'vendor-onboarding-flow') . '</p>',
             esc_html(get_bloginfo('name'))
-        ) . "\n\n";
+        );
         
-        $message .= sprintf(
+        $message .= '<p>' . sprintf(
             /* translators: %s: Username */
             esc_html__('Username: %s', 'vendor-onboarding-flow'),
-            esc_html($email)
-        ) . "\n";
+            esc_html($new_user_data->user_login)
+        ) . '</p>';
         
-        $message .= sprintf(
+        $message .= '<p>' . sprintf(
             /* translators: %s: Password */
             esc_html__('Password: %s', 'vendor-onboarding-flow'),
             esc_html($password)
-        ) . "\n\n";
+        ) . '</p>';
     
-        $message .= sprintf(
+        $message .= '<p>' . sprintf(
             /* translators: %s: Password change link */
             esc_html__('Click here to change your password: %s', 'vendor-onboarding-flow'),
-            esc_url(add_query_arg('action', 'lostpassword', wp_login_url()))
-        ) . "\n\n";
+            '<a href="' . esc_url(add_query_arg('action', 'lostpassword', wp_login_url())) . '">' . 
+            esc_html__('Change Password', 'vendor-onboarding-flow') . '</a>'
+        ) . '</p>';
     
-        return apply_filters('vof_new_user_email_content', $message, $email, $password);
-    }
-
-    private function vof_send_new_user_notification($email, $password) {
-        // Set up email content
-        $subject = 'Your new account information';
-        $message = sprintf(
-            "Hi %s,\n\n" .
-            "Thanks for creating an account on %s. Your account has been created with the following credentials:\n\n" .
-            "Username: %s\n" .
-            "Password: %s\n\n" .
-            "Click here to change your password: %s\n",
-            $email,
-            get_bloginfo('name'),
-            $email,
-            $password,
-            wp_login_url() . "?action=lostpassword"
-        );
-    
-        // Set up email headers
-        $headers = array(
-            'Content-Type: text/html; charset=UTF-8',
-            'From: ' . get_bloginfo('name') . ' <' . get_bloginfo('admin_email') . '>',
-            'Reply-To: ' . get_bloginfo('admin_email')
-        );
-    
-        // Send email and log result
-        $sent = wp_mail($email, $subject, $message, $headers);
-        
-        if (!$sent) {
-            error_log('VOF Debug: Failed to send new user notification email to ' . $email);
-            global $phpmailer;
-            if (isset($phpmailer)) {
-                error_log('VOF Debug: Mailer Error: ' . $phpmailer->ErrorInfo);
-            }
-        } else {
-            error_log('VOF Debug: Successfully sent new user notification email to ' . $email);
-        }
-    
-        return $sent;
+        return apply_filters('vof_new_user_email_content', $message, $new_user_data, $password);
     }
 }

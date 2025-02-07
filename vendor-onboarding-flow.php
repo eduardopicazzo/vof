@@ -52,6 +52,32 @@ register_deactivation_hook(__FILE__, ['\VOF\VOF_Core', 'vof_deactivate']);
 // Start the plugin
 add_action('plugins_loaded', 'VOF\vof', 0);
 
+// Add auth check for checkout success page NEED TO STUDY HOW AND WHY THIS WORKS!!!
+add_action('template_redirect', function() {
+    if (isset($_GET['checkout']) && $_GET['checkout'] === 'success' && !is_user_logged_in()) {
+        // Get session ID
+        $session_id = isset($_GET['session_id']) ? sanitize_text_field($_GET['session_id']) : '';
+        
+        if ($session_id) {
+            // Get user from session
+            $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+            $session = $stripe->checkout->sessions->retrieve($session_id);
+            
+            if ($session && isset($session->metadata->uuid)) {
+                $temp_user_meta = VOF_Core::instance()->temp_user_meta();
+                $temp_data = $temp_user_meta->vof_get_temp_user_by_uuid($session->metadata->uuid);
+                
+                if ($temp_data && !empty($temp_data['true_user_id'])) {
+                    error_log('VOF Debug: Force logging in user ID: ' . $temp_data['true_user_id']);
+                    wp_set_auth_cookie($temp_data['true_user_id']);
+                    wp_redirect(remove_query_arg(['session_id', 'checkout']));
+                    exit;
+                }
+            }
+        }
+    }
+});
+
 // TO DO: Remove this after testing
 add_action('init', function() {
     error_log('VOF Debug: Checking if vof_listing_contact_details_fields is hooked: ' . 
