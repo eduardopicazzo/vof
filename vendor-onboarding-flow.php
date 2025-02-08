@@ -12,7 +12,7 @@
 namespace VOF;
 
 defined('ABSPATH') || exit;
-
+// path: wp-content/plugins/vendor-onboarding-flow/vendor-onboarding-flow.php
 // Define plugin constants
 define('VOF_VERSION', '1.0.0');
 define('VOF_PLUGIN_FILE', __FILE__);
@@ -52,31 +52,139 @@ register_deactivation_hook(__FILE__, ['\VOF\VOF_Core', 'vof_deactivate']);
 // Start the plugin
 add_action('plugins_loaded', 'VOF\vof', 0);
 
-// Add auth check for checkout success page NEED TO STUDY HOW AND WHY THIS WORKS!!!
+// ################### REDIRECT STUFF [start]
+
+// First, add this debug action to see what's happening with the cookie domain
+add_action('init', function() {
+    $site_url = get_site_url();
+    $parsed_url = parse_url($site_url);
+    $host = $parsed_url['host'];
+    $domain_parts = explode('.', $host);
+    error_log('VOF Debug: Current host: ' . $host);
+    error_log('VOF Debug: Domain parts: ' . print_r($domain_parts, true));
+});
+
+// Modify the cookie domain filter
+
+// First, add this new filter to ensure WordPress recognizes our root domain
+add_filter('site_option_cookie_domain', function($cookie_domain) {
+    // Get host and determine cookie domain
+    $host = parse_url(get_site_url(), PHP_URL_HOST);
+    
+    // Skip for localhost/IP
+    if (preg_match('/^(?:localhost|(?:\d{1,3}\.){3}\d{1,3})$/', $host)) {
+        return $cookie_domain;
+    }
+    
+    $domain_parts = explode('.', $host);
+    if (count($domain_parts) > 2) {
+        return '.' . implode('.', array_slice($domain_parts, -2));
+    }
+    
+    return '.' . $host;
+}, 10, 1);
+
+// Then modify the template_redirect handler
 add_action('template_redirect', function() {
     if (isset($_GET['checkout']) && $_GET['checkout'] === 'success' && !is_user_logged_in()) {
-        // Get session ID
+        error_log('VOF Debug: Starting authentication process');
         $session_id = isset($_GET['session_id']) ? sanitize_text_field($_GET['session_id']) : '';
         
         if ($session_id) {
-            // Get user from session
-            $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
-            $session = $stripe->checkout->sessions->retrieve($session_id);
-            
-            if ($session && isset($session->metadata->uuid)) {
-                $temp_user_meta = VOF_Core::instance()->temp_user_meta();
-                $temp_data = $temp_user_meta->vof_get_temp_user_by_uuid($session->metadata->uuid);
+            try {
+                $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+                $session = $stripe->checkout->sessions->retrieve($session_id);
                 
-                if ($temp_data && !empty($temp_data['true_user_id'])) {
-                    error_log('VOF Debug: Force logging in user ID: ' . $temp_data['true_user_id']);
-                    wp_set_auth_cookie($temp_data['true_user_id']);
-                    wp_redirect(remove_query_arg(['session_id', 'checkout']));
-                    exit;
+                if ($session && isset($session->metadata->uuid)) {
+                    $temp_user_meta = VOF_Core::instance()->temp_user_meta();
+                    $temp_data = $temp_user_meta->vof_get_temp_user_by_uuid($session->metadata->uuid);
+                    
+                    if ($temp_data && !empty($temp_data['true_user_id'])) {
+                        $user_id = $temp_data['true_user_id'];
+                        error_log('VOF Debug: Processing authentication for user ID: ' . $user_id);
+                        
+                        // Force cookie domain setup
+                        $host = parse_url(get_site_url(), PHP_URL_HOST);
+                        $domain_parts = explode('.', $host);
+                        $root_domain = count($domain_parts) > 2 ? 
+                            implode('.', array_slice($domain_parts, -2)) : 
+                            $host;
+                            
+                        error_log('VOF Debug: Setting cookies for root domain: .' . $root_domain);
+                        
+                        // Clear existing cookies and session
+                        wp_clear_auth_cookie();
+                        if (session_id()) {
+                            session_destroy();
+                        }
+                        
+                        // Define cookie parameters
+                        $secure = is_ssl();
+                        $expiration = time() + DAY_IN_SECONDS;
+                        
+                        // Set WordPress cookies through core function first
+                        wp_set_auth_cookie($user_id, false, $secure);
+                        
+                        // Then set cookies manually to ensure subdomain coverage
+                        $auth_cookie = wp_generate_auth_cookie($user_id, $expiration, 'auth');
+                        $logged_in_cookie = wp_generate_auth_cookie($user_id, $expiration, 'logged_in');
+                        
+                        // Common cookie options
+                        $cookie_options = [
+                            'expires' => $expiration,
+                            'path' => COOKIEPATH,
+                            'domain' => '.' . $root_domain, // Note the leading dot
+                            'secure' => $secure,
+                            'httponly' => true
+                        ];
+                        
+                        // Set auth cookie
+                        if (!setcookie(AUTH_COOKIE, $auth_cookie, $cookie_options)) {
+                            error_log('VOF Error: Failed to set AUTH_COOKIE');
+                        }
+                        
+                        // Set logged in cookie
+                        if (!setcookie(LOGGED_IN_COOKIE, $logged_in_cookie, $cookie_options)) {
+                            error_log('VOF Error: Failed to set LOGGED_IN_COOKIE');
+                        }
+                        
+                        // Set secure auth cookie if needed
+                        if ($secure) {
+                            if (!setcookie(SECURE_AUTH_COOKIE, $auth_cookie, $cookie_options)) {
+                                error_log('VOF Error: Failed to set SECURE_AUTH_COOKIE');
+                            }
+                        }
+                        
+                        // Update current user
+                        wp_set_current_user($user_id);
+                        
+                        // Force no caching
+                        nocache_headers();
+                        
+                        error_log('VOF Debug: Authentication process completed');
+                        error_log('VOF Debug: Cookie domain used: .' . $root_domain);
+                        error_log('VOF Debug: Cookie path: ' . COOKIEPATH);
+                        
+                        // Redirect
+                        $redirect_url = remove_query_arg(['session_id', 'checkout']);
+                        wp_redirect($redirect_url);
+                        exit;
+                    } else {
+                        error_log('VOF Error: No valid user data found for UUID: ' . $session->metadata->uuid);
+                    }
                 }
+            } catch (\Exception $e) {
+                error_log('VOF Error: Auth redirect failed - ' . $e->getMessage());
+                error_log('VOF Error: Stack trace - ' . $e->getTraceAsString());
             }
         }
     }
-});
+}, 5); // Note the priority of 5 to ensure early execution
+
+
+// ################### REDIRECT STUFF [end]
+
+
 
 // TO DO: Remove this after testing
 add_action('init', function() {
