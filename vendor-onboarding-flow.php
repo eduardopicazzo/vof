@@ -21,11 +21,23 @@ define('VOF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Load dependencies first
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-dependencies.php';
+
+// Load Helpers and Utils first
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-helper-functions.php';
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-temp-user-meta.php';
-require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-config.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
+
+// Load Traits and (needed by extended models)
+require_once VOF_PLUGIN_DIR . 'traits/trait-vof-payment-meta-handler.php';
+require_once VOF_PLUGIN_DIR . 'traits/trait-vof-stripe-data-mapper.php';
+
+// Load Extended Models
+require_once VOF_PLUGIN_DIR . 'models/class-vof-membership.php';
+require_once VOF_PLUGIN_DIR . 'models/class-vof-payment.php';
+
+// Load VOF API (if not works put back on 4th place top-down)
+require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
 
 // Then load fulfillment handlers
 require_once VOF_PLUGIN_DIR . 'includes/fulfillment/class-vof-webhook-handler.php';
@@ -52,7 +64,7 @@ register_deactivation_hook(__FILE__, ['\VOF\VOF_Core', 'vof_deactivate']);
 // Start the plugin
 add_action('plugins_loaded', 'VOF\vof', 0);
 
-// ################### REDIRECT STUFF [start]
+// ################### REDIRECT STUFF [start] ###################
 
 // First, add this debug action to see what's happening with the cookie domain
 add_action('init', function() {
@@ -63,8 +75,6 @@ add_action('init', function() {
     error_log('VOF Debug: Current host: ' . $host);
     error_log('VOF Debug: Domain parts: ' . print_r($domain_parts, true));
 });
-
-// Modify the cookie domain filter
 
 // First, add this new filter to ensure WordPress recognizes our root domain
 add_filter('site_option_cookie_domain', function($cookie_domain) {
@@ -181,8 +191,7 @@ add_action('template_redirect', function() {
     }
 }, 5); // Note the priority of 5 to ensure early execution
 
-
-// ################### REDIRECT STUFF [end]
+// ################### REDIRECT STUFF [end] ###################
 
 
 

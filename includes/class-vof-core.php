@@ -10,6 +10,8 @@ use VOF\VOF_Pricing_Modal;
 use VOF\Includes\Fulfillment\VOF_Webhook_Handler;
 use VOF\Includes\Fulfillment\VOF_Subscription_Handler;
 use VOF\Includes\Fulfillment\VOF_Fulfillment_Handler;
+use VOF\Models\VOF_Membership;
+use VOF\Models\VOF_Payment;
 
 class VOF_Core {
     private static $instance = null;
@@ -24,6 +26,8 @@ class VOF_Core {
     private $webhook_handler;
     private $fulfillment_handler;
     private $subscription_handler;
+    private $vof_membership = null;
+    private $vof_payment = null;
 
 
     public static function instance() {
@@ -86,30 +90,35 @@ class VOF_Core {
             return;
         }
 
-        $this->api = VOF_API::vof_api_get_instance(); // Initialize API first since other components might need it
-        add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15); // higher (later) priority (Initialize REST API with later priority)
+        $this->api = VOF_API::vof_api_get_instance();                           // Initialize API first since other components might need it
+        add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15);          // Higher (later) priority (Initialize REST API with later priority)
         add_action('init', [$this, 'init_components'], 0);
-        add_action('init', [$this, 'load_textdomain']); // Load text domain
+        add_action('init', [$this, 'load_textdomain']);                          // Load text domain
         add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
     }
 
     public function init_components() {
-        $this->assets = new VOF_Assets();
-        $this->listing = new VOF_Listing();
-        $this->form_handler = new VOF_Form_Handler();
+        $this->assets         = new VOF_Assets();
+        $this->listing        = new VOF_Listing();
+        $this->form_handler   = new VOF_Form_Handler();
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance(); // commenting this will break the modal
-        $this->vof_helper = new VOF_Helper_Functions();
-        $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
+        $this->vof_helper     = new VOF_Helper_Functions();
+        $this->stripe_config  = VOF_Stripe_Config::vof_get_stripe_config_instance();
 
         // Initialize vof pricing modal only if needed 
         if($this->vof_should_init_pricing_modal()) {
             $this->vof_pricing_modal = new VOF_Pricing_Modal();
         }
         
+        // Initialize models if needed [for later central init on core]
+        // if ($this->vof_should_init_models()) {
+        //     $this->vof_init_models();
+        // }
+
         // Initialize fulfillment handlers
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
-        $this->fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
-        $this->webhook_handler = VOF_Webhook_Handler::getInstance();
+        $this->fulfillment_handler  = VOF_Fulfillment_Handler::getInstance();
+        $this->webhook_handler      = VOF_Webhook_Handler::getInstance();
 
         // Initialize only if needed
         if (is_admin()) {
@@ -118,6 +127,27 @@ class VOF_Core {
             add_action( 'admin_menu', [$this, 'vof_add_admin_menu'] );
             new VOF_Stripe_Settings(); // initialize vof-stripe admin dashboard
         }
+    }
+
+    /**
+     * Check if models should be initialized
+     */
+    private function vof_should_init_models() {
+        // Add conditions when models should be initialized
+        // e.g., during checkout, webhook processing, etc.
+        return (
+            isset($_GET['checkout']) && $_GET['checkout'] === 'success' ||
+            strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false ||
+            defined('DOING_AJAX') && DOING_AJAX
+        );
+    }
+
+    /**
+     * Initialize VOF models
+     */
+    private function vof_init_models() {
+        // Models will be initialized on demand through getters
+        // This avoids unnecessary initialization when not needed
     }
 
     public function vof_should_init_pricing_modal() {
@@ -164,6 +194,26 @@ class VOF_Core {
     }
 
     // Getters
+    /**
+     * Get VOF Payment model instance
+     */
+    public function vof_get_payment($stripe_data = null, $temp_user_data = null) {
+        if ($stripe_data && $temp_user_data) {
+            return new VOF_Payment($stripe_data, $temp_user_data);
+        }
+        return null;
+    }
+
+    /**
+     * Get VOF Membership model instance
+     */
+    public function vof_get_membership($user_id = null, $stripe_data = null) {
+        if ($user_id && $stripe_data) {
+            return new VOF_Membership($user_id, $stripe_data);
+        }
+        return null;
+    }
+
     public function vof_get_webhook_handler() {
         return $this->webhook_handler;
     }
@@ -218,13 +268,13 @@ class VOF_Core {
     // Add admin menu MENU
     public function vof_add_admin_menu() {
         add_menu_page(
-            'VOF Debug', // Page title
-            'VOF Debug', // Menu title
-            'manage_options', // Capability required
-            'vof_debug', // Menu slug
+            'VOF Debug',                      // Page title
+            'VOF Debug',                      // Menu title
+            'manage_options',                 // Capability required
+            'vof_debug',                      // Menu slug
             [$this, 'vof_render_debug_page'], // callback function
-            'dashicons-bug', // Icon URL
-            100 // position
+            'dashicons-bug',                  // Icon URL
+            100                               // position
         );
     }
 
@@ -431,7 +481,7 @@ class VOF_Core {
                 <div class="table-structure">
                     <h3>Table Structure</h3>
                     <pre style="background: #f6f7f7; padding: 15px; overflow-x: auto;">
-    <?php echo esc_html($temp_user_meta->vof_get_create_table_sql()); ?>
+                        <?php echo esc_html($temp_user_meta->vof_get_create_table_sql()); ?>
                     </pre>
                 </div>
             </div>
