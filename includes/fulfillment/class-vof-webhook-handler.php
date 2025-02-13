@@ -69,37 +69,6 @@ class VOF_Webhook_Handler {
         }
     }
 
-    public function vof_handle_webhookOLD(\WP_REST_Request $request) {
-        try {
-            $payload = $request->get_body();
-            $sig_header = $request->get_header('stripe-signature');
-            
-            error_log('Webhook received - Signature: ' . ($sig_header ? 'exists' : 'missing'));
-            error_log('Webhook payload: ' . substr($payload, 0, 100) . '...'); // Log first 100 chars
-
-            // Validate webhook
-            $event = $this->vof_validate_and_construct_event($payload, $sig_header);
-            if (is_wp_error($event)) {
-                return $event;
-            }
-
-            // Process webhook event
-            $result = $this->vof_process_webhook_event($event);
-            if (is_wp_error($result)) {
-                return $result;
-            }
-
-            return new \WP_REST_Response(['status' => 'success'], 200);
-
-        } catch (\Exception $e) {
-            error_log('Webhook Error: ' . $e->getMessage());
-            return new \WP_REST_Response([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
-
     private function vof_validate_and_construct_event($payload, $sig_header) {
         try {
             if (empty($sig_header) || empty($payload)) {
@@ -134,43 +103,43 @@ class VOF_Webhook_Handler {
     private function vof_process_webhook_event($event) {
         
         switch ($event->type) {
-            // case 'checkout.session.completed': //Occurs when a Checkout Session has been successfully completed.
-            //     // return $this->vof_handle_checkout_completed($event->data->object); // COMMENT FOR QUICK TESTING
-            //     return true; // Return true to indicate success
-
-            // case 'checkout.session.expired': // TODO
-            //     // SEND PERIODIC EMAIL TO CUSTOMER
-            //     break;
-            // case 'customer.subscription.created': //Occurs whenever a customer is signed up for a new plan.
-            //     error_log($event->data->object);
-            //     return $this->vof_handle_subscription_created($event->data->object); // COMMENTED FOR TESTING
-            //     // create / sync subscription rtcl <-> stripe (call subscription handler)
-            //     return true; // Return true to indicate success
             case 'checkout.session.completed':
                 $session = $event->data->object;
+                // $result = $this->vof_handle_checkout_completed($session);
+                $result = $this->vof_handle_checkout_completed_STUB();
+                
                 error_log('VOF Debug: Checkout completed');
-                // return $this->vof_handle_checkout_completed($session);
-                break;
+                
+                return $result;
     
             case 'customer.subscription.created':
-                $subscription = $event->data->object;
+                $subscription = $event->data->object;                
+                $result = $this->vof_handle_subscription_created($subscription);
+                
                 error_log('VOF Debug: Subscription created');
-                return $this->vof_handle_subscription_created($subscription);
-                break;
+                
+                return $result;
+            
+            // case 'checkout.session.expired':      // TODO (maybe)
+                    // SEND PERIODIC EMAIL TO CUSTOMER
+                // return true; // Return true to indicate success
+                // break;
+            // case 'customer.subscription.updated': // CURRENTLY NOT IN USE
+                // Occurs whenever a subscription changes 
+                // (e.g., switching from one plan to another, or changing the status from trial to active).
+                // return $this->vof_handle_subscription_updated($event->data->object);
 
-            case 'customer.subscription.updated': // Occurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active).
-                return $this->vof_handle_subscription_updated($event->data->object);
+            // case 'customer.subscription.deleted': // CURRENTLY NOT IN USE
+                // return $this->vof_handle_subscription_deleted($event->data->object);
 
-            case 'customer.subscription.deleted':
-                return $this->vof_handle_subscription_deleted($event->data->object);
+            // case 'invoice.payment_succeeded':     // CURRENTLY NOT IN USE
+                // return $this->vof_handle_invoice_payment_succeeded($event->data->object);
 
-            case 'invoice.payment_succeeded':
-                return $this->vof_handle_invoice_payment_succeeded($event->data->object);
-
-            case 'invoice.payment_failed':
-                return $this->vof_handle_invoice_payment_failed($event->data->object);
+            // case 'invoice.payment_failed':        // CURRENTLY NOT IN USE
+                // return $this->vof_handle_invoice_payment_failed($event->data->object);
 
             default:
+                http_response_code(400);
                 return new WP_Error(
                     'unhandled_event',
                     'Unhandled webhook event type: ' . $event->type,
@@ -209,11 +178,31 @@ class VOF_Webhook_Handler {
             }
 
             do_action('vof_checkout_completed', $session, $uuid);
-            return true;
+
+            http_response_code(200);
+            return array('success' => true);
 
         } catch (\Exception $e) {
-            return new WP_Error('checkout_error', $e->getMessage());
+            http_response_code(400);
+            return new WP_Error('checkout_error', 
+            $e->getMessage(),
+            array('status' => 400)
+            );
         }
+    }
+
+    private function vof_handle_checkout_completed_STUB() {
+        try {
+            http_response_code(200);
+                return array('success' => true);
+
+        } catch (\Exception $e) {
+            http_response_code(400);
+            return new WP_Error('checkout_error', 
+            $e->getMessage(),
+            array('status' => 400)
+            );
+        }  
     }
 
     private function vof_handle_subscription_created($subscription) {
@@ -280,100 +269,58 @@ class VOF_Webhook_Handler {
                 error_log('VOF Subscription: Retrieved extracted subscription data (w print_r): ' . print_r($subscription_data, true));
                 
                 // Dispatch the subscription created action - THIS IS CRUCIAL
-                do_action('vof_subscription_created', 
-                    $subscription_data,
-                    $subscription->customer,
-                    $subscription->id
-                );
-                
-                return true;
-    
-            } catch (\Exception $e) {
-                error_log('VOF Subscription Error: Failed to expand subscription - ' . $e->getMessage());
-                throw $e;
-            }
-    
-        } catch (\Exception $e) {
-            error_log('VOF Subscription Error: ' . $e->getMessage());
-            throw $e;
-        }
-    }
+                // do_action('vof_subscription_created', 
+                //     $subscription_data,
+                //     $subscription->customer,
+                //     $subscription->id
+                // );
 
-    private function vof_handle_subscription_createdOLDEST($subscription) {
-        try {
-            // Get Stripe config instance
-            $stripe_config = VOF_Core::instance()->vof_get_stripe_config();
-            
-            // Get Stripe instance
-            $stripe = $stripe_config->vof_get_stripe();
-            
-            // Debug log
-            error_log('VOF Debug: Stripe instance initialized ' . ($stripe ? 'successfully' : 'failed'));
-            
-            // Retrieve expanded subscription
-            try {
-                $expanded_subscription = $stripe->subscriptions->retrieve(
-                    $subscription->id,
-                    [
-                        'expand' => [
-                            'items.data.price.product',
-                            'default_payment_method',
-                            'latest_invoice.payment_method'
-                        ]
-                    ]
-                );
-                
-                error_log('VOF Debug: Expanded subscription: ' . print_r($expanded_subscription, true));
-                
-                // Extract required data with careful null checks
-                $subscription_data = [
-                    'product_name' => $expanded_subscription->items->data[0]->price->product->name ?? null,
-                    'product_id' => $expanded_subscription->items->data[0]->price->product->id ?? null,
-                    'price_id' => $expanded_subscription->items->data[0]->price->id ?? null,
-                    'amount' => $expanded_subscription->items->data[0]->price->unit_amount ?? null,
-                    'currency' => $expanded_subscription->currency ?? null,
-                    'customer' => $expanded_subscription->customer ?? null,
-                    'status' => $expanded_subscription->status ?? null,
-                    'current_period_end' => $expanded_subscription->current_period_end ?? null
-                ];
-    
-                // Debug log subscription data
-                error_log('VOF Debug: Subscription data extracted: ' . print_r($subscription_data, true));
-    
-                // Add payment method details if available
-                if (isset($expanded_subscription->default_payment_method)) {
-                    $subscription_data['payment_method'] = [
-                        'card' => [
-                            'last4' => $expanded_subscription->default_payment_method->card->last4 ?? null,
-                            'exp_month' => $expanded_subscription->default_payment_method->card->exp_month ?? null,
-                            'exp_year' => $expanded_subscription->default_payment_method->card->exp_year ?? null
-                        ]
-                    ];
+                $vof_subscription_handler = \VOF\Includes\Fulfillment\VOF_Subscription_Handler::getInstance();
+                $vof_subscription_handler->vof_process_subscription( $subscription_data, $subscription->customer, $subscription->id );
+
+                if(is_wp_error($vof_subscription_handler)) {
+                    http_response_code(400);
+                    return $vof_subscription_handler;
+                } else {
+                    http_response_code(200);
+                    return array('success' => true);
                 }
-    
-                return $subscription_data;
-    
+                   
             } catch (\Exception $e) {
+                http_response_code(400);
                 error_log('VOF Subscription Error: Failed to expand subscription - ' . $e->getMessage());
-                throw $e;
+                return new WP_Error('subscription_creation_error', 
+                $e->getMessage(),
+                array('status' => 400)
+                );
             }
     
         } catch (\Exception $e) {
+            http_response_code(400);
             error_log('VOF Subscription Error: ' . $e->getMessage());
-            throw $e;
+            return new WP_Error('subscription_creation_error', 
+            $e->getMessage(),
+            array('status' => 400)
+            );
         }
     }
 
-    // TODO: probably update expiration date every time on renewal for "monthly"
-    private function vof_handle_subscription_updated($subscription) {
+    private function vof_handle_subscription_updated($subscription) { // TODO: probably update expiration date every time on renewal for "monthly"
         try {
             do_action('vof_subscription_updated', 
                 $subscription->id,
                 $subscription
             );
-            return true;
+
+            http_response_code(200);
+            return array('success' => true);
+
         } catch (\Exception $e) {
-            return new WP_Error('subscription_error', $e->getMessage());
+            http_response_code(400);
+            return new WP_Error('subscription_update_error', 
+                $e->getMessage(),
+                array('status' => 400)
+            );
         }
     }
 
@@ -383,9 +330,16 @@ class VOF_Webhook_Handler {
                 $subscription->id,
                 $subscription
             );
-            return true;
+
+            http_response_code(200);
+            return array('success' => true);
+
         } catch (\Exception $e) {
-            return new WP_Error('subscription_error', $e->getMessage());
+            http_response_code(400);
+            return new WP_Error('subscription_deletion_error', 
+                $e->getMessage(),
+                array('status' => 400)
+            ); 
         }
     }
 
@@ -397,9 +351,16 @@ class VOF_Webhook_Handler {
                     ['status' => 'active']
                 );
             }
-            return true;
+
+            http_response_code(200);
+            return array('success' => true);
+
         } catch (\Exception $e) {
-            return new WP_Error('invoice_error', $e->getMessage());
+            http_response_code(400);
+            return new WP_Error('invoice_error', 
+                $e->getMessage(),
+                array('status' => 400)
+            );
         }
     }
 
@@ -411,9 +372,16 @@ class VOF_Webhook_Handler {
                     ['status' => 'past_due']
                 );
             }
-            return true;
+            
+            http_response_code(200);
+            return array('success' => true);
+
         } catch (\Exception $e) {
-            return new WP_Error('invoice_error', $e->getMessage());
+            http_response_code(400);
+            return new WP_Error('invoice_error', 
+                $e->getMessage(), 
+                array('success' => true)
+            );
         }
     }
 

@@ -2,8 +2,6 @@
 namespace VOF\Includes\Fulfillment;
 
 use Rtcl\Helpers\Functions;
-use VOF\Models\VOF_Payment;
-use VOF\Models\VOF_Membership;
 use VOF\Utils\Helpers\VOF_Temp_User_Meta;
 use WP_Error;
 
@@ -22,20 +20,23 @@ class VOF_Fulfillment_Handler {
     private function __construct() {
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
-        
-        // Hook into subscription events
-        add_action('vof_subscription_created', [$this, 'vof_initiate_fulfillment'], 10, 3);
-        add_action('vof_before_fulfillment', [$this, 'vof_validate_data'], 10, 2);
-        add_action('vof_after_fulfillment', [$this, 'vof_cleanup_temp_data'], 10, 2);
     }
 
     /**
      * Main fulfillment process entry point
+     * 
+     * @param array $stripe_data Stripe webhook data
+     * @param int|null $customer_id Optional customer ID
+     * @param string|null $subscription_id Optional subscription ID
+     * @return bool
+     * @throws \Exception
      */
-    public function vof_initiate_fulfillment($stripe_data, $customer_id, $subscription_id) {
+    public function vof_initiate_fulfillment($stripe_data, $customer_id = null, $subscription_id = null) {
         try {
             global $wpdb;
             $wpdb->query('START TRANSACTION');
+
+            error_log('VOF Debug: Starting fulfillment with stripe data-> ' . print_r($stripe_data, true));
 
             // Get temp user data
             $temp_user = $this->temp_user_meta->vof_get_temp_user_by_uuid(
@@ -43,19 +44,24 @@ class VOF_Fulfillment_Handler {
             );
 
             if (!$temp_user) {
-                throw new \Exception('No temporary user data found');
+                throw new \Exception('No temporary user data found for UUID: ' . $stripe_data['metadata']['uuid']);
             }
 
-            do_action('vof_before_fulfillment', $stripe_data, $temp_user);
+            // Create RTCL payment post first
+            $payment_id = $this->vof_create_rtcl_payment($stripe_data, $temp_user);
+            if (!$payment_id) {
+                throw new \Exception('Failed to create RTCL payment record');
+            }
 
             // Process membership fulfillment
-            $result = $this->vof_process_fulfillment($stripe_data, $temp_user);
+            $result = $this->vof_process_fulfillment($stripe_data, $temp_user, $payment_id);
             
             if (is_wp_error($result)) {
                 throw new \Exception($result->get_error_message());
             }
 
-            do_action('vof_after_fulfillment', $stripe_data, $temp_user);
+            // Cleanup temporary data
+            $this->vof_cleanup_temp_data($stripe_data, $temp_user);
 
             $wpdb->query('COMMIT');
             return true;
@@ -63,37 +69,99 @@ class VOF_Fulfillment_Handler {
         } catch (\Exception $e) {
             $wpdb->query('ROLLBACK');
             error_log('VOF Fulfillment Error: ' . $e->getMessage());
+            error_log('VOF Fulfillment Error Stack: ' . $e->getTraceAsString());
             do_action('vof_fulfillment_failed', $stripe_data, $e->getMessage());
             throw $e;
         }
     }
 
     /**
-     * Processes the actual fulfillment with new VOF classes
+     * Creates RTCL payment post type record
+     * 
+     * @param array $stripe_data Stripe webhook data
+     * @param array $temp_user Temporary user data
+     * @return int|false Post ID on success, false on failure
      */
-    private function vof_process_fulfillment($stripe_data, $temp_user) {
+    private function vof_create_rtcl_payment($stripe_data, $temp_user) {
+        // Format stripe amount to RTCL format
+        $amount = $stripe_data['amount'] / 100;
+
+        // Prepare basic meta input
+        $meta_input = [
+            'customer_id' => $temp_user['true_user_id'],
+            'customer_ip_address' => Functions::get_ip_address(),
+            '_order_key' => apply_filters('rtcl_generate_order_key', uniqid('rtcl_order_')),
+            '_pricing_id' => $stripe_data['metadata']['pricing_id'],
+            'amount' => Functions::get_payment_formatted_price($amount),
+            '_tax_amount' => 0.00,
+            '_subtotal' => Functions::get_payment_formatted_price($amount),
+            '_payment_method' => 'stripe',
+            '_payment_method_title' => 'Stripe',
+            '_order_currency' => strtoupper($stripe_data['currency']),
+            '_billing_email' => $temp_user['vof_email'],
+            'payment_type' => 'membership',
+            'transaction_id' => $stripe_data['payment_intent'],
+            '_stripe_customer_id' => $stripe_data['customer'],
+            '_stripe_subscription_id' => $stripe_data['subscription'],
+            '_applied' => 1,
+            'date_paid' => current_time('mysql'),
+            'date_completed' => current_time('mysql')
+        ];
+
+        // Add membership promotions if present in pricing
+        $membership_promotions = get_post_meta($stripe_data['metadata']['pricing_id'], '_rtcl_membership_promotions', true);
+        if (!empty($membership_promotions)) {
+            $meta_input['_rtcl_membership_promotions'] = $membership_promotions;
+        }
+
+        // Create payment post
+        $payment_args = [
+            'post_title' => esc_html__('Order on', 'classified-listing') . ' ' . current_time("l jS F Y h:i:s A"),
+            'post_status' => 'rtcl-completed',
+            'post_parent' => '0',
+            'ping_status' => 'closed',
+            'post_author' => 1,
+            'post_type' => rtcl()->post_type_payment,
+            'meta_input' => $meta_input
+        ];
+
+        $payment_id = wp_insert_post($payment_args);
+        
+        if (!$payment_id || is_wp_error($payment_id)) {
+            error_log('VOF Error: Failed to create payment post. ' . ($payment_id ? $payment_id->get_error_message() : ''));
+            return false;
+        }
+
+        error_log('VOF Debug: Created payment post ID: ' . $payment_id);
+        return $payment_id;
+    }
+
+    /**
+     * Processes the membership fulfillment using RTCL's native functionality
+     * 
+     * @param array $stripe_data Stripe webhook data
+     * @param array $temp_user Temporary user data
+     * @param int $payment_id Payment post ID
+     * @return true|WP_Error True on success, WP_Error on failure
+     */
+    private function vof_process_fulfillment($stripe_data, $temp_user, $payment_id) {
         try {
-            // Create VOF Payment
-            $payment = new VOF_Payment($stripe_data, $temp_user);
-
-            // Create VOF Membership
-            $membership = new VOF_Membership(
-                $temp_user['true_user_id'],
-                $stripe_data
-            );
-
-            // Apply membership using VOF-specific method
-            $result = $membership->vof_apply_stripe_membership($payment);
-            if (!$result) {
-                throw new \Exception('Failed to apply membership');
+            // Get RTCL payment object
+            $payment = rtcl()->factory->get_order($payment_id);
+            if (!$payment) {
+                throw new \Exception('Invalid payment record');
             }
 
+            // Apply membership using RTCL's native function
+            Functions::apply_membership($payment);
+
             // Publish the temporary listing
-            $this->vof_publish_listing($temp_user, $membership->get_user_id());
+            $this->vof_publish_listing($temp_user, $payment->get_customer_id());
 
             return true;
 
         } catch (\Exception $e) {
+            error_log('VOF Fulfillment Process Error: ' . $e->getMessage());
             return new WP_Error(
                 'fulfillment_failed',
                 $e->getMessage()
@@ -102,24 +170,11 @@ class VOF_Fulfillment_Handler {
     }
 
     /**
-     * Validates data before fulfillment
-     */
-    public function vof_validate_data($stripe_data, $temp_user) {
-        if (empty($temp_user['true_user_id'])) {
-            throw new \Exception('Invalid user ID');
-        }
-
-        if (empty($temp_user['post_id'])) {
-            throw new \Exception('Invalid listing ID');
-        }
-
-        if (!isset($stripe_data['status']) || $stripe_data['status'] !== 'active') {
-            throw new \Exception('Invalid subscription status');
-        }
-    }
-
-    /**
      * Publishes the temporary listing
+     * 
+     * @param array $temp_user Temporary user data
+     * @param int $user_id User ID
+     * @return int|WP_Error Post ID on success, WP_Error on failure
      */
     private function vof_publish_listing($temp_user, $user_id) {
         $post_data = [
@@ -129,23 +184,27 @@ class VOF_Fulfillment_Handler {
             'meta_input' => [
                 '_rtcl_membership_assigned' => true,
                 '_rtcl_listing_owner' => $user_id,
-                '_rtcl_manager_id' => $user_id,
-                '_vof_subscription_id' => $temp_user['subscription_id']
+                '_rtcl_manager_id' => $user_id
             ]
         ];
 
         $result = wp_update_post($post_data);
         if (is_wp_error($result)) {
+            error_log('VOF Error: Failed to publish listing: ' . $result->get_error_message());
             throw new \Exception('Failed to publish listing: ' . $result->get_error_message());
         }
 
+        error_log('VOF Debug: Published listing ID: ' . $result);
         return $result;
     }
 
     /**
      * Cleanup temporary data after successful fulfillment
+     * 
+     * @param array $stripe_data Stripe webhook data
+     * @param array $temp_user Temporary user data
      */
-    public function vof_cleanup_temp_data($stripe_data, $temp_user) {
+    private function vof_cleanup_temp_data($stripe_data, $temp_user) {
         // Mark temp user as completed
         $this->temp_user_meta->vof_update_post_status(
             $temp_user['uuid'], 
@@ -157,47 +216,7 @@ class VOF_Fulfillment_Handler {
             time() + DAY_IN_SECONDS, 
             'vof_cleanup_expired_temp_data'
         );
-    }
 
-    /**
-     * Handles subscription status changes
-     */
-    public function vof_handle_subscription_status_change($subscription_id, $new_status, $stripe_data) {
-        try {
-            $user_id = $this->vof_get_user_by_subscription($subscription_id);
-            if (!$user_id) {
-                throw new \Exception('No user found for subscription');
-            }
-
-            $membership = new VOF_Membership($user_id, $stripe_data);
-            
-            // Create temporary payment for status update
-            $payment = new VOF_Payment($stripe_data, [
-                'true_user_id' => $user_id
-            ]);
-
-            // Update membership using VOF-specific method
-            $membership->vof_update_stripe_membership($payment);
-
-            do_action('vof_subscription_status_updated', $subscription_id, $new_status);
-
-        } catch (\Exception $e) {
-            error_log('VOF Status Change Error: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Gets user ID by subscription ID
-     */
-    private function vof_get_user_by_subscription($subscription_id) {
-        global $wpdb;
-        
-        return $wpdb->get_var($wpdb->prepare(
-            "SELECT user_id 
-            FROM {$wpdb->usermeta} 
-            WHERE meta_key = '_vof_stripe_subscription_id' 
-            AND meta_value = %s",
-            $subscription_id
-        ));
+        error_log('VOF Debug: Cleaned up temporary data for UUID: ' . $temp_user['uuid']);
     }
 }

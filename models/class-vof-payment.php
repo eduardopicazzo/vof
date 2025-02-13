@@ -14,31 +14,31 @@ class VOF_Payment extends Payment {
     use VOF_Payment_Meta_Handler;
 
     private $stripe_data;
-    private $temp_user_data;
-    private $rtcl_payment_id;
+    private $vof_temp_user_data;
+    private $vof_to_rtcl_payment_id;
     
     /**
      * @param array $stripe_data Stripe subscription data
-     * @param array $temp_user_data VOF temporary user data
+     * @param array $vof_temp_user_data VOF temporary user data
      */
-    public function __construct($stripe_data, $temp_user_data) {
+    public function __construct($stripe_data, $temp_user_data, $payment_id = null) {
         $this->stripe_data = $stripe_data;
-        $this->temp_user_data = $temp_user_data;
+        $this->vof_temp_user_data = $temp_user_data;
         
-        // Create payment record and initialize parent
-        $this->rtcl_payment_id = $this->vof_create_payment_record();
-        if (!$this->rtcl_payment_id) {
+        // Create payment record and initialize parent. Use existing payment ID if provided.
+        $this->vof_to_rtcl_payment_id = $payment_id ?: $this->vof_create_payment_record();
+        if (!$this->vof_to_rtcl_payment_id) {
             throw new \Exception('Failed to create payment record');
         }
         
-        parent::__construct($this->rtcl_payment_id);
+        parent::__construct($this->vof_to_rtcl_payment_id);
     }
 
     /**
      * Gets the underlying RTCL payment ID
      */
     public function vof_get_rtcl_payment_id() {
-        return $this->rtcl_payment_id;
+        return $this->vof_to_rtcl_payment_id;
     }
 
     /**
@@ -52,7 +52,7 @@ class VOF_Payment extends Payment {
                 __('Payment for Order #%s', 'vof'),
                 $this->stripe_data['payment_intent']
             ),
-            'post_author' => $this->temp_user_data['true_user_id'],
+            'post_author' => $this->vof_temp_user_data['true_user_id'],
             'meta_input' => $this->vof_get_payment_meta()
         ];
 

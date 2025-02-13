@@ -67,7 +67,7 @@ class VOF_Subscription_Handler {
         wp_cache_add_global_groups([$this->cache_group]);
         
         // Add hooks for subscription lifecycle events
-        add_action('vof_subscription_created', [$this, 'vof_process_subscription'], 10, 3);
+        // add_action('vof_subscription_created', [$this, 'vof_process_subscription'], 10, 3);
         add_action('vof_subscription_cancelled', [$this, 'vof_handle_subscription_cancelled'], 10, 2);
         add_action('vof_subscription_updated', [$this, 'vof_handle_subscription_updated'], 10, 2);
     }
@@ -144,8 +144,8 @@ class VOF_Subscription_Handler {
             if (!empty($stripe_data['payment_method']['cc'])) {
                 // Format credit card meta consistently
                 $cc_data = [
-                    'type' => "card", // Always "card" for card payments
-                    'last4' => (string)$stripe_data['payment_method']['cc']['last4'], // Cast to string
+                    'type'   => "card", // Always "card" for card payments
+                    'last4'  => (string)$stripe_data['payment_method']['cc']['last4'], // Cast to string
                     'expiry' => sprintf(
                         '%d/%d',  // Format: month/year without leading zeros
                         (int)$stripe_data['payment_method']['cc']['exp_month'],
@@ -166,9 +166,15 @@ class VOF_Subscription_Handler {
             // Commit transaction
             $wpdb->query('COMMIT');
             error_log('VOF Debug: Transaction committed successfully');
-    
-            do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
-    
+
+            try {
+                // do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
+                $vof_fulfillment_handler = \VOF\Includes\Fulfillment\VOF_Fulfillment_Handler::getInstance();
+                $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data, $new_sub);
+            } catch(\Exception $e) {
+                error_log('VOF Debug: Could not process membership fulfillment - ' . $e->getMessage());
+            }
+
             return $new_sub;
     
         } catch (\Exception $e) {
