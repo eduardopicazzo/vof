@@ -349,6 +349,14 @@ class VOF_API {
                 'cancel_url' => site_url('/my-account?checkout=cancelled'),
                 'mode' => 'subscription',
                 'customer_email' => $user_data['vof_email'],
+                'subscription_data' => [ // test iff uuid persists
+                    'metadata' => [
+                        'uuid' => $user_data['uuid'],
+                        'tier' => $tier_selected['name'],
+                        'post_id' => $user_data['post_id'],
+                        'phone' => $user_data['vof_phone'],
+                    ],
+                ],
                 'metadata' => [
                     'uuid' => $user_data['uuid'],
                     'tier' => $tier_selected['name'],

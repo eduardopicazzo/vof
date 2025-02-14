@@ -170,7 +170,17 @@ class VOF_Subscription_Handler {
             try {
                 // do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
                 $vof_fulfillment_handler = \VOF\Includes\Fulfillment\VOF_Fulfillment_Handler::getInstance();
-                $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data, $new_sub);
+
+                error_log('VOF Debug: About to fulfill membership with $new_sub data -> ' . print_r($new_sub, true));
+                error_log('VOF Debug: >> OR << About to fulfill membership with $stripe_data -> ' . print_r($stripe_data, true));
+                error_log('VOF Debug: >> OR <<About to fulfill membership with $subscription_id data -> ' . print_r($subscription_id, true));
+
+                // Create a copy of stripe_data with the additional product_id
+                $stripe_data_merged = array_merge($stripe_data, ['rtcl_pricing_tier_id' => $subscription_data['product_id']]);
+
+                // $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data, $new_sub); // need pass $stripe_data, and $subscription_data['product_id']
+                $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data_merged); // passes all required contents for payment order creation
+
             } catch(\Exception $e) {
                 error_log('VOF Debug: Could not process membership fulfillment - ' . $e->getMessage());
             }
@@ -368,7 +378,7 @@ class VOF_Subscription_Handler {
         if (count($rtcl_membership_id) === 1) {
             $matched_id = reset($rtcl_membership_id);
             error_log('VOF Debug: Found matching membership tier ID: ' . $matched_id);
-            $this->vof_sync_stripe_data($matched_id, $stripe_data); // COMMENT FOR TO AVOID DB WRITES UNTIL TEST LOGS
+            $this->vof_sync_stripe_data($matched_id, $stripe_data);
             return $matched_id;
         }
     
