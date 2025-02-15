@@ -239,27 +239,28 @@ class VOF_Webhook_Handler {
                 
                 // Extract required data with careful null checks <-- THIS $subscription_data will be passed to VOF Fulfillment Handler
                 $subscription_data = [
-                    'product_name' => $expanded_subscription->items->data[0]->price->product->name ?? null,
-                    'product_id' => $expanded_subscription->items->data[0]->price->product->id ?? null,
-                    'price_id' => $expanded_subscription->items->data[0]->price->id ?? null,
-                    'amount' => $expanded_subscription->items->data[0]->price->unit_amount ?? null,
-                    'currency' => $expanded_subscription->currency ?? null,
-                    'customer' => $expanded_subscription->customer ?? null,
-                    'status' => $expanded_subscription->status ?? null,
-                    'current_period_end' => $expanded_subscription->current_period_end ?? null,
+                    'product_name'             => $expanded_subscription->items->data[0]->price->product->name ?? null,
+                    'product_id'               => $expanded_subscription->items->data[0]->price->product->id ?? null,
+                    'price_id'                 => $expanded_subscription->items->data[0]->price->id ?? null,
+                    'amount'                   => $expanded_subscription->items->data[0]->price->unit_amount ?? null,
+                    'currency'                 => $expanded_subscription->currency ?? null,
+                    'customer'                 => $expanded_subscription->customer ?? null,
+                    'status'                   => $expanded_subscription->status ?? null,
+                    'current_period_end'       => $expanded_subscription->current_period_end ?? null,
+
                     // newly added
-                    'subscription_id' => $expanded_subscription->items->data[0]->subscription ?? null,
-                    'uuid' => $expanded_subscription->metadata->uuid ?? null,
-                    'post_id' => $expanded_subscription->metadata->post_id ?? null,
-                    'interval' => $expanded_subscription->items->data[0]->price->recurring->interval ?? null,
-                    'stripe_payment_method' => $expanded_subscription->default_payment_method->id ?? null,  // pm_1QsCGlF1Da8bBQoXuayrxeTT of sorts...
-                    'product_id' => $expanded_subscription->items->data[0]->plan->product ?? null,          // prod_RgJuPNg8SnYaPG of sorts...
-                    'lookup_key' => $expanded_subscription->items->data[0]->price->lookup_key ?? null,
-                    'customer_email' => $expanded_subscription->latest_invoice->customer_email ?? null,
-                    'customer_name' => $expanded_subscription->latest_invoice->customer_name ?? null,
-                    'customer_phone' => $expanded_subscription->latest_invoice->customer_phone ?? null,
-                    'period_end' => $expanded_subscription->latest_invoice->period_end ?? null,
-                    'period_start' => $expanded_subscription->latest_invoice->period_start ?? null
+                    'subscription_id'          => $expanded_subscription->items->data[0]->subscription ?? null,
+                    'uuid'                     => $expanded_subscription->metadata->uuid ?? null,
+                    'post_id'                  => $expanded_subscription->metadata->post_id ?? null,
+                    'interval'                 => $expanded_subscription->items->data[0]->price->recurring->interval ?? null,
+                    'stripe_payment_method_id' => $expanded_subscription->default_payment_method->id ?? null,    // pm_1QsCGlF1Da8bBQoXuayrxeTT of sorts...
+                    'product_id'               => $expanded_subscription->items->data[0]->plan->product ?? null, // prod_RgJuPNg8SnYaPG of sorts...
+                    'lookup_key'               => $expanded_subscription->items->data[0]->price->lookup_key ?? null,
+                    'customer_email'           => $expanded_subscription->latest_invoice->customer_email ?? null,
+                    'customer_name'            => $expanded_subscription->latest_invoice->customer_name ?? null,
+                    'customer_phone'           => $expanded_subscription->latest_invoice->customer_phone ?? null,
+                    'period_end'               => $expanded_subscription->latest_invoice->period_end ?? null,
+                    'period_start'             => $expanded_subscription->latest_invoice->period_start ?? null
                 ];
     
                 // Get payment method details from either default_payment_method or latest_invoice
@@ -284,13 +285,6 @@ class VOF_Webhook_Handler {
                 }
     
                 error_log('VOF Subscription: Retrieved extracted subscription data (w print_r): ' . print_r($subscription_data, true));
-                
-                // Dispatch the subscription created action - THIS IS CRUCIAL
-                // do_action('vof_subscription_created', 
-                //     $subscription_data,
-                //     $subscription->customer,
-                //     $subscription->id
-                // );
 
                 $vof_subscription_handler = \VOF\Includes\Fulfillment\VOF_Subscription_Handler::getInstance();
                 $vof_subscription_handler->vof_process_subscription( $subscription_data, $subscription->customer, $subscription->id );

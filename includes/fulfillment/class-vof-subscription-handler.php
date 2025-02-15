@@ -167,19 +167,15 @@ class VOF_Subscription_Handler {
             $wpdb->query('COMMIT');
             error_log('VOF Debug: Transaction committed successfully');
 
-            try {
-                // do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
+            try { // Start Fulfillment Handling and hand-off
+
                 $vof_fulfillment_handler = \VOF\Includes\Fulfillment\VOF_Fulfillment_Handler::getInstance();
-
-                error_log('VOF Debug: About to fulfill membership with $new_sub data -> ' . print_r($new_sub, true));
-                error_log('VOF Debug: >> OR << About to fulfill membership with $stripe_data -> ' . print_r($stripe_data, true));
-                error_log('VOF Debug: >> OR <<About to fulfill membership with $subscription_id data -> ' . print_r($subscription_id, true));
-
+                
                 // Create a copy of stripe_data with the additional product_id
                 $stripe_data_merged = array_merge($stripe_data, ['rtcl_pricing_tier_id' => $subscription_data['product_id']]);
+                error_log('VOF Debug: About to fulfill membership with $stripe_data_merged data: ' . print_r($stripe_data_merged, true));
 
-                // $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data, $new_sub); // need pass $stripe_data, and $subscription_data['product_id']
-                $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data_merged); // passes all required contents for payment order creation
+                $vof_fulfillment_handler->vof_initiate_fulfillment($stripe_data_merged);
 
             } catch(\Exception $e) {
                 error_log('VOF Debug: Could not process membership fulfillment - ' . $e->getMessage());

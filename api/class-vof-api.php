@@ -351,17 +351,17 @@ class VOF_API {
                 'customer_email' => $user_data['vof_email'],
                 'subscription_data' => [ // test iff uuid persists
                     'metadata' => [
-                        'uuid' => $user_data['uuid'],
-                        'tier' => $tier_selected['name'],
+                        'uuid'    => $user_data['uuid'],
+                        'tier'    => $tier_selected['name'],
                         'post_id' => $user_data['post_id'],
-                        'phone' => $user_data['vof_phone'],
+                        'phone'   => $user_data['vof_phone'],
                     ],
                 ],
                 'metadata' => [
-                    'uuid' => $user_data['uuid'],
-                    'tier' => $tier_selected['name'],
+                    'uuid'    => $user_data['uuid'],
+                    'tier'    => $tier_selected['name'],
                     'post_id' => $user_data['post_id'],
-                    'phone' => $user_data['vof_phone'], // Pre-fill the customer's phone number
+                    'phone'   => $user_data['vof_phone'], // Pre-fill the customer's phone number
                 ],
                 'line_items' => [$checkout_data['line_items']],
                 'allow_promotion_codes' => true,
