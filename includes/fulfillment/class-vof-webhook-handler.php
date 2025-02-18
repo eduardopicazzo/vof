@@ -230,7 +230,13 @@ class VOF_Webhook_Handler {
                             'items.data.price.product',
                             'default_payment_method',
                             'latest_invoice',
-                            'pending_setup_intent'
+                            'pending_setup_intent',
+                            // retrieves balance transaction & charge id's
+                            'latest_invoice.payment_intent',
+                            'latest_invoice.payment_intent.latest_charge',
+                            // retrieves stripe's net amount and stripe's fee
+                            'latest_invoice.charge',
+                            'latest_invoice.charge.balance_transaction',
                         ]
                     ]
                 );
@@ -253,14 +259,22 @@ class VOF_Webhook_Handler {
                     'uuid'                     => $expanded_subscription->metadata->uuid ?? null,
                     'post_id'                  => $expanded_subscription->metadata->post_id ?? null,
                     'interval'                 => $expanded_subscription->items->data[0]->price->recurring->interval ?? null,
-                    'stripe_payment_method_id' => $expanded_subscription->default_payment_method->id ?? null,    // pm_1QsCGlF1Da8bBQoXuayrxeTT of sorts...
-                    'product_id'               => $expanded_subscription->items->data[0]->plan->product ?? null, // prod_RgJuPNg8SnYaPG of sorts...
+                    'stripe_payment_method_id' => $expanded_subscription->default_payment_method->id ?? null,                       // pm_1QsCGlF1Da8bBQoXuayrxeTT of sorts...
+                    'product_id'               => $expanded_subscription->items->data[0]->plan->product ?? null,                    // prod_RgJuPNg8SnYaPG of sorts...
                     'lookup_key'               => $expanded_subscription->items->data[0]->price->lookup_key ?? null,
                     'customer_email'           => $expanded_subscription->latest_invoice->customer_email ?? null,
                     'customer_name'            => $expanded_subscription->latest_invoice->customer_name ?? null,
                     'customer_phone'           => $expanded_subscription->latest_invoice->customer_phone ?? null,
                     'period_end'               => $expanded_subscription->latest_invoice->period_end ?? null,
-                    'period_start'             => $expanded_subscription->latest_invoice->period_start ?? null
+                    'period_start'             => $expanded_subscription->latest_invoice->period_start ?? null,
+
+                    // newly very newly added
+                    'rtcl_transaction_id'      => $expanded_subscription->latest_invoice->charge->id ?? null,                        // ch_xxxx
+                    'stripe_fee'               => $expanded_subscription->latest_invoice->charge->balance_transaction->fee ?? null,
+                    'stripe_net_amount'        => $expanded_subscription->latest_invoice->charge->balance_transaction->net ?? null,
+                    'stripe_intent_id'         => $expanded_subscription->latest_invoice->payment_intent->id ?? null,                // pi_xxxx
+                    'stripe_charge_captured'   => $expanded_subscription->latest_invoice->charge->amount_captured ?? null,
+                    'is_stripe_captured'       => $expanded_subscription->latest_invoice->charge->captured ? 'yes' : 'no'           // yes / no
                 ];
     
                 // Get payment method details from either default_payment_method or latest_invoice

@@ -1,10 +1,14 @@
 <?php
 namespace VOF\Includes\Fulfillment;
 
-use Rtcl\Helpers\Functions;
 use VOF\Models\VOF_Payment;
 use VOF\Models\VOF_Membership;
 use VOF\Utils\Helpers\VOF_Temp_User_Meta;
+
+use Rtcl\Gateways\Store\GatewayStore;
+use Rtcl\Traits\SingletonTrait;
+use Rtcl\Helpers\Functions;
+use Rtcl\Models\Payment;
 use WP_Error;
 
 class VOF_Fulfillment_Handler {
@@ -45,21 +49,23 @@ class VOF_Fulfillment_Handler {
             $vof_fulfillment_ds = $this->vof_build_fulfillment_data_structure($stripe_data, $temp_user);
             error_log('VOF Debug: From VOF Fulfillment Handler; returning vof_fulfillment_ds with data: ' . print_r($vof_fulfillment_ds, true));
 
-            // Create RTCL payment post first (THE ORDER ID CREATION MISSING)
-            $order_id = $this->vof_create_rtcl_order_id($vof_fulfillment_ds);
+            // Create RTCL payment post first
+            $order_props = $this->vof_create_rtcl_order_id($vof_fulfillment_ds, $stripe_data);
+            error_log('VOF Debug: From VOF Fulfillment Handler (outer calling fn); returning $order_props with $order_id value: ' . print_r($order_props['order_id'], true) . "\n\n and" . ' $order_props with $gateway value: ' . print_r($order_props['gateway'], true));
         
-            if (!$order_id) {
+            if (!$order_props['order_id']) {
                 throw new \Exception('Failed to create VOF->RTCL payment record');
             }
 
-            // $this->vof_validate_data($stripe_data, $temp_user); // REMOVE
+            // $this->vof_validate_data($stripe_data, $temp_user); // REMOVE MAYBE
 
             // Process membership fulfillment
-            // $result = $this->vof_fulfill_and_handoff_product($order_id); // NEEDS IMPLEMENT
+            $payment_data = $this->vof_fulfill_and_handoff_product($order_props);
+            error_log('VOF Debug: Retrieved $payment_data with data: ' . print_r($payment_data, true));
             
-            // if (is_wp_error($result)) {
-            //     throw new \Exception($result->get_error_message());
-            // }
+            if (is_wp_error($payment_data)) {
+                throw new \Exception($payment_data->get_error_message());
+            }
 
             // $this->vof_cleanup_temp_data($stripe_data, $temp_user); // maybe not needed?
 
@@ -74,18 +80,26 @@ class VOF_Fulfillment_Handler {
         }
     }
 
-    private function vof_create_rtcl_order_id($vof_fulfillment_ds) { // KEEP
+    private function vof_create_rtcl_order_id($vof_fulfillment_ds, $stripe_data) { // KEEP
         // Get RTCL objects
-        $pricing = rtcl()->factory->get_pricing( $vof_fulfillment_ds['checkout_data']['pricing_id'] );
-        $gateway = Functions::get_payment_gateway( $vof_fulfillment_ds['checkout_data']['payment_method'] );
-        $checkout_data  = $vof_fulfillment_ds['checkout_data'];
-        $new_order_args = $vof_fulfillment_ds['new_order_args'];
+        $pricing          = rtcl()->factory->get_pricing( $vof_fulfillment_ds['checkout_data']['pricing_id'] );
+        $gateway          = Functions::get_payment_gateway( $vof_fulfillment_ds['checkout_data']['payment_method'] );
+        $checkout_data    = $vof_fulfillment_ds['checkout_data'];
+        $new_order_args   = $vof_fulfillment_ds['new_order_args'];
+        $order_id         = null;
+        $order_props      = [];
+
 
         // ##############
 
         // Validate checkout data
         $errors = new WP_Error();
-        do_action('rtcl_checkout_data', $vof_fulfillment_ds['checkout_data'], $pricing, $gateway, [], $errors);
+        do_action('rtcl_checkout_data', $vof_fulfillment_ds['checkout_data'], $pricing, $gateway, [], $errors); // filter not used
+        /** ####### about rtcl_checkout_validation_errors ######
+         * 
+         * used @wp-content/plugins/classified-listing/app/Controllers/Hooks/AppliedBothEndHooks.php
+         * used @wp-content/plugins/classified-listing-pro/app/Gateways/WooPayment/WooPayment.php
+         */
         $errors = apply_filters('rtcl_checkout_validation_errors', $errors, $vof_fulfillment_ds['checkout_data'], $pricing, $gateway, []);
 
         if (is_wp_error($errors) && $errors->has_errors()) {
@@ -99,22 +113,117 @@ class VOF_Fulfillment_Handler {
         $order_id = wp_insert_post(apply_filters('rtcl_checkout_process_new_order_args', $new_order_args, $pricing, $gateway, $checkout_data));
 
         if (!$order_id || is_wp_error($order_id)) {
-            error_log('VOF Error: Failed to create payment post [order_id]. ' . ($order_id instanceof WP_Error ? $order_id->get_error_message() : ''));
+            error_log('VOF Error: Failed to create order id. ' . ($order_id instanceof WP_Error ? $order_id->get_error_message() : ''));
             return false;
         }
 
-        // Set order key and trigger actions
-        $order = rtcl()->factory->get_order($order_id);
-        $order->set_order_key(); // already set in data structure... or with hook
-        do_action('rtcl_checkout_process_new_payment_created', $order_id, $order); // HOOK NOT USED (!ADD_ACTION) 
-        do_action('rtcl_checkout_process_success', $order, []);                    // HOOK USED (ADD_ACTION @wp-content/plugins/classified-listing/app/Controllers/Hooks/ActionHooks.php 
-                                                                                   // & ADD_ACTION @wp-content/plugins/classified-listing/app/Controllers/Hooks/AppliedBothEndHooks.php)
-        return $order_id;        
+        // Update Return variable
+        $order_props = [
+            'order_id'       => $order_id, 
+            'gateway'        => $gateway, 
+            'intent_id'      => $stripe_data['stripe_intent_id'], 
+            'transaction_id' => $stripe_data['rtcl_transaction_id'], 
+            'is_captured'    => $stripe_data['is_stripe_captured']
+        ];
+        
+        // error_log('VOF Debug: From VOF Fulfillment Handler; returning $order_props with $order_id value: ' . print_r($order_props['order_id'], true) . "\n and" . '$order_props with $gateway value: ' . print_r($order_props['gateway'], true));
+        error_log('VOF Debug: From VOF Fulfillment Handler (inner); returning $order_id with value: ' . print_r($order_id, true));
+        error_log('VOF Debug: From VOF Fulfillment Handler (inner); returning $gateway with value: ' . print_r($gateway, true));
+
+        return $order_props;
     }
+
+    private function vof_fulfill_and_handoff_product($order_props){
+        // ####### Fulfillment & Handoff Handling Starts Here: #######
+        error_log('VOF Debug: Starting Fulfillment and Handoff with $order_id: ' . print_r($order_props['order_id'], true). "\n" . 'And $gateway: ' . print_r($order_props['gateway'], true));
+
+        // Set order key and trigger actions
+        Functions::clear_notices();
+        $order_id             = $order_props['order_id'];
+        $gateway              = $order_props['gateway'];
+        $stripe_intent_id     = $order_props['intent_id'];
+        $transaction_id       = $order_props['transaction_id'];
+        $is_captured          = $order_props['is_captured'];
+
+		$success              = false;
+		$redirect_url         = $gateway_id = null;
+		$payment_process_data = [];
+
+
+        $order = rtcl()->factory->get_order($order_id);
+        update_post_meta($order->get_id(), '_stripe_intent_id', $stripe_intent_id);
+		$order->update_meta('_stripe_charge_captured', $is_captured);
+        $order->set_order_key();                                                      // Already set in data structure... or with hook
+
+        // do_action('rtcl_checkout_process_new_payment_created', $order_id, $order); // HOOK NOT USED (!ADD_ACTION) 
+        // $gateway = new GatewayStore();
+        
+
+        // process payment
+        try {
+            /**    ###### The HAND-OFF happens here ######
+             *
+             * $gateway->process_payment($order) -> Triggers and sets payment complete 
+             * then indirectly hands-off product to rtcl's -> indirectly triggers rtcl's membership fulfillment processes
+             * 
+             * Notes:
+             *  - Core WP triggers the status change action
+             *  - Which 'StatusChange.php' catches and fulfills
+             */
+            // $payment_process_data = $gateway->process_payment( $order );
+            $payment_process_data = $order->payment_complete($transaction_id);
+
+            error_log('VOF Debug: Payment process result: ' . print_r($payment_process_data, true));
+            error_log('VOF Debug: Order status after payment: ' . $order->get_status());
+            
+            $payment_process_data = apply_filters( 'rtcl_checkout_process_payment_result', $payment_process_data, $order );
+            $redirect_url         = ! empty( $payment_process_data['redirect'] ) ? $payment_process_data['redirect'] : null;
+            error_log('VOF Debug: $redirect_url is: ' . print_r($redirect_url, true));
+
+            // Redirect to success/confirmation/payment page
+            // if ( isset( $payment_process_data['result'] ) && 'success' === $payment_process_data['result'] ) {
+            if ( $payment_process_data ) {
+                $success = true;
+
+                /** ABOUT: 'rtcl_checkout_process_success'
+                 * 
+                 * Hook Used @:
+                 *  - ADD_ACTION @wp-content/plugins/classified-listing/app/Controllers/Hooks/ActionHooks.php 
+                 *  - ADD_ACTION @wp-content/plugins/classified-listing/app/Controllers/Hooks/AppliedBothEndHooks.php
+                 */
+                // do_action( 'rtcl_checkout_process_success', $order, $payment_process_data );
+            } else {
+                wp_delete_post( $order->get_id(), true );
+                if ( ! empty( $payment_process_data['message'] ) ) {
+                    Functions::add_notice( $payment_process_data['message'], 'error' );
+                }
+                // do_action( 'rtcl_checkout_process_error', $order, $payment_process_data );
+            }
+		} catch ( \Exception $e ) {
+            error_log('VOF DEBUG: catched exception on VOF Hand-off with message: ' . $e);
+        }
+
+        error_log('VOF DEBUG: Returning $payment_process_data with data: ' .  print_r($payment_process_data, true));
+        return $payment_process_data;
+
+        // $error_message   = Functions::get_notices( 'error' );
+		// $success_message = Functions::get_notices( 'success' );
+		// Functions::clear_notices();
+
+		// return $payment_process_data = [ 
+        //     'error_message'   => $error_message,
+        //     'success_message' => $success_message,
+        //     'success'         => $success,
+        //     'redirect_url'    => $redirect_url,
+        //     'gateway_id'      => $gateway_id
+        // ];
+    }    
 
     private function vof_build_fulfillment_data_structure($stripe_data, $temp_user) { // KEEP 
         // Format stripe amount to RTCL format
-        $amount  = $stripe_data['amount'] / 100;
+        $amount     = $stripe_data['amount'] / 100;
+        $stripe_fee = $stripe_data['stripe_fee'] / 100;
+        $stripe_net = $stripe_data['stripe_net_amount'] / 100;
     
         $VOF_Fulfillment_DS = [
             'checkout_data' => [
@@ -140,15 +249,23 @@ class VOF_Fulfillment_Handler {
                 '_payment_method_title'     => 'Stripe',
                 '_order_currency'           => strtoupper($stripe_data['currency']),
                 '_billing_email'            => $temp_user['vof_email'],
+                '_billing_first_name'       => isset($stripe_data['customer_name']) ? $stripe_data['customer_name'] : '', // check if works
+                '_billing_last_name'        => isset($stripe_data['last_name']) ? $stripe_data['last_name'] : '',         // check if works
                 'payment_type'              => 'membership',
                 // VOF External Provided:
-                '_stripe_customer_id'       => $stripe_data['customer'],                // Check
-                '_stripe_subscription_id'   => $stripe_data['subscription_id']          // Missing in stripe data
-                // Let RTCL handle these:
-                    // '_applied'          => 1,
-                    // 'date_paid'         => current_time('mysql'),
-                    // 'date_completed'    => current_time('mysql')
-                    // transaction_id
+                '_stripe_customer_id'       => $stripe_data['customer'],             // cus_xxxxxxxx
+                '_stripe_subscription_id'   => $stripe_data['subscription_id'],      // not used in rtcl orglly
+                // Let RTCL handle these (maybe... try complete_payment directly first else directly insert missing data):
+                //  '_stripe_charge_captured'  => $stripe_data['is_stripe_captured'],
+                 '_stripe_fee'              => $stripe_fee,
+                 '_stripe_net'              => $stripe_net,
+                 '_stripe_currency'         => strtoupper($stripe_data['currency']),  // MXN
+                // '_stripe_intent_id'        => $stripe_data['transaction_id'],      // set later
+                // 'transaction_id'           => $stripe_data['rtcl_transaction_id'], // set later ch_xxxxxxxx,
+                 // not stripe's
+                  // '_applied'                => 1,                                  // set later
+                  // 'date_paid'               => current_time('mysql'),              // set later
+                  // 'date_completed'          => current_time('mysql')               // don't know if necessary... 
             ],
             'new_order_args' => [
                 'post_title'                => esc_html__('Order on', 'classified-listing') . ' ' . current_time("l jS F Y h:i:s A"),
@@ -165,144 +282,6 @@ class VOF_Fulfillment_Handler {
         $VOF_Fulfillment_DS['new_order_args']['meta_input'] = $VOF_Fulfillment_DS['meta_input'];
 
         return $VOF_Fulfillment_DS;
-    }
-
-    /**
-     * Creates RTCL payment post type record
-     */
-    private function vof_create_rtcl_payment_REMOVE($stripe_data, $temp_user) {
-        // Format stripe amount to RTCL format
-        $amount = $stripe_data['amount'] / 100;
-
-        $meta_input = [
-            'customer_id' => $temp_user['true_user_id'],                                         // CHECK
-            'customer_ip_address' => Functions::get_ip_address(),                                // CHECK
-            // '_order_key' => apply_filters('rtcl_generate_order_key', uniqid('vof_order_')),   // CHECK
-            '_order_key' => apply_filters( 'rtcl_generate_order_key', uniqid( 'rtcl_oder_' ) ),
-            '_pricing_id' => $stripe_data['metadata']['pricing_id'],                             // CHECK
-            'amount' => Functions::get_payment_formatted_price($amount),                         // CHECK
-            '_tax_amount' => 0.00,
-            '_subtotal' => Functions::get_payment_formatted_price($amount),
-            '_payment_method' => 'stripe',                                                       // CHECK
-            '_payment_method_title' => 'Stripe',                                                 // CHECK
-            '_order_currency' => strtoupper($stripe_data['currency']),                           // CHECK
-            // '_billing_email'      => RETRIEVE FROM TEMP_USER_META                             // MISSING
-            // '_billing_first_name' => RETRIEVE FROM TEMP_USER_META or ''                       // MISSING
-            // '_billing_last_name'  => RETRIEVE FROM TEMP_USER_META or ''                       // MISSING
-            'payment_type' => 'membership', // Critical for RTCL membership handling             // CHECK
-            'transaction_id' => $stripe_data['payment_intent'],                                  // EXTRA not on initial example (postmeta)
-            '_stripe_customer_id' => $stripe_data['customer'],                                   // EXTRA not on initial example (postmeta) -> CHECK ON rtcl_complete
-            // 'stripe_intent_id'=>,                                                             // MISSING (appears on rtcl_complete)
-            // 'stripe_charge_captured'=>,                                                       // MISSING (appears on rtcl_complete)
-            // 'stripe_fee'=>,                                                                   // MISSING (appears on rtcl_complete)
-            // 'stripe_net'=>,                                                                   // MISSING (appears on rtcl_complete)
-            // 'stripe_currency'=>,                                                              // MISSING (appears on rtcl_complete)
-            '_stripe_subscription_id' => $stripe_data['subscription'],                           // EXTRA not on initial example (postmeta)
-            '_applied' => 1, // Mark as applied immediately                                      // EXTRA not on initial example (postmeta)
-            'date_paid' => current_time('mysql'),                                                // EXTRA not on initial example (postmeta)
-            'date_completed' => current_time('mysql')                                            // EXTRA not on initial example (postmeta)
-        ];
-
-        // Add membership promotions if any                                                      // WRONG FIXXXX!!! PROMOTIONS DON'T COME FROM STRIPE DATA
-        if (!empty($stripe_data['metadata']['promotions'])) {                                    // WRONG FIXXXX!!! PROMOTIONS DON'T COME FROM STRIPE DATA
-            $meta_input['_rtcl_membership_promotions'] = $stripe_data['metadata']['promotions']; // WRONG FIXXXX!!! PROMOTIONS DON'T COME FROM STRIPE DATA
-        }
-
-        $payment_args = [                                                                        // WRONG POST TITLE FIXXX!!!
-            'post_author' => 1,                                                                  // CHECK
-            // 'post_date' =>,                                                                   // MISSING
-            // 'post_date_gmt' =>,                                                               // MISSING 
-            // 'post_content' =>,                                                                // MISSING (but always blank)
-            // 'post_title' => sprintf(__('Payment for Order via VOF #%s', 'vendor-onboarding-flow'), $stripe_data['payment_intent']), // WRONG VALUE FIXXX!!!
-            'post_title' =>  esc_html__( 'Order on', 'classified-listing' ) . ' ' . current_time( "l jS F Y h:i:s A" ),
-            // 'post_excerpt' =>                                                                 // MISSING (but always blank)
-            // 'post_status' => 'rtcl-completed',                                                   // CHECK (rtcl_created at first, then rtcl_completed)
-            'post_status' => 'rtcl-created',
-            // 'comment_status' =>,                                                              // MISSING (but always open) on rtcl_completed
-            'ping_status' => 'closed',                                                           // CHECK
-            // 'post_password' =>,                                                               // MISSING (but always blank)
-            // 'post_name' =>,                                                                   // MISSING
-            // 'to_ping' =>,                                                                     // MISSING (but always blank)
-            // 'pinged' =>,                                                                      // MISSING (but always blank)
-            // 'post_modified' =>,                                                               // MISSING
-            // 'post_modified_gmt' =>,                                                           // MISSING
-            // 'post_content_filtered' =>,                                                       // MISSING (but always blank)
-            'post_parent' => '0',                                                                // CHECK
-            // 'guid' =>,                                                                        // MISSING
-            // 'menu_order' =>,                                                                  // MISSING
-            'post_type' => rtcl()->post_type_payment,                                            // CHECK
-            // 'post_mime_type' =>,                                                              // MISSING (but always blank)
-            // 'comment_count' =>,                                                               // MISSING
-            'meta_input' => $meta_input                                                          // WHAT'S THIS?
-        ];
-
-        return wp_insert_post($payment_args); // maybe need to use the rtcl approach: 				$order_id = wp_insert_post( apply_filters( 'rtcl_checkout_process_new_order_args', $newOrderArgs, $pricing, $gateway, $checkout_data ) );
-    }
-
-    /**
-     * Processes the actual fulfillment with new VOF classes
-     */
-    private function vof_process_fulfillment_REMOVE_TOO($stripe_data, $temp_user, $payment_id) { // MAYBE CAN GET AWAY WITH NATIVE RTCL's Functions
-        try {
-            // Create VOF Payment with payment post ID
-            $payment = new VOF_Payment($stripe_data, $temp_user, $payment_id); // THIS CHANGED
-
-            // Create VOF Membership
-            $membership = new VOF_Membership(
-                $temp_user['true_user_id'],
-                $stripe_data
-            );
-
-            // Apply membership using VOF-specific method
-            $result = $membership->vof_apply_stripe_membership($payment);
-            if (!$result) {
-                throw new \Exception('Failed to apply membership');
-            }
-
-            // Publish the temporary listing
-            $this->vof_publish_listing($temp_user, $membership->get_user_id());
-
-            return true;
-
-        } catch (\Exception $e) {
-            return new WP_Error(
-                'fulfillment_failed',
-                $e->getMessage()
-            );
-        }
-    }
-
-    /**
-     * Processes the actual fulfillment with new VOF classes
-     */
-    private function vof_process_fulfillment_REMOVE($stripe_data, $temp_user) {
-        try {
-            // Create VOF Payment
-            $payment = new VOF_Payment($stripe_data, $temp_user);
-
-            // Create VOF Membership
-            $membership = new VOF_Membership(
-                $temp_user['true_user_id'],
-                $stripe_data
-            );
-
-            // Apply membership using VOF-specific method
-            $result = $membership->vof_apply_stripe_membership($payment);
-            if (!$result) {
-                throw new \Exception('Failed to apply membership');
-            }
-
-            // Publish the temporary listing
-            $this->vof_publish_listing($temp_user, $membership->get_user_id());
-
-            return true;
-
-        } catch (\Exception $e) {
-            return new WP_Error(
-                'fulfillment_failed',
-                $e->getMessage()
-            );
-        }
     }
 
     /**
