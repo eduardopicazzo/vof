@@ -198,88 +198,6 @@ class VOF_Subscription_Handler {
     }
 
     /**
-     * Main method to process new subscriptions
-     */
-    public function vof_process_subscriptionOLD($stripe_data, $temp_user_id, $subscription_id) {
-        global $wpdb;
-        
-        try {
-            // Start transaction
-            $wpdb->query('START TRANSACTION');
-
-            // Validate input data
-            $this->vof_validate_subscription_data($stripe_data); // CHECK FORMAT BEFORE USE
-
-            // Check cache to prevent duplicate processing
-            $cache_key = "vof_sub_{$subscription_id}";
-            if (wp_cache_get($cache_key, $this->cache_group)) {
-                throw new \Exception('Subscription already processed');
-            }
-
-            // Find matching RTCL membership tier [BEING LOGGED - OK]
-            $rtcl_membership_tier_id = $this->vof_find_matching_rtcl_membership_tier_with_retry($stripe_data);
-
-            // Create subscription record
-            $subscription_data = [
-                'user_id'      => $temp_user_id, // should be updated after user is created
-                'name'         => $stripe_data['product_name'],
-                'sub_id'       => $subscription_id,
-                'occurrence'   => 1,
-                'gateway_id'   => 'stripe',
-                'status'       => $this->vof_map_stripe_status_to_rtcl($stripe_data['status']),
-                'product_id'   => $rtcl_membership_tier_id,
-                'quantity'     => 1,
-                'price'        => (float) ($stripe_data['amount']/100 == floor($stripe_data['amount']/100) ? 
-                                     number_format($stripe_data['amount']/100, 0, '.', '') : 
-                                     number_format($stripe_data['amount']/100, 2, '.', '')),
-                'meta'         => null,
-                'expiry_at'    => date('Y-m-d H:i:s', $stripe_data['current_period_end']),
-                'created_at'   => current_time('mysql'),
-                'updated_at'   => current_time('mysql')
-            ];
-
-            // Create subscription using RTCL's model
-            $subscriptions = new Subscriptions();
-            $new_sub = $subscriptions->create($subscription_data);
-
-            if (is_wp_error($new_sub)) {
-                throw new \Exception($new_sub->get_error_message());
-            }
-
-            // Add subscription meta
-            $this->vof_add_subscription_meta($new_sub, [
-                'cc' => [
-                    'type' => 'card',
-                    'last4' => $stripe_data['payment_method']['card']['last4'],
-                    'expiry' => $stripe_data['payment_method']['card']['exp_month'] . '/' . 
-                               $stripe_data['payment_method']['card']['exp_year']
-                ]
-            ]);
-
-            // Cache subscription data
-            $this->vof_cache_subscription_data($subscription_id, $subscription_data);
-
-            // Commit transaction
-            $wpdb->query('COMMIT');
-
-            do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
-
-            return $new_sub;
-
-        } catch (\Exception $e) {
-            $wpdb->query('ROLLBACK');
-            error_log('VOF Subscription Error: ' . $e->getMessage());
-            
-            // Cleanup any partial data
-            if (!empty($new_sub)) {
-                $this->vof_cleanup_failed_subscription($new_sub->getId());
-            }
-            
-            throw $e;
-        }
-    }
-
-    /**
      * Find matching RTCL membership tier with retry logic
      */
     private function vof_find_matching_rtcl_membership_tier_with_retry($stripe_data) {
@@ -389,114 +307,6 @@ class VOF_Subscription_Handler {
     }
 
     /**
-     * Find matching RTCL membership tier
-     */
-    private function vof_find_matching_rtcl_membership_tierOLD($stripe_data) {
-        global $wpdb;
-        // $product_name = trim($stripe_data['product_name']);
-        // $lookup_key = trim($stripe_data['lookup_key']);
-        $product_name = preg_replace('/\s+/', ' ', trim($stripe_data['product_name']));
-        $lookup_key = preg_replace('/\s+/', ' ', trim($stripe_data['lookup_key']));
-        
-        error_log('VOF: Searching for membership tier - Product: ' . $stripe_data['product_name'] . 'or Lookup Key: ' . $stripe_data['price']['lookup_key'] . ', with  Price: ' . ($stripe_data['amount'] / 100));
-
-        // First look for published membership tiers with matching names
-        $title_query = $wpdb->prepare(
-            "SELECT ID FROM {$wpdb->posts} 
-            WHERE post_type = 'rtcl_pricing' 
-            AND post_status = 'publish' 
-            AND ID IN (
-                SELECT post_id FROM {$wpdb->postmeta} 
-                -- WHERE meta_key = '_pricing_type' 
-                WHERE meta_key = 'pricing_type' 
-                AND meta_value = 'membership'
-            )
-            AND (
-                -- post_title LIKE %s 
-                post_title = %s 
-                -- OR post_name LIKE %s
-                OR post_name = %s
-            )",
-            // '%' . $wpdb->esc_like( $stripe_data['product_name'] ) . '%',
-            // $stripe_data['product_name'], // Exact match for post_title in db
-            $product_name, // Exact match for post_title in db
-            // '%' . $wpdb->esc_like( $stripe_data['lookup_key'] ) . '%'
-            // $stripe_data['lookup_key'] // Exact match for post_name in db
-            $lookup_key // Exact match for post_name in db
-        );
-
-
-        $debug_query = $wpdb->prepare(
-            "SELECT ID, post_title, post_name 
-            FROM {$wpdb->posts} 
-            WHERE post_type = 'rtcl_pricing' 
-            AND post_status = 'publish' 
-            AND ID IN (
-                SELECT post_id FROM {$wpdb->postmeta} 
-                WHERE meta_key = 'pricing_type' 
-                AND meta_value = 'membership'
-            )"
-        );  
-
-        $results = $wpdb->get_results($debug_query);
-        // Log the results for debugging
-        error_log('VOF: Database values for rtcl_pricing posts: ' . json_encode($results));
-
-        $id_via_title_matches = $wpdb->get_col($title_query);
-        error_log('VOF: Title matches found: ' . json_encode($id_via_title_matches));
-
-        // Log or print the query
-        error_log($wpdb->last_query); // Log to debug.log
-
-        // Look for membership tiers with matching prices
-        $price_query = $wpdb->prepare(
-            "SELECT post_id FROM {$wpdb->postmeta} 
-            -- WHERE meta_key = '_price' 
-            WHERE meta_key = 'price' 
-            AND meta_value = %f 
-            AND post_id IN (
-                SELECT ID FROM {$wpdb->posts} 
-                WHERE post_type = 'rtcl_pricing' 
-                AND post_status = 'publish'
-                AND post_id IN (
-                    SELECT post_id FROM {$wpdb->postmeta} 
-                    -- WHERE meta_key = '_pricing_type' 
-                    WHERE meta_key = 'pricing_type' 
-                    AND meta_value = 'membership'
-                )
-            )",
-            $stripe_data['amount'] / 100
-        );
-
-        $id_via_price_matches = $wpdb->get_col($price_query);
-        error_log('VOF: Price matches found: ' . json_encode($id_via_price_matches));
-
-        // Log or print the query
-        error_log($wpdb->last_query); // Log to debug.log
-
-        // Find the common IDs between both matches
-        $rtcl_membership_id = array_intersect($id_via_title_matches, $id_via_price_matches);
-        error_log('VOF: Intersection matches found: ' . json_encode($rtcl_membership_id));
-        error_log('VOF: Expected IDs:  biz -> 11445 noise -> 11447; noise+ -> 11446; = ' . json_encode($rtcl_membership_id));
-
-        if (count($rtcl_membership_id) === 1) {
-            $matched_id = reset($rtcl_membership_id);
-            error_log('VOF: Found matching membership tier ID: ' . $matched_id);
-            // $this->vof_sync_stripe_data($matched_id, $stripe_data); // COMMENT FOR TO AVOID DB WRITES UNTIL TEST LOGS
-            return $matched_id;
-        }
-
-        $error_msg = sprintf(
-            'Found %d matching membership tiers for Stripe product "%s" with price %.2f',
-            count($rtcl_membership_id),
-            $stripe_data['product_name'],
-            $stripe_data['amount'] / 100
-        );
-        error_log('VOF: Error - ' . $error_msg);
-        throw new \Exception($error_msg);
-    }
-
-    /**
      * Sync Stripe data with RTCL membership tier
      */
     private function vof_sync_stripe_data($rtcl_membership_tier_id, $stripe_data) {
@@ -545,15 +355,6 @@ class VOF_Subscription_Handler {
     
             // Save to database
             $subscription->update_meta('cc', $cc_meta);
-        }
-    }
-
-    /**
-     * Add subscription meta
-     */
-    private function vof_add_subscription_metaOLD($subscription, $meta_data) {
-        foreach ($meta_data as $key => $value) {
-            $subscription->update_meta($key, $value);
         }
     }
 
@@ -670,4 +471,206 @@ class VOF_Subscription_Handler {
             $subscription_id, $meta_key
         ));
     }
+
+    // ##################################################################
+    // ######################### DELETE SOON ############################
+    // ##################################################################
+    /**
+     * Add subscription meta
+     */
+    // private function vof_add_subscription_metaOLD($subscription, $meta_data) {
+        //     foreach ($meta_data as $key => $value) {
+        //         $subscription->update_meta($key, $value);
+        //     }
+    // }
+
+    /**
+     * Find matching RTCL membership tier
+     */
+    // private function vof_find_matching_rtcl_membership_tierOLD($stripe_data) {
+        //     global $wpdb;
+        //     // $product_name = trim($stripe_data['product_name']);
+        //     // $lookup_key = trim($stripe_data['lookup_key']);
+        //     $product_name = preg_replace('/\s+/', ' ', trim($stripe_data['product_name']));
+        //     $lookup_key = preg_replace('/\s+/', ' ', trim($stripe_data['lookup_key']));
+
+        //     error_log('VOF: Searching for membership tier - Product: ' . $stripe_data['product_name'] . 'or Lookup Key: ' . $stripe_data['price']['lookup_key'] . ', with  Price: ' . ($stripe_data['amount'] / 100));
+
+        //     // First look for published membership tiers with matching names
+        //     $title_query = $wpdb->prepare(
+        //         "SELECT ID FROM {$wpdb->posts} 
+        //         WHERE post_type = 'rtcl_pricing' 
+        //         AND post_status = 'publish' 
+        //         AND ID IN (
+        //             SELECT post_id FROM {$wpdb->postmeta} 
+        //             -- WHERE meta_key = '_pricing_type' 
+        //             WHERE meta_key = 'pricing_type' 
+        //             AND meta_value = 'membership'
+        //         )
+        //         AND (
+        //             -- post_title LIKE %s 
+        //             post_title = %s 
+        //             -- OR post_name LIKE %s
+        //             OR post_name = %s
+        //         )",
+        //         // '%' . $wpdb->esc_like( $stripe_data['product_name'] ) . '%',
+        //         // $stripe_data['product_name'], // Exact match for post_title in db
+        //         $product_name, // Exact match for post_title in db
+        //         // '%' . $wpdb->esc_like( $stripe_data['lookup_key'] ) . '%'
+        //         // $stripe_data['lookup_key'] // Exact match for post_name in db
+        //         $lookup_key // Exact match for post_name in db
+        //     );
+
+
+        //     $debug_query = $wpdb->prepare(
+        //         "SELECT ID, post_title, post_name 
+        //         FROM {$wpdb->posts} 
+        //         WHERE post_type = 'rtcl_pricing' 
+        //         AND post_status = 'publish' 
+        //         AND ID IN (
+        //             SELECT post_id FROM {$wpdb->postmeta} 
+        //             WHERE meta_key = 'pricing_type' 
+        //             AND meta_value = 'membership'
+        //         )"
+        //     );  
+
+        //     $results = $wpdb->get_results($debug_query);
+        //     // Log the results for debugging
+        //     error_log('VOF: Database values for rtcl_pricing posts: ' . json_encode($results));
+
+        //     $id_via_title_matches = $wpdb->get_col($title_query);
+        //     error_log('VOF: Title matches found: ' . json_encode($id_via_title_matches));
+
+        //     // Log or print the query
+        //     error_log($wpdb->last_query); // Log to debug.log
+
+        //     // Look for membership tiers with matching prices
+        //     $price_query = $wpdb->prepare(
+        //         "SELECT post_id FROM {$wpdb->postmeta} 
+        //         -- WHERE meta_key = '_price' 
+        //         WHERE meta_key = 'price' 
+        //         AND meta_value = %f 
+        //         AND post_id IN (
+        //             SELECT ID FROM {$wpdb->posts} 
+        //             WHERE post_type = 'rtcl_pricing' 
+        //             AND post_status = 'publish'
+        //             AND post_id IN (
+        //                 SELECT post_id FROM {$wpdb->postmeta} 
+        //                 -- WHERE meta_key = '_pricing_type' 
+        //                 WHERE meta_key = 'pricing_type' 
+        //                 AND meta_value = 'membership'
+        //             )
+        //         )",
+        //         $stripe_data['amount'] / 100
+        //     );
+
+        //     $id_via_price_matches = $wpdb->get_col($price_query);
+        //     error_log('VOF: Price matches found: ' . json_encode($id_via_price_matches));
+
+        //     // Log or print the query
+        //     error_log($wpdb->last_query); // Log to debug.log
+
+        //     // Find the common IDs between both matches
+        //     $rtcl_membership_id = array_intersect($id_via_title_matches, $id_via_price_matches);
+        //     error_log('VOF: Intersection matches found: ' . json_encode($rtcl_membership_id));
+        //     error_log('VOF: Expected IDs:  biz -> 11445 noise -> 11447; noise+ -> 11446; = ' . json_encode($rtcl_membership_id));
+
+        //     if (count($rtcl_membership_id) === 1) {
+        //         $matched_id = reset($rtcl_membership_id);
+        //         error_log('VOF: Found matching membership tier ID: ' . $matched_id);
+        //         // $this->vof_sync_stripe_data($matched_id, $stripe_data); // COMMENT FOR TO AVOID DB WRITES UNTIL TEST LOGS
+        //         return $matched_id;
+        //     }
+
+        //     $error_msg = sprintf(
+        //         'Found %d matching membership tiers for Stripe product "%s" with price %.2f',
+        //         count($rtcl_membership_id),
+        //         $stripe_data['product_name'],
+        //         $stripe_data['amount'] / 100
+        //     );
+        //     error_log('VOF: Error - ' . $error_msg);
+        //     throw new \Exception($error_msg);
+    // }
+
+    /**
+     * Main method to process new subscriptions
+     */
+    // public function vof_process_subscriptionOLD($stripe_data, $temp_user_id, $subscription_id) {
+        //     global $wpdb;
+
+        //     try {
+        //         // Start transaction
+        //         $wpdb->query('START TRANSACTION');
+
+        //         // Validate input data
+        //         $this->vof_validate_subscription_data($stripe_data); // CHECK FORMAT BEFORE USE
+
+        //         // Check cache to prevent duplicate processing
+        //         $cache_key = "vof_sub_{$subscription_id}";
+        //         if (wp_cache_get($cache_key, $this->cache_group)) {
+        //             throw new \Exception('Subscription already processed');
+        //         }
+
+        //         // Find matching RTCL membership tier [BEING LOGGED - OK]
+        //         $rtcl_membership_tier_id = $this->vof_find_matching_rtcl_membership_tier_with_retry($stripe_data);
+
+        //         // Create subscription record
+        //         $subscription_data = [
+        //             'user_id'      => $temp_user_id, // should be updated after user is created
+        //             'name'         => $stripe_data['product_name'],
+        //             'sub_id'       => $subscription_id,
+        //             'occurrence'   => 1,
+        //             'gateway_id'   => 'stripe',
+        //             'status'       => $this->vof_map_stripe_status_to_rtcl($stripe_data['status']),
+        //             'product_id'   => $rtcl_membership_tier_id,
+        //             'quantity'     => 1,
+        //             'price'        => (float) ($stripe_data['amount']/100 == floor($stripe_data['amount']/100) ? 
+        //                                  number_format($stripe_data['amount']/100, 0, '.', '') : 
+        //                                  number_format($stripe_data['amount']/100, 2, '.', '')),
+        //             'meta'         => null,
+        //             'expiry_at'    => date('Y-m-d H:i:s', $stripe_data['current_period_end']),
+        //             'created_at'   => current_time('mysql'),
+        //             'updated_at'   => current_time('mysql')
+        //         ];
+
+        //         // Create subscription using RTCL's model
+        //         $subscriptions = new Subscriptions();
+        //         $new_sub = $subscriptions->create($subscription_data);
+
+        //         if (is_wp_error($new_sub)) {
+        //             throw new \Exception($new_sub->get_error_message());
+        //         }
+
+        //         // Add subscription meta
+        //         $this->vof_add_subscription_meta($new_sub, [
+        //             'cc' => [
+        //                 'type' => 'card',
+        //                 'last4' => $stripe_data['payment_method']['card']['last4'],
+        //                 'expiry' => $stripe_data['payment_method']['card']['exp_month'] . '/' . 
+        //                            $stripe_data['payment_method']['card']['exp_year']
+        //             ]
+        //         ]);
+
+        //         // Cache subscription data
+        //         $this->vof_cache_subscription_data($subscription_id, $subscription_data);
+
+        //         // Commit transaction
+        //         $wpdb->query('COMMIT');
+
+        //         do_action('vof_after_subscription_processed', $new_sub, $stripe_data);
+
+        //         return $new_sub;
+
+        //     } catch (\Exception $e) {
+        //         $wpdb->query('ROLLBACK');
+        //         error_log('VOF Subscription Error: ' . $e->getMessage());
+
+        //         // Cleanup any partial data
+        //         if (!empty($new_sub)) {
+        //             $this->vof_cleanup_failed_subscription($new_sub->getId());
+        //         }
+
+        //         throw $e;
+        //     }
+    // }
 }

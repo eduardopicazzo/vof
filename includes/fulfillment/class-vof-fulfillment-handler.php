@@ -30,15 +30,17 @@ class VOF_Fulfillment_Handler {
 
     /**
      * Main fulfillment process entry point
+     * 
+     * Tries to follow RTCL's original fulfillment flow steps.
+     * Tries to reuse most of RTCL's fulfillment functions.
      */
-    public function vof_initiate_fulfillment($stripe_data) { // $new_sub: has protected data, $subscription_id: not used nor needed
+    public function vof_initiate_fulfillment($stripe_data) {
         try {
             global $wpdb;
             $wpdb->query('START TRANSACTION');
 
             error_log('VOF Debug: INITIATING FULFILLMENT with $stripe_data -> ' . print_r($stripe_data, true));
 
-            // change this read.. or pass the uuid
             $temp_user = $this->temp_user_meta->vof_get_temp_user_by_uuid($stripe_data['uuid']);
 
             if (!$temp_user) {
@@ -57,9 +59,8 @@ class VOF_Fulfillment_Handler {
                 throw new \Exception('Failed to create VOF->RTCL payment record');
             }
 
-            // $this->vof_validate_data($stripe_data, $temp_user); // REMOVE MAYBE
+            // $this->vof_validate_data($stripe_data, $temp_user); // maybe not needed??
 
-            // Process membership fulfillment
             $payment_data = $this->vof_fulfill_and_handoff_product($order_props);
             error_log('VOF Debug: Retrieved $payment_data with data: ' . print_r($payment_data, true));
             
@@ -285,23 +286,6 @@ class VOF_Fulfillment_Handler {
     }
 
     /**
-     * Validates data before fulfillment
-     */
-    public function vof_validate_data_REMOVE($stripe_data, $temp_user) {
-        if (empty($temp_user['true_user_id'])) {
-            throw new \Exception('Invalid user ID');
-        }
-
-        if (empty($temp_user['post_id'])) {
-            throw new \Exception('Invalid listing ID');
-        }
-
-        if (!isset($stripe_data['status']) || $stripe_data['status'] !== 'active') {
-            throw new \Exception('Invalid subscription status');
-        }
-    }
-
-    /**
      * Publishes the temporary listing
      */
     private function vof_publish_listing($temp_user, $user_id) {
@@ -383,4 +367,24 @@ class VOF_Fulfillment_Handler {
             $subscription_id
         ));
     }
+ 
+    // ##################################################################
+    // ######################### DELETE SOON ############################
+    // ##################################################################
+    /**
+     * Validates data before fulfillment
+     */
+    // public function vof_validate_data_REMOVE($stripe_data, $temp_user) {
+        //     if (empty($temp_user['true_user_id'])) {
+        //         throw new \Exception('Invalid user ID');
+        //     }
+
+        //     if (empty($temp_user['post_id'])) {
+        //         throw new \Exception('Invalid listing ID');
+        //     }
+
+        //     if (!isset($stripe_data['status']) || $stripe_data['status'] !== 'active') {
+        //         throw new \Exception('Invalid subscription status');
+        //     }
+    // }
 }

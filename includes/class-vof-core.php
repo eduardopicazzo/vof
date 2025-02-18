@@ -26,8 +26,8 @@ class VOF_Core {
     private $webhook_handler;
     private $fulfillment_handler;
     private $subscription_handler;
-    private $vof_membership = null;
-    private $vof_payment = null;
+    // private $vof_membership = null;
+    // private $vof_payment = null;
 
 
     public static function instance() {
@@ -197,22 +197,22 @@ class VOF_Core {
     /**
      * Get VOF Payment model instance
      */
-    public function vof_get_payment($stripe_data = null, $temp_user_data = null) {
-        if ($stripe_data && $temp_user_data) {
-            return new VOF_Payment($stripe_data, $temp_user_data);
-        }
-        return null;
-    }
+    // public function vof_get_payment($stripe_data = null, $temp_user_data = null) {
+        //     if ($stripe_data && $temp_user_data) {
+        //         return new VOF_Payment($stripe_data, $temp_user_data);
+        //     }
+        //     return null;
+    // }
 
     /**
      * Get VOF Membership model instance
      */
-    public function vof_get_membership($user_id = null, $stripe_data = null) {
-        if ($user_id && $stripe_data) {
-            return new VOF_Membership($user_id, $stripe_data);
-        }
-        return null;
-    }
+    // public function vof_get_membership($user_id = null, $stripe_data = null) {
+        //     if ($user_id && $stripe_data) {
+        //         return new VOF_Membership($user_id, $stripe_data);
+        //     }
+        //     return null;
+    // }
 
     public function vof_get_webhook_handler() {
         return $this->webhook_handler;
