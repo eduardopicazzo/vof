@@ -609,7 +609,7 @@ class VOF_Listing {
         // Create temp user entry with new schema
         $vof_temp_user_meta = VOF_Core::instance()->temp_user_meta();
         $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_user_data);
-        
+
         if (!$uuid) {
             wp_send_json_error([
                 'message' => [__('Failed to create temporary user record', 'vendor-onboarding-flow')]
@@ -622,10 +622,8 @@ class VOF_Listing {
 
         if ($post_id) { // probably fix this... make it clearer or something
             $post_data['ID'] = $post_id;
-            // $post_id = wp_update_post($post_data);
             $post_id = wp_update_post( apply_filters( 'rtcl_listing_save_update_args', $post_data, $type ) );
         } else {
-            // $post_id = wp_insert_post($post_data);
             $post_id = wp_insert_post( apply_filters( 'rtcl_listing_save_update_args', $post_data, $type ) );
         }
         

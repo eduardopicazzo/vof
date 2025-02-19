@@ -113,7 +113,7 @@ class VOF_Subscription_Handler {
     
             // Create subscription data
             $subscription_data = [
-                'user_id'      => $temp_user_id,
+                'user_id'      => $temp_user_id, // FIX: not being set...
                 'name'         => $stripe_data['product_name'],
                 'sub_id'       => $subscription_id,
                 'occurrence'   => 1,
@@ -472,9 +472,9 @@ class VOF_Subscription_Handler {
         ));
     }
 
-    // ##################################################################
-    // ######################### DELETE SOON ############################
-    // ##################################################################
+    // ##############################################################################
+    // ############################### DELETE SOON ##################################
+    // ##############################################################################
     /**
      * Add subscription meta
      */
