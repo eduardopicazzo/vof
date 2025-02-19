@@ -26,9 +26,6 @@ class VOF_Core {
     private $webhook_handler;
     private $fulfillment_handler;
     private $subscription_handler;
-    // private $vof_membership = null;
-    // private $vof_payment = null;
-
 
     public static function instance() {
         if (null === self::$instance) {

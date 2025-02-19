@@ -330,18 +330,18 @@ class VOF_Listing {
 		}
         // SECTION: Contact Information
 		// Process all contact-related fields
-		// if ( isset( $_POST['phone'] ) ) {
-		// 	$meta['phone'] = Functions::sanitize( $_POST['phone'] );
-		// }
-        // if ( isset( $_POST['_rtcl_whatsapp_number'] ) ) {
-		// 	$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['_rtcl_whatsapp_number'] );
-		// }
+		if ( isset( $_POST['vof_phone'] ) ) {
+			$meta['phone'] = Functions::sanitize( $_POST['vof_phone'] );
+		}
+        if ( isset( $_POST['vof_whatsapp_number'] ) ) {
+			$meta['_rtcl_whatsapp_number'] = Functions::sanitize( $_POST['vof_whatsapp_number'] );
+		}
         // if ( isset( $_POST['_rtcl_telegram'] ) ) {
 		// 	$meta['_rtcl_telegram'] = Functions::sanitize( $_POST['_rtcl_telegram'] );
 		// }
-		// if ( isset( $_POST['email'] ) ) {
-		// 	$meta['email'] = Functions::sanitize( $_POST['email'], 'email' );
-		// }
+		if ( isset( $_POST['vof_email'] ) ) {
+			$meta['email'] = Functions::sanitize( $_POST['vof_email'], 'email' );
+		}
         
         if ( isset( $_POST['website'] ) ) {
             $meta['website'] = Functions::sanitize( $_POST['website'], 'url' );
@@ -596,11 +596,37 @@ class VOF_Listing {
             'post_type' => rtcl()->post_type,
         ];
 
-        if ($post_id) {
+        // Collect user data for new schema
+        $vof_user_data = [
+            'vof_email' => isset($_POST['vof_email']) ? sanitize_email($_POST['vof_email']) : '',
+            'vof_phone' => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : '',
+            'vof_whatsapp_number' => isset($_POST['vof_whatsapp_number']) ? sanitize_text_field($_POST['vof_whatsapp_number']) : '',
+            'post_parent_cat' => $parent_id,
+            'vof_tier' => sanitize_text_field(self::vof_get_available_tiers($parent_id)),
+            'post_status' => $post_data['post_status']
+        ];
+
+        // Create temp user entry with new schema
+        $vof_temp_user_meta = VOF_Core::instance()->temp_user_meta();
+        $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_user_data);
+        
+        if (!$uuid) {
+            wp_send_json_error([
+                'message' => [__('Failed to create temporary user record', 'vendor-onboarding-flow')]
+            ]);
+            return;
+        }
+        
+        $new_user_id = VOF_Listing::vof_handle_user_creation($vof_user_data['vof_email'], $post_id, $uuid);
+        $post_data['post_author'] = $new_user_id;
+
+        if ($post_id) { // probably fix this... make it clearer or something
             $post_data['ID'] = $post_id;
-            $post_id = wp_update_post($post_data);
+            // $post_id = wp_update_post($post_data);
+            $post_id = wp_update_post( apply_filters( 'rtcl_listing_save_update_args', $post_data, $type ) );
         } else {
-            $post_id = wp_insert_post($post_data);
+            // $post_id = wp_insert_post($post_data);
+            $post_id = wp_insert_post( apply_filters( 'rtcl_listing_save_update_args', $post_data, $type ) );
         }
         
         if (is_wp_error($post_id)) {
@@ -619,34 +645,9 @@ class VOF_Listing {
         // Set category
         wp_set_object_terms($post_id, [$category->term_id], rtcl()->category);
 
-        // Collect user data for new schema
-        $vof_user_data = [
-            'vof_email' => isset($_POST['vof_email']) ? sanitize_email($_POST['vof_email']) : '',
-            'vof_phone' => isset($_POST['vof_phone']) ? sanitize_text_field($_POST['vof_phone']) : '',
-            'vof_whatsapp_number' => isset($_POST['vof_whatsapp_number']) ? sanitize_text_field($_POST['vof_whatsapp_number']) : '',
-            'post_parent_cat' => $parent_id,
-            'vof_tier' => sanitize_text_field(self::vof_get_available_tiers($parent_id)),
-            'post_status' => $post_data['post_status']
-        ];
-
-        // Create temp user entry with new schema
-        $vof_temp_user_meta = VOF_Core::instance()->temp_user_meta();
-        $uuid = $vof_temp_user_meta->vof_create_temp_user($post_id, $vof_user_data);
-        // $this->vof_handle_user_creation($_POST['vof_email'], $post_id);
-        // VOF_Listing::vof_handle_user_creation($_POST['vof_email'], $post_id);
-        VOF_Listing::vof_handle_user_creation($vof_user_data['vof_email'], $post_id, $uuid);
-
-        if (!$uuid) {
-            wp_send_json_error([
-                'message' => [__('Failed to create temporary user record', 'vendor-onboarding-flow')]
-            ]);
-            return;
-        }
-
         // Store temporary form data
         set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS);
 
-        // ####################
         try {
             // Get API instance from VOF core
             $api = VOF_Core::instance()->vof_get_vof_api();
@@ -736,6 +737,10 @@ class VOF_Listing {
 
             if (is_wp_error($new_user_id)) {
                 throw new \Exception($new_user_id->get_error_message());
+            }
+
+            if (!$new_user_id || !is_numeric($new_user_id)) {
+                error_log('VOF Debug: user creation -> $new_user_id not valid or non-numeric: ', $new_user_id);
             }
             
             error_log('VOF Debug: New user created with ID: ' . $new_user_id);
