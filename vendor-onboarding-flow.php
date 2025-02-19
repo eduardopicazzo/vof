@@ -28,14 +28,6 @@ require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-temp-user-meta.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-config.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
 
-// Load Traits and (needed by extended models)
-// require_once VOF_PLUGIN_DIR . 'traits/trait-vof-payment-meta-handler.php';
-// require_once VOF_PLUGIN_DIR . 'traits/trait-vof-stripe-data-mapper.php';
-
-// Load Extended Models
-// require_once VOF_PLUGIN_DIR . 'models/class-vof-membership.php';
-// require_once VOF_PLUGIN_DIR . 'models/class-vof-payment.php';
-
 // Load VOF API (if not works put back on 4th place top-down)
 require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
 

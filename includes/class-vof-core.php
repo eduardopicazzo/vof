@@ -193,27 +193,6 @@ class VOF_Core {
         );
     }
 
-    // Getters
-    /**
-     * Get VOF Payment model instance
-     */
-    // public function vof_get_payment($stripe_data = null, $temp_user_data = null) {
-        //     if ($stripe_data && $temp_user_data) {
-        //         return new VOF_Payment($stripe_data, $temp_user_data);
-        //     }
-        //     return null;
-    // }
-
-    /**
-     * Get VOF Membership model instance
-     */
-    // public function vof_get_membership($user_id = null, $stripe_data = null) {
-        //     if ($user_id && $stripe_data) {
-        //         return new VOF_Membership($user_id, $stripe_data);
-        //     }
-        //     return null;
-    // }
-
     public function vof_get_webhook_handler() {
         return $this->webhook_handler;
     }
@@ -263,7 +242,9 @@ class VOF_Core {
         return $this->vof_helper;
     }
 
-    // ### DEBUG SECTION (admin menu) ###
+    // ##########################################################
+    // ############### DEBUG SECTION (admin menu) ###############
+    // ##########################################################
 
     // Add admin menu MENU
     public function vof_add_admin_menu() {
