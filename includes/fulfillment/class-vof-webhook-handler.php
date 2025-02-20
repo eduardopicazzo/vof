@@ -214,12 +214,14 @@ class VOF_Webhook_Handler {
             $stripe = $stripe_config->vof_get_stripe();
 
             $uuid = $subscription->metadata->uuid ?? null;
-            // $post_id = $subscription->metadata->post_id ?? null;
+            $wp_user_id = $subscription->metadata->wp_user_id ?? null;
+            $post_id = $subscription->metadata->post_id ?? null;
             
             // Debug log
             error_log('VOF Debug: Stripe instance initialized ' . ($stripe ? 'successfully' : 'failed'));
             error_log('VOF Debug: handle_subscription_created with uuid: ' . print_r($uuid, true));
-            // error_log('VOF Debug: handle_subscription_created with post_id: ' . print_r($post_id, true));
+            error_log('VOF Debug: handle_subscription_created with user id: ' . print_r($wp_user_id, true));
+            error_log('VOF Debug: handle_subscription_created with post_id: ' . print_r($post_id, true));
             
             // Retrieve expanded subscription with correct expand paths
             try {
@@ -274,7 +276,8 @@ class VOF_Webhook_Handler {
                     'stripe_net_amount'        => $expanded_subscription->latest_invoice->charge->balance_transaction->net ?? null,
                     'stripe_intent_id'         => $expanded_subscription->latest_invoice->payment_intent->id ?? null,                // pi_xxxx
                     'stripe_charge_captured'   => $expanded_subscription->latest_invoice->charge->amount_captured ?? null,
-                    'is_stripe_captured'       => $expanded_subscription->latest_invoice->charge->captured ? 'yes' : 'no'           // yes / no
+                    'is_stripe_captured'       => $expanded_subscription->latest_invoice->charge->captured ? 'yes' : 'no',          // yes / no
+                    'wp_user_id'               => $expanded_subscription->metadata->wp_user_id ?? null
                 ];
     
                 // Get payment method details from either default_payment_method or latest_invoice
@@ -301,7 +304,7 @@ class VOF_Webhook_Handler {
                 error_log('VOF Subscription: Retrieved extracted subscription data (w print_r): ' . print_r($subscription_data, true));
 
                 $vof_subscription_handler = \VOF\Includes\Fulfillment\VOF_Subscription_Handler::getInstance();
-                $vof_subscription_handler->vof_process_subscription( $subscription_data, $subscription->customer, $subscription->id );
+                $vof_subscription_handler->vof_process_subscription($subscription_data);
 
                 if(is_wp_error($vof_subscription_handler)) {
                     http_response_code(400);

@@ -355,6 +355,7 @@ class VOF_API {
                         'tier'    => $tier_selected['name'],
                         'post_id' => $user_data['post_id'],
                         'phone'   => $user_data['vof_phone'],
+                        'wp_user_id' => $user_data['true_user_id'] // TODO: CHECK IF WORKS
                     ],
                 ],
                 'metadata' => [
@@ -362,6 +363,7 @@ class VOF_API {
                     'tier'    => $tier_selected['name'],
                     'post_id' => $user_data['post_id'],
                     'phone'   => $user_data['vof_phone'], // Pre-fill the customer's phone number
+                    'wp_user_id' => $user_data['true_user_id'] // TODO: CHECK IF WORKS
                 ],
                 'line_items' => [$checkout_data['line_items']],
                 'allow_promotion_codes' => true,
