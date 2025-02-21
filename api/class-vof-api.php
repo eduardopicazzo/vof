@@ -468,11 +468,11 @@ class VOF_API {
         $price_ids = [
             'test' => [
                 // 'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
-                'biz Test Subscription Handler' => 'price_1QmxGTF1Da8bBQoX1HE9BMLC',
+                'biz Test Subscription Handler' => 'price_1QushhF1Da8bBQoXx6owQdne',
                 // 'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                'noise Test Subscription Handler' => 'price_1QmxHwF1Da8bBQoX4DKhUcD8',
+                'noise Test Subscription Handler' => 'price_1QusjwF1Da8bBQoXRXJTb8ie',
                 // 'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
-                'noise_plus Test Subscription Handler' => 'price_1QmxJtF1Da8bBQoXO0GNjQHu'
+                'noise_plus Test Subscription Handler' => 'price_1QuslaF1Da8bBQoXmDNcAzuM'
             ],
             'live' => [
                 'biz' => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',
