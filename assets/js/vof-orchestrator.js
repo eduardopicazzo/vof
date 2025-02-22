@@ -4,7 +4,7 @@
 
     // Configuration flags (set via PHP localization)
     window.vofConfig = {
-        enableValidation: false,
+        enableValidation: true,
         stubMode: false // Set this via PHP to toggle stub behavior
     };
 

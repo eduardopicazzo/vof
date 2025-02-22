@@ -4,11 +4,11 @@ window.VOFFormValidation = (function() {
 
     const requiredFields = {
         'rtcl-title': {
-            message: 'Title is required',
+            message: '☝️ aquí tu título. PRO TIP: sé claro, pero déjalos con curiosidad',
             validate: value => value.trim().length > 0
         },
         // 'rtcl-gallery': {
-        //     message: 'At least one image is required',
+        //     message: '☝️ ojos que no ven, corazón que no compra',
         //     validate: () => {
         //         if (!window.vofGalleryValidator) {
         //             console.error('Gallery validator not initialized');
@@ -18,7 +18,7 @@ window.VOFFormValidation = (function() {
         //     }
         // },
         'description': {
-            message: 'Description is required',
+            message: '☝️ aquí tu descripción. PRO TIP: lúcete con esto, ¡es LA clave para destacar!',
             validate: () => {
                 if (typeof tinyMCE !== 'undefined' && tinyMCE.get('description')) {
                     const content = tinyMCE.get('description').getContent();
@@ -32,7 +32,7 @@ window.VOFFormValidation = (function() {
             }
         },
         'rtcl-price': {
-            message: 'Price is required',
+            message: '☝️ heyyyy! no te saltes precio. ¿sabes por qué? el precio es la base de tu marketing',
             validate: value => {
                 const pricingDisabled = document.getElementById('_rtcl_listing_pricing_disabled');
                 if (pricingDisabled && pricingDisabled.checked) return true;
@@ -43,18 +43,29 @@ window.VOFFormValidation = (function() {
             message: 'Price type is required',
             validate: value => value.trim().length > 0
         },
-        'rtcl-phone': {
-            message: 'Valid phone number is required',
+        'rtcl-geo-address': {
+            message: 'no seas tímido, aquí tu ubicación ☝️',
+            validate: value => value.trim().length > 0
+        },
+        // 'rtcl-phone': { rtcl-geo-address
+        'vof-phone': {
+            message: 'tus clientes llegan aquí ☝️',
             validate: value => /^\+?[\d\s-]{10,}$/.test(value.trim())
         },
-        'rtcl-whatsapp-number': {
-            message: 'Valid WhatsApp number is required',
+        // 'rtcl-whatsapp-number': {
+        'vof-whatsapp-number': {
+            message: 'tus clientes llegan aquí ☝️',
             validate: value => /^\+?[\d\s-]{10,}$/.test(value.trim())
         },
-        'rtcl-email': {
-            message: 'Valid email is required',
+        // 'rtcl-email': {
+        'vof_email': {
+            message: 'tu email, aquí ☝️ suceden cosas muy interesantes',
             validate: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
-        }
+        },
+        // 'vof_email_confirm': {
+        //     message: 'verifica ☝️ que sea tu mejor email, el que más checas nada de ironman2245@mail.com ehhh!!!',
+        //     validate: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+        // }
     };
 
     return {
