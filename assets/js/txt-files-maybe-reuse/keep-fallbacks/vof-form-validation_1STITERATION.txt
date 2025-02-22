@@ -26,7 +26,7 @@ window.VOFFormValidation = (function() {
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
         
         // Add some padding for better visual spacing
-        const additionalPadding = 60;
+        const additionalPadding = 40;
         
         // Calculate total offset
         const totalOffset = headerHeight + additionalPadding;
@@ -53,7 +53,7 @@ window.VOFFormValidation = (function() {
         //             behavior: 'smooth'
         //         });
         //     }
-        // }, 800); // Adjust timeout based on your scroll animation duration
+        // }, 500); // Adjust timeout based on your scroll animation duration
     }
 
     const requiredFields = {
@@ -128,20 +128,11 @@ window.VOFFormValidation = (function() {
             const galleryValid = this.requiredFields['rtcl-gallery'].validate();
             if (!galleryValid) {
                 isValid = false;
-                const galleryContainer = document.querySelector('.rtcl-gallery');
-                if (galleryContainer) {
-                    // Find the uploads area within the gallery container
-                    const galleryWrapper = galleryContainer.querySelector('.rtcl-gallery-uploads');
-                    this.showError(galleryContainer, this.requiredFields['rtcl-gallery'].message);
-                    
-                    // Set focus to the gallery container
-                    galleryContainer.setAttribute('tabindex', '-1');
+                const galleryWrapper = document.querySelector('.rtcl-gallery-uploads');
+                if (galleryWrapper) {
+                    this.showError(galleryWrapper, this.requiredFields['rtcl-gallery'].message);
                     if (!firstError) {
-                        firstError = galleryContainer;
-                        // Add a small delay before focusing to ensure smooth scroll completes
-                        // setTimeout(() => {
-                            galleryContainer.focus();
-                        // }, 600);
+                        firstError = galleryWrapper;
                     }
                 }
             }
@@ -188,26 +179,12 @@ window.VOFFormValidation = (function() {
 
         init: function() {
             const style = document.createElement('style');
-            // border: 2px dashed #dc3545 !important;
-            // .vof-error .rtcl-gallery-uploads {
-            // border: 2px dashed #dc3545 !important;
             style.textContent = `
                 .vof-error input,
                 .vof-error select,
-                .vof-error textarea {
+                .vof-error textarea,
+                .vof-error .rtcl-gallery-uploads {
                     border-color: #dc3545 !important;
-                }
-                .vof-error .rtcl-gallery {
-                    border-color: #dc3545 !important;
-                    border-radius: 4px;
-                    padding: 10px;
-                    background-color: rgba(220, 53, 69, 0.05);
-                    transition: all 0.3s ease;
-                }
-                .vof-error .rtcl-gallery-uploads:focus-within {
-                    border-color: #dc3545 !important;
-                    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-                    outline: none;
                 }
                 .vof-error-message {
                     color: #dc3545;

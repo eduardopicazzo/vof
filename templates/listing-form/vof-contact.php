@@ -353,6 +353,35 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
+    <!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
+	<?php if ( $enable_post_for_unregister ): ?>
+        <div class="row classima-form-email-row">
+            <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
+                <label class="control-label"><?php esc_html_e( "Confirma Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                    <span> *</span><?php endif; ?></label>
+            </div>
+            <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
+                <div class="form-group">
+                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
+                    <input type="email" 
+                           class="form-control" 
+                           id="vof_email_confirm" 
+                           name="vof_email_confirm"
+                           value="<?php echo esc_attr( $vof_email ); ?>" 
+                    <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
+                    
+                    <!-- Add a hidden field for compatibility -->
+                    <input type="hidden" 
+                            name="email" 
+                            value="<?php echo esc_attr( $vof_email ); ?>" />
+					<?php if ( $enable_post_for_unregister ): ?>
+                        <p class="description"><?php esc_html_e( "Confirma tu email. Enviaremos el acceso a tu cuenta a este correo", 'classima' ); ?></p>
+					<?php endif; ?>
+                </div>
+            </div>
+        </div>
+	<?php endif; ?>
+
 
 
 
