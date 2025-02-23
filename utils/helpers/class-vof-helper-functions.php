@@ -37,7 +37,7 @@ class VOF_Helper_Functions {
 	}
 
 	// Add new email validation methods
-	public static function vof_validate_email($email) { 
+	public static function vof_validate_email($email) { // maybe not used... 
 		error_log('VOF Debug: vof_validate_email called with data: ' . print_r($email, true));
 
 		// TODO: Add validation for the email field

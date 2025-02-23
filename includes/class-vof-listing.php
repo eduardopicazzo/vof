@@ -16,7 +16,10 @@ class VOF_Listing {
         // Intercept the AJAX submission
         // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1); // commented for testing using STUB or MODAL
         // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_STUB'], 1);
-        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'], 1);
+        add_action('wp_ajax_rtcl_post_new_listing',        [ $this, 'vof_cursor_handle_listing_submission_MODAL' ], 1);
+        if (! is_user_logged_in()) { 
+            add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'],   1);
+        }
         
         // Custom submit button 
         remove_action('rtcl_listing_form_end', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
@@ -40,13 +43,17 @@ class VOF_Listing {
     public function vof_custom_submit_button($post_id) {
         $form_handler = new \VOF\VOF_Form_Handler();
         if (!is_user_logged_in() && $this->vof_is_post_ad_page()) {
-            $this->vof_render_guest_submit_button();
-            $form_handler->vof_show_pricing_modal();
+            $is_guest = true;
+            $this->vof_render_guest_submit_button($is_guest);
+            $form_handler->vof_show_pricing_modal(); // MAYBE REMOVE??
             return;
         }
 
-        if (is_user_logged_in() && !VOF_Helper_Functions::vof_has_active_subscription() && $this->vof_is_post_ad_page()) {           
-            $this->vof_render_subscription_required_button(); 
+        if (is_user_logged_in() && !VOF_Helper_Functions::vof_has_active_subscription() && $this->vof_is_post_ad_page()) {
+            $is_guest = false;           
+            // $this->vof_render_subscription_required_button();
+            $this->vof_render_guest_submit_button($is_guest); 
+            $form_handler->vof_show_pricing_modal(); // MAYBE REMOVE??
             return;
         }
 
@@ -60,7 +67,7 @@ class VOF_Listing {
         }
     }
 
-    private function vof_render_guest_submit_button() {
+    private function vof_render_guest_submit_button($is_guest) {
         wp_enqueue_script('vof-listing-submit');
         wp_enqueue_script('rtcl-gallery');
         ?>
@@ -69,13 +76,14 @@ class VOF_Listing {
                     class="vof-guest-submit-btn btn btn-primary" 
                     >
                     <!-- onclick="handleTempListing()"> -->
-                <?php esc_html_e('Continue to Create Account', 'vendor-onboarding-flow'); ?>
+                <?php echo esc_html($is_guest == true ? __('Continue to Create Account', 'vendor-onboarding-flow') : __('Continue to Select Plan', 'vendor-onboarding-flow')); ?>
+                <!-- <//?php esc_html_e('Continue to Create Account', 'vendor-onboarding-flow'); ?> -->
             </button>
         </div>
         <?php
     }
 
-    private function vof_render_subscription_required_button() {
+    private function vof_render_subscription_required_button() { // not used
         wp_enqueue_script('vof-listing-submit');
         wp_enqueue_script('rtcl-gallery');
         ?>
@@ -94,7 +102,7 @@ class VOF_Listing {
         return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
     }
    
-    public function vof_cursor_handle_listing_submission() {
+    public function vof_cursor_handle_listing_submission() { // REMOVE: NOT USED
         Functions::clear_notices();
         $success = false;
         $post_id = 0;
@@ -705,7 +713,7 @@ class VOF_Listing {
                 $temp_data = [
                     'user_type' => 'returning',
                     'true_user_id' => $existing_user,
-                    // 'password' => '',
+                    'password' => '',
                     'vof_flow_status' => 'started'
                 ];
 

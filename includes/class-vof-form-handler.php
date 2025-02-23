@@ -98,7 +98,7 @@ class VOF_Form_Handler {
 			error_log('VOF Debug: Intercepting listing submission');
 			// Prevent the default registration process
 			wp_send_json_error([
-				'message' => __('Please complete the registration process first.', 'vendor-onboarding-flow')
+				'message' => __('Please complete the registration process first.TRRRRACE', 'vendor-onboarding-flow')
 			]);
 			exit;
 		}
@@ -154,7 +154,9 @@ class VOF_Form_Handler {
 	}
 
     public static function vof_is_vof_conditions() : bool {  // KEEP
-        return !is_user_logged_in() || !VOF_Helper_Functions::vof_has_active_subscription();
+        return !is_user_logged_in() || 
+			   !VOF_Helper_Functions::vof_has_active_subscription() || 
+			   (is_user_logged_in() && !VOF_Helper_Functions::vof_has_active_subscription());
     }
 
 	/**
