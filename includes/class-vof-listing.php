@@ -16,10 +16,22 @@ class VOF_Listing {
         // Intercept the AJAX submission
         // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission'], 1); // commented for testing using STUB or MODAL
         // add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_STUB'], 1);
-        add_action('wp_ajax_rtcl_post_new_listing',        [ $this, 'vof_cursor_handle_listing_submission_MODAL' ], 1);
-        if (! is_user_logged_in()) { 
-            add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'],   1);
-        }
+        
+        // Make sure WP is fully loaded before checking subscriptions
+        // add_action('init', function() {
+            //     if (!is_user_logged_in()) { // fails on ajax response
+            //         add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'],   1);
+            //     }
+            //     if (is_user_logged_in() && !VOF_Helper_Functions::vof_has_active_subscription()) { // fails on ajax response
+            //         add_action('wp_ajax_rtcl_post_new_listing', [ $this, 'vof_cursor_handle_listing_submission_MODAL' ], 1);
+            //     }
+            //     if (is_user_logged_in() && VOF_Helper_Functions::vof_has_active_subscription())  { // WORKS
+            //         remove_action('wp_ajax_rtcl_post_new_listing', [ $this, 'vof_cursor_handle_listing_submission_MODAL' ], 1);
+            //     }
+            // });
+            
+        add_action('wp_ajax_nopriv_rtcl_post_new_listing', [$this, 'vof_cursor_handle_listing_submission_MODAL'],   1);
+        add_action('wp_ajax_rtcl_post_new_listing', [ $this, 'vof_cursor_handle_listing_submission_MODAL' ], 1);
         
         // Custom submit button 
         remove_action('rtcl_listing_form_end', ['Rtcl\Controllers\Hooks\TemplateHooks', 'listing_form_submit_button'], 50);
@@ -504,6 +516,15 @@ class VOF_Listing {
     }
 
     public function vof_cursor_handle_listing_submission_MODAL() {
+        // Check user status and subscription at the start
+        if (is_user_logged_in()) {
+            if (VOF_Helper_Functions::vof_has_active_subscription()) {
+                // Let the default handler take over
+                return;
+            }
+            // Continue processing for logged-in users without subscription
+        }
+
         Functions::clear_notices();
         $success = false;
         $post_id = 0;

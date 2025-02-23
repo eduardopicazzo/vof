@@ -172,6 +172,17 @@ class VOF_Helper_Functions {
     }
 	
 	public static function vof_has_active_subscription($user_id = null) {
+		// Check if rtclStore function exists and plugin is active
+		if (!function_exists('rtclStore')) {
+			return false;
+		}
+
+		// Get store instance safely
+		$store = rtclStore();
+		if (!$store) {
+			return false;
+		}
+
         if (!$user_id) {
             $user_id = get_current_user_id();
         }
@@ -187,7 +198,8 @@ class VOF_Helper_Functions {
         }
 
 	    if (class_exists('\RtclStore\Models\Membership')) {
-	        $membership = rtclStore()->factory->get_membership();
+	        // $membership = rtclStore()->factory->get_membership();
+	        $membership = $store->factory->get_membership();
 	        if ($membership && !$membership->is_expired()) {
 	            return true;
 	        }
