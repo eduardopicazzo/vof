@@ -42,6 +42,7 @@ class VOF_Fulfillment_Handler {
             error_log('VOF Debug: INITIATING FULFILLMENT with $stripe_data -> ' . print_r($stripe_data, true));
 
             $temp_user = $this->temp_user_meta->vof_get_temp_user_by_uuid($stripe_data['uuid']);
+            $post_id = $stripe_data['post_id'];
 
             if (!$temp_user) {
                 throw new \Exception('No temporary user data found');
@@ -61,12 +62,15 @@ class VOF_Fulfillment_Handler {
 
             // $this->vof_validate_data($stripe_data, $temp_user); // maybe not needed??
 
-            $payment_data = $this->vof_fulfill_and_handoff_product($order_props);
+            $payment_data = $this->vof_fulfill_and_handoff_product($order_props, $post_id);
             error_log('VOF Debug: Retrieved $payment_data with data: ' . print_r($payment_data, true));
             
             if (is_wp_error($payment_data)) {
                 throw new \Exception($payment_data->get_error_message());
             }
+
+            // Release the captive listing!!!
+            $this->vof_publish_listing($post_id);
 
             // $this->vof_cleanup_temp_data($stripe_data, $temp_user); // maybe not needed?
 
@@ -134,8 +138,9 @@ class VOF_Fulfillment_Handler {
         return $order_props;
     }
 
-    private function vof_fulfill_and_handoff_product($order_props){
+    private function vof_fulfill_and_handoff_product($order_props, $post_id ){
         // ####### Fulfillment & Handoff Handling Starts Here: #######
+        error_log('VOF Debug: Starting Fulfillment and Handoff with $order_props: ' . print_r($order_props, true));
         error_log('VOF Debug: Starting Fulfillment and Handoff with $order_id: ' . print_r($order_props['order_id'], true). "\n" . 'And $gateway: ' . print_r($order_props['gateway'], true));
 
         // Set order key and trigger actions
@@ -288,20 +293,14 @@ class VOF_Fulfillment_Handler {
     /**
      * Publishes the temporary listing
      */
-    private function vof_publish_listing($temp_user, $user_id) {
+    private function vof_publish_listing($post_id) {
         $post_data = [
-            'ID' => $temp_user['post_id'],
-            'post_status' => 'publish',
-            'post_author' => $user_id,
-            'meta_input' => [
-                '_rtcl_membership_assigned' => true,
-                '_rtcl_listing_owner' => $user_id,
-                '_rtcl_manager_id' => $user_id,
-                '_vof_subscription_id' => $temp_user['subscription_id']
-            ]
+            'ID'          => $post_id,
+            'post_status' => 'publish'
         ];
 
-        $result = wp_update_post($post_data);
+        // $result = wp_update_post($post_data);
+        $result = wp_update_post( apply_filters( 'rtcl_listing_save_update_args', $post_data, 'update' ) );
         if (is_wp_error($result)) {
             throw new \Exception('Failed to publish listing: ' . $result->get_error_message());
         }
