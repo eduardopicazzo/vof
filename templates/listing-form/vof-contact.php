@@ -338,7 +338,12 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
                            class="form-control" 
                            id="vof_email" 
                            name="vof_email"
-                           value="<?php echo esc_attr( $vof_email ); ?>" 
+                           <?php if($is_logged_in): ?>
+                                value="<?php echo esc_attr( $registered_email ); ?>"
+                                readonly
+                           <?php else: ?>
+                                value="<?php echo esc_attr( $vof_email ); ?>" 
+                           <?php endif;?>
                     <?php echo esc_html( $enable_post_for_unregister ? " required" : '' ); ?> />
                     
                     <!-- Add a hidden field for compatibility -->

@@ -891,6 +891,9 @@ class VOF_Listing {
     }
     
     private function vof_get_new_user_email_content($new_user_data, $password) {
+        
+        $lost_password_url = \Rtcl\Helpers\Link::lostpassword_url();
+
         $message = sprintf(
             /* translators: %s: Customer username */
             '<p>' . esc_html__('Hi %s,', 'vendor-onboarding-flow') . '</p>', 
@@ -918,7 +921,7 @@ class VOF_Listing {
         $message .= '<p>' . sprintf(
             /* translators: %s: Password change link */
             esc_html__('Click here to change your password: %s', 'vendor-onboarding-flow'),
-            '<a href="' . esc_url(add_query_arg('action', 'lostpassword', wp_login_url())) . '">' . 
+            '<a href="' . esc_url($lost_password_url) . '">' . 
             esc_html__('Change Password', 'vendor-onboarding-flow') . '</a>'
         ) . '</p>';
     

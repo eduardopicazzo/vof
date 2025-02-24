@@ -258,6 +258,9 @@ class VOF_Form_Handler {
 			'hidden_fields'       => (!empty($moderation_settings['hide_form_fields'])) ? 
 				$moderation_settings['hide_form_fields'] : [],
 			'enable_post_for_unregister' => !is_user_logged_in() && Functions::is_enable_post_for_unregister(),
+			'is_logged_in' => is_user_logged_in(),
+			// 'vof_lock_email' => get_post_meta( $post_id, 'email', true ),
+			'registered_email' => $email,
 			'fields' => $fields // Add the field vondfigurations to the data array.
 		];
 
