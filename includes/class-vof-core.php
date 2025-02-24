@@ -10,6 +10,7 @@ use VOF\VOF_Pricing_Modal;
 use VOF\Includes\Fulfillment\VOF_Webhook_Handler;
 use VOF\Includes\Fulfillment\VOF_Subscription_Handler;
 use VOF\Includes\Fulfillment\VOF_Fulfillment_Handler;
+use RtclStore\Helpers\Functions as StoreFunctions;
 use VOF\Models\VOF_Membership;
 use VOF\Models\VOF_Payment;
 
@@ -92,6 +93,89 @@ class VOF_Core {
         add_action('init', [$this, 'init_components'], 0);
         add_action('init', [$this, 'load_textdomain']);                          // Load text domain
         add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
+
+        // override myaccount dashboard templates
+        add_filter('rtcl_locate_template', [$this, 'vof_override_templates'], 10, 4);
+
+        // ###########################################################
+        // ################ R E M O V E   S O O N ###################
+        // ##########################################################
+        // add_action( 'rtcl_account_dashboard_report', [ &$this, 'vof_subscription_report' ], 19 );               // before 20
+        // if (  StoreFunctions::is_membership_enabled() ) {
+			// add_action( 'rtcl_account_dashboard_report', [ __CLASS__, 'vof_membership_statistic_report' ], 9 ); // before 10
+			// add_action( 'rtcl_account_dashboard_report', [ $this, 'vof_membership_statistic_report' ], 9 ); // before 10
+		// }
+        
+    }
+
+    /**
+     * Override default templates with VOF templates
+     */
+    public function vof_override_templates($template, $template_name, $args = array(), $template_path = '') {
+        $vof_templates = [
+            'myaccount/subscription-report.php' => 'my-account/vof-subscription-report.php',
+            'myaccount/membership-statistic.php' => 'my-account/vof-membership-statistic.php'
+        ];
+
+        if (isset($vof_templates[$template_name])) {
+            $vof_template = trailingslashit(VOF_PLUGIN_DIR) . 'templates/' . $vof_templates[$template_name];
+
+            if (file_exists($vof_template)) {
+                // Remove the original template loading action to prevent duplication
+                remove_action('rtcl_account_dashboard_report', ['\RtclPro\Controllers\SubscriptionController', 'subscription_report'], 20);
+                remove_action('rtcl_account_dashboard_report', ['RtclStore\Controllers\Hooks\TemplateHooks', 'membership_statistic_report'], 10);
+
+                return $vof_template;
+            }
+        }
+
+        return $template;
+    }    
+
+    // /**
+    //  * Override default templates with VOF templates
+    //  */
+    // public function vof_override_templates_OLD($template, $template_name, $args = array(), $template_path = '') {
+    //     $vof_templates = [
+    //         'myaccount/subscription-report.php' => 'my-account/vof-subscription-report.php',
+    //         'myaccount/membership-statistic.php' => 'my-account/vof-membership-statistic.php'
+    //     ];
+
+    //     if (isset($vof_templates[$template_name])) {
+    //         $vof_template = trailingslashit(VOF_PLUGIN_DIR) . 'templates/' . $vof_templates[$template_name];
+
+    //         if (file_exists($vof_template)) {
+    //             return $vof_template;
+    //         }
+    //     }
+
+    //     return $template;
+    // }
+
+    // /**
+	//  * @param WP_User $current_user
+	//  *
+	//  * @return void
+	//  */
+    // public function vof_subscription_report_OLD(\WP_User $current_user) {
+    //     $subscriptions = (new \RtclPro\Models\Subscriptions())->findAllByUserId($current_user->ID);
+    //     if (!empty($subscriptions)) {
+    //         \Rtcl\Helpers\Functions::get_template(
+    //             'my-account/vof-subscription-report', 
+    //             compact('subscriptions', 'current_user'),
+    //             '',
+    //             VOF_PLUGIN_DIR . 'templates/'
+    //         );
+    //     }
+    // }
+
+    public static function vof_membership_statistic_report_OLD($current_user) {
+        \Rtcl\Helpers\Functions::get_template(
+            'my-account/vof-membership-statistic',
+            compact('current_user'),
+            '',
+            VOF_PLUGIN_DIR . 'templates/'
+        );
     }
 
     public function init_components() {
