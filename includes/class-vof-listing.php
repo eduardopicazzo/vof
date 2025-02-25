@@ -673,7 +673,7 @@ class VOF_Listing {
         wp_set_object_terms($post_id, [$category->term_id], rtcl()->category);
 
         // Store temporary form data
-        set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS);
+        // set_transient('vof_temp_listing_' . $post_id, $_POST, DAY_IN_SECONDS);
 
         try {
             // Get API instance from VOF core

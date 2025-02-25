@@ -61,9 +61,9 @@ class VOF_Core {
         VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
 
         // Schedule cleanup cron job
-        if( !wp_next_scheduled( 'vof_cleanup_temp_data' ) ) {
-            wp_schedule_event( time(), 'daily', 'vof_cleanup_temp_data');
-        }
+        // if( !wp_next_scheduled( 'vof_cleanup_temp_data' ) ) {
+        //     wp_schedule_event( time(), 'daily', 'vof_cleanup_temp_data');
+        // }
 
         // Register post status for temporary listings
         VOF_Helper_Functions::vof_register_temp_post_status();
@@ -75,7 +75,7 @@ class VOF_Core {
      */
     public static function vof_deactivate() {
         // Clear scheduled cron
-        wp_clear_scheduled_hook( 'vof_cleanup_temp_data' );
+        // wp_clear_scheduled_hook( 'vof_cleanup_temp_data' );
         // Maybe add other cleanup tasks
         do_action( 'vof_deactivated' );
     }
@@ -92,7 +92,7 @@ class VOF_Core {
         add_action('rest_api_init', [$this, 'vof_init_rest_api'], 15);          // Higher (later) priority (Initialize REST API with later priority)
         add_action('init', [$this, 'init_components'], 0);
         add_action('init', [$this, 'load_textdomain']);                          // Load text domain
-        add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
+        // add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
 
         // override myaccount dashboard templates
         add_filter('rtcl_locate_template', [$this, 'vof_override_templates'], 10, 4);
@@ -240,11 +240,11 @@ class VOF_Core {
         $this->temp_user_meta->vof_maybe_create_table();
     }
 
-    public function vof_cleanup_temp_data() {
-        if ($this->temp_user_meta) {
-            $this->temp_user_meta->vof_delete_expired_data();
-        }
-    }
+    // public function vof_cleanup_temp_data() {
+    //     if ($this->temp_user_meta) {
+    //         $this->temp_user_meta->vof_delete_expired_data();
+    //     }
+    // }
 
     public function vof_init_rest_api() {
         try {

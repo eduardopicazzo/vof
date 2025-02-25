@@ -62,17 +62,19 @@ class VOF_Fulfillment_Handler {
 
             // $this->vof_validate_data($stripe_data, $temp_user); // maybe not needed??
 
-            $payment_data = $this->vof_fulfill_and_handoff_product($order_props, $post_id);
-            error_log('VOF Debug: Retrieved $payment_data with data: ' . print_r($payment_data, true));
+            $is_vof_fulfilled = $this->vof_fulfill_and_handoff_product($order_props, $post_id);
+            error_log('VOF Debug: Retrieved $payment_data with data: ' . print_r($is_vof_fulfilled, true));
             
-            if (is_wp_error($payment_data)) {
-                throw new \Exception($payment_data->get_error_message());
+            if (is_wp_error($is_vof_fulfilled)) {
+                throw new \Exception($is_vof_fulfilled->get_error_message());
             }
 
             // Release the captive listing!!!
             $this->vof_publish_listing($post_id);
 
-            // $this->vof_cleanup_temp_data($stripe_data, $temp_user); // maybe not needed?
+            // update vof database with new data 
+            $this->vof_update_vof_flow($stripe_data, $is_vof_fulfilled);
+            // $this->vof_update_vof_temp_user_data($stripe_data, $temp_user); // DEVELOP
 
             $wpdb->query('COMMIT');
             return true;
@@ -308,21 +310,46 @@ class VOF_Fulfillment_Handler {
         return $result;
     }
 
-    /**
-     * Cleanup temporary data after successful fulfillment
-     */
-    public function vof_cleanup_temp_data($stripe_data, $temp_user) {
+    public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
+        if (!$is_vof_fulfilled) {
+            return false;
+        }
+
+        // $vof_temp_user_meta_instance = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        // $vof_flow_started_at =  $vof_temp_user_meta_instance->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
+        $vof_flow_started_at =  $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
+
+        $price_purchased_at = $stripe_data['amount'] / 100 ?? null;
+        $vof_flow_completed_at = current_time('mysql') ?? null;
+        $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
+
+
+        $vof_updated_data = [
+                          'vof_flow_status'        => 'completed' ?? null,
+                          'vof_flow_completed_at'  => $vof_flow_completed_at,
+                          'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
+                          'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
+                          'stripe_customer_id'     => $stripe_data['customer'] ?? null,
+                          'stripe_sub_id'          => $stripe_data['subscription_id'] ?? null,
+                          'stripe_sub_status'      => $stripe_data['status'] ?? null,
+                          'stripe_prod_name'       => $stripe_data['product_name'] ?? null,
+                          'stripe_prod_lookup_key' => $stripe_data['lookup_key'] ?? null,
+                          'stripe_period_interval' => $stripe_data['interval'] ?? null,
+                          'price_purchased_at'     => $price_purchased_at
+                        ];
+
+        self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
+    }
+
+    public function vof_update_vof_temp_user_data($uuid, $vof_updated_data) {
         // Mark temp user as completed
-        $this->temp_user_meta->vof_update_post_status(
-            $temp_user['uuid'], 
-            'completed'
-        );
+        $this->temp_user_meta->vof_update_post_status($uuid, $vof_updated_data);
 
         // Schedule cleanup of expired temp data
-        wp_schedule_single_event(
-            time() + DAY_IN_SECONDS, 
-            'vof_cleanup_expired_temp_data'
-        );
+        // wp_schedule_single_event(
+        //     time() + DAY_IN_SECONDS, 
+        //     'vof_cleanup_expired_temp_data'
+        // );
     }
 
     /**
@@ -385,5 +412,22 @@ class VOF_Fulfillment_Handler {
         //     if (!isset($stripe_data['status']) || $stripe_data['status'] !== 'active') {
         //         throw new \Exception('Invalid subscription status');
         //     }
+    // }
+
+    /**
+     * Cleanup temporary data after successful fulfillment
+     */
+    // public function vof_cleanup_temp_data($stripe_data, $temp_user) {
+     //     // Mark temp user as completed
+     //     $this->temp_user_meta->vof_update_post_status(
+     //         $temp_user['uuid'], 
+     //         'completed'
+     //     );
+
+     //     // Schedule cleanup of expired temp data
+     //     wp_schedule_single_event(
+     //         time() + DAY_IN_SECONDS, 
+     //         'vof_cleanup_expired_temp_data'
+     //     );
     // }
 }

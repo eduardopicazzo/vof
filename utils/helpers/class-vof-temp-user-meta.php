@@ -29,7 +29,7 @@ class VOF_Temp_User_Meta {
         // Updated schema with normalized columns
         $sql = "CREATE TABLE IF NOT EXISTS `{$this->table_name}` (
             `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            `uuid` char(36) NOT NULL,
+            `uuid` varchar(36) NOT NULL,
             `post_id` bigint(20) unsigned NOT NULL,
             `vof_email` varchar(255) NOT NULL,
             `vof_phone` varchar(20) NOT NULL,
@@ -41,14 +41,27 @@ class VOF_Temp_User_Meta {
             `true_user_id` bigint(20) unsigned DEFAULT NULL,
             `password` varchar(255) DEFAULT NULL,
             `vof_flow_status` enum('started', 'completed') DEFAULT NULL,
-            `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-            `expires_at` datetime,
-            `days_elapsed` int(11),
+            -- old modified columns
+            `vof_flow_started_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            `vof_flow_completed_at` datetime DEFAULT NULL,
+            `vof_flow_time_elapsed` int(11) DEFAULT NULL,
+            -- new columns
+            `stripe_user_name` varchar(255) DEFAULT NULL,
+            `stripe_customer_id` varchar(255) DEFAULT NULL,
+            `stripe_sub_id` varchar(255) DEFAULT NULL,
+            `stripe_sub_status` varchar(50) DEFAULT NULL,
+            `stripe_prod_name` varchar(255) DEFAULT NULL,
+            `stripe_prod_lookup_key` varchar(255) DEFAULT NULL,
+            `stripe_period_interval` varchar(50) DEFAULT NULL,
+            `price_purchased_at` int(11) DEFAULT NULL,
+            -- `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            -- `expires_at` datetime,
+            -- `days_elapsed` int(11),
             PRIMARY KEY (`uuid`),
             UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
             KEY `post_parent_cat` (`post_parent_cat`),
-            KEY `expires_at` (`expires_at`),
+            -- KEY `expires_at` (`expires_at`),
             KEY `true_user_id` (`true_user_id`)
         ) $charset_collate;";
     
@@ -57,25 +70,26 @@ class VOF_Temp_User_Meta {
         
         // Create trigger to update days_elapsed
         // Drop existing trigger if it exists
-        $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
+        // $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
         
         // Create new trigger
-        $trigger_sql = "CREATE TRIGGER update_days_elapsed 
-            BEFORE INSERT ON {$this->table_name}
-            FOR EACH ROW
-            SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
+        // $trigger_sql = "CREATE TRIGGER update_days_elapsed 
+        //     BEFORE INSERT ON {$this->table_name}
+        //     FOR EACH ROW
+        //     SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
         
-        $wpdb->query($trigger_sql);
+        // $wpdb->query($trigger_sql);
     }
 
     // GETTERS
     public function vof_get_temp_user_by_uuid($uuid) {
         global $wpdb;
-
+        // WHERE uuid = %s AND expires_at > NOW()",
+        
         $result = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$this->table_name}
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             ),
             ARRAY_A
@@ -92,10 +106,11 @@ class VOF_Temp_User_Meta {
     public function vof_get_email_by_uuid($uuid) {
         global $wpdb;
         
+        // WHERE uuid = %s AND expires_at > NOW()",
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT vof_email FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -110,11 +125,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_phone_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT vof_phone FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -129,11 +145,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_whatsapp_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT vof_whatsapp FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -143,11 +160,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_post_status_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT post_status FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -162,11 +180,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_tier_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT vof_tier FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -176,11 +195,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_parent_cat_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT post_parent_cat FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -195,11 +215,12 @@ class VOF_Temp_User_Meta {
     
     public function vof_get_post_id_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT post_id FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -212,13 +233,14 @@ class VOF_Temp_User_Meta {
         return absint($result);
     }
     
-    public function vof_get_created_at_by_uuid($uuid) {
+    public function vof_get_flow_started_at_by_uuid($uuid) {
         global $wpdb;
+        // WHERE uuid = %s AND expires_at > NOW()",
         
         $result = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT created_at FROM {$this->table_name} 
-                WHERE uuid = %s AND expires_at > NOW()",
+                "SELECT vof_flow_started_at FROM {$this->table_name} 
+                WHERE uuid = %s",
                 $uuid
             )
         );
@@ -252,11 +274,12 @@ class VOF_Temp_User_Meta {
 
     public function vof_get_temp_user_by_post_id($post_id) {
         global $wpdb;
+        // WHERE post_id = %d AND expires_at > NOW()",
 
         $result = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$this->table_name}
-                WHERE post_id = %d AND expires_at > NOW()",
+                WHERE post_id = %d",
                 $post_id
             ),
             ARRAY_A
@@ -280,7 +303,7 @@ class VOF_Temp_User_Meta {
 
         return "CREATE TABLE IF NOT EXISTS `{$this->table_name}` (
             `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            `uuid` char(36) NOT NULL,
+            `uuid` varchar(36) NOT NULL,
             `post_id` bigint(20) unsigned NOT NULL,
             `vof_email` varchar(255) NOT NULL,
             `vof_phone` varchar(20) NOT NULL,
@@ -292,28 +315,41 @@ class VOF_Temp_User_Meta {
             `true_user_id` bigint(20) unsigned DEFAULT NULL,
             `password` varchar(255) DEFAULT NULL,
             `vof_flow_status` enum('started', 'completed') DEFAULT NULL,
-            `days_elapsed` int(11),
-            `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-            `expires_at` datetime,
+            -- old modified columns
+            `vof_flow_started_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            `vof_flow_completed_at` datetime DEFAULT NULL,
+            `vof_flow_time_elapsed` int(11) DEFAULT NULL,
+            -- new columns
+            `stripe_user_name` varchar(255) DEFAULT NULL,
+            `stripe_customer_id` varchar(255) DEFAULT NULL,
+            `stripe_sub_id` varchar(255) DEFAULT NULL,
+            `stripe_sub_status` varchar(50) DEFAULT NULL,
+            `stripe_prod_name` varchar(255) DEFAULT NULL,
+            `stripe_prod_lookup_key` varchar(255) DEFAULT NULL,
+            `stripe_period_interval` varchar(50) DEFAULT NULL,
+            `price_purchased_at` int(11) DEFAULT NULL,
+            -- `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            -- `expires_at` datetime,
+            -- `days_elapsed` int(11),
             PRIMARY KEY (`uuid`),
             UNIQUE KEY `id` (`id`),
             KEY `post_id` (`post_id`),
             KEY `post_parent_cat` (`post_parent_cat`),
-            KEY `expires_at` (`expires_at`),
+            -- KEY `expires_at` (`expires_at`),
             KEY `true_user_id` (`true_user_id`)
         ) $charset_collate;";
 
         // Create trigger to update days_elapsed
         // Drop existing trigger if it exists
-        $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
+        // $wpdb->query("DROP TRIGGER IF EXISTS update_days_elapsed");
         
-        // Create new trigger
-        $trigger_sql = "CREATE TRIGGER update_days_elapsed 
-            BEFORE INSERT ON {$this->table_name}
-            FOR EACH ROW
-            SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
+        // // Create new trigger
+        // $trigger_sql = "CREATE TRIGGER update_days_elapsed 
+        //     BEFORE INSERT ON {$this->table_name}
+        //     FOR EACH ROW
+        //     SET NEW.days_elapsed = DATEDIFF(NOW(), NEW.created_at)";
         
-        $wpdb->query($trigger_sql);
+        // $wpdb->query($trigger_sql);
     }
 
     public function vof_get_all_records() {
@@ -353,7 +389,7 @@ class VOF_Temp_User_Meta {
         return true;
     }
 
-    public function vof_update_post_status($uuid, $status) {
+    public function vof_update_post_status_OLD($uuid, $status) {
         global $wpdb;
         
         $result = $wpdb->update(
@@ -366,6 +402,37 @@ class VOF_Temp_User_Meta {
 
         if ($result === false) {
             error_log('VOF Debug: Failed to update post status for UUID: ' . $uuid);
+            return false;
+        }
+
+        return true;
+    }
+
+    public function vof_update_post_status($uuid, $vof_updated_data) {
+        global $wpdb;
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            $vof_updated_data,
+            array('uuid' => $uuid),
+            array(
+                '%s',   // vof_flow_status
+                '%s',   // vof_flow_completed_at
+                '%d',   // vof_flow_time_elapsed
+                '%s',   // stripe_user_name
+                '%s',   // stripe_customer_id
+                '%s',   // stripe_sub_id
+                '%s',   // stripe_sub_status
+                '%s',   // stripe_prod_name
+                '%s',   // stripe_prod_lookup_key
+                '%s',   // stripe_period_interval
+                '%d',   // price_purchased_at
+            ),
+            array('%s') // uuid format
+        );
+
+        if ($result === false) {
+            error_log('VOF Debug: Failed to update credentials for UUID: ' . $uuid);
             return false;
         }
 
@@ -417,9 +484,10 @@ class VOF_Temp_User_Meta {
                 'post_status' => $data['post_status'],
                 'vof_tier' => $data['vof_tier'],
                 'post_parent_cat' => $data['post_parent_cat'] ?? 0,
-                'expires_at' => $expires_at
+                // 'expires_at' => $expires_at
             ),
-            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
+            array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d')
+            // array('%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
         );
 
         if ($result === false) {
