@@ -10,9 +10,9 @@ use VOF\VOF_Pricing_Modal;
 use VOF\Includes\Fulfillment\VOF_Webhook_Handler;
 use VOF\Includes\Fulfillment\VOF_Subscription_Handler;
 use VOF\Includes\Fulfillment\VOF_Fulfillment_Handler;
+use VOF\Utils\MailingESPs\VOF_MailerLite;
+use VOF\Utils\MailingESPs\VOF_MailerLite_Settings;
 use RtclStore\Helpers\Functions as StoreFunctions;
-use VOF\Models\VOF_Membership;
-use VOF\Models\VOF_Payment;
 
 class VOF_Core {
     private static $instance = null;
@@ -27,6 +27,8 @@ class VOF_Core {
     private $webhook_handler;
     private $fulfillment_handler;
     private $subscription_handler;
+    private $mailerlite;
+    private $mailerlite_settings;
 
     public static function instance() {
         if (null === self::$instance) {
@@ -132,43 +134,6 @@ class VOF_Core {
         return $template;
     }    
 
-    // /**
-    //  * Override default templates with VOF templates
-    //  */
-    // public function vof_override_templates_OLD($template, $template_name, $args = array(), $template_path = '') {
-    //     $vof_templates = [
-    //         'myaccount/subscription-report.php' => 'my-account/vof-subscription-report.php',
-    //         'myaccount/membership-statistic.php' => 'my-account/vof-membership-statistic.php'
-    //     ];
-
-    //     if (isset($vof_templates[$template_name])) {
-    //         $vof_template = trailingslashit(VOF_PLUGIN_DIR) . 'templates/' . $vof_templates[$template_name];
-
-    //         if (file_exists($vof_template)) {
-    //             return $vof_template;
-    //         }
-    //     }
-
-    //     return $template;
-    // }
-
-    // /**
-	//  * @param WP_User $current_user
-	//  *
-	//  * @return void
-	//  */
-    // public function vof_subscription_report_OLD(\WP_User $current_user) {
-    //     $subscriptions = (new \RtclPro\Models\Subscriptions())->findAllByUserId($current_user->ID);
-    //     if (!empty($subscriptions)) {
-    //         \Rtcl\Helpers\Functions::get_template(
-    //             'my-account/vof-subscription-report', 
-    //             compact('subscriptions', 'current_user'),
-    //             '',
-    //             VOF_PLUGIN_DIR . 'templates/'
-    //         );
-    //     }
-    // }
-
     public static function vof_membership_statistic_report_OLD($current_user) {
         \Rtcl\Helpers\Functions::get_template(
             'my-account/vof-membership-statistic',
@@ -186,15 +151,17 @@ class VOF_Core {
         $this->vof_helper     = new VOF_Helper_Functions();
         $this->stripe_config  = VOF_Stripe_Config::vof_get_stripe_config_instance();
 
+        // Initialize MailerLite integration if the class exists
+        error_log('VOF Debug: MailerLite class exists: ' . (class_exists('\VOF\Utils\MailingESPs\VOF_MailerLite') ? 'Yes' : 'No'));
+        error_log('VOF Debug: MailerLite class exists: ' . (class_exists('VOF\Utils\MailingESPs\VOF_MailerLite') ? 'Yes' : 'No'));
+        if (class_exists('\VOF\Utils\MailingESPs\VOF_MailerLite')) { // check if need "\"
+            $this->mailerlite = \VOF\Utils\MailingESPs\VOF_MailerLite::vof_get_instance();
+        }
+
         // Initialize vof pricing modal only if needed 
         if($this->vof_should_init_pricing_modal()) {
             $this->vof_pricing_modal = new VOF_Pricing_Modal();
         }
-        
-        // Initialize models if needed [for later central init on core]
-        // if ($this->vof_should_init_models()) {
-        //     $this->vof_init_models();
-        // }
 
         // Initialize fulfillment handlers
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
@@ -207,6 +174,14 @@ class VOF_Core {
             // Adds the vof_temp_post records view in admin
             add_action( 'admin_menu', [$this, 'vof_add_admin_menu'] );
             new VOF_Stripe_Settings(); // initialize vof-stripe admin dashboard
+            
+            // Initialize MailerLite settings if the class exists
+            error_log('VOF Debug: MailerLite Settings class exists: ' . (class_exists('VOF\Utils\MailingESPs\VOF_MailerLite_Settings') ? 'Yes' : 'No'));
+            error_log('VOF Debug: MailerLite Settings class exists: ' . (class_exists('VOF\Utils\MailingESPs\VOF_MailerLite_Settings') ? 'Yes' : 'No'));
+
+            if (class_exists('\VOF\Utils\MailingESPs\VOF_MailerLite_Settings')) {
+                $this->mailerlite_settings = new \VOF\Utils\MailingESPs\VOF_MailerLite_Settings();
+            }
         }
     }
 
@@ -295,6 +270,15 @@ class VOF_Core {
             $this->api = VOF_API::vof_api_get_instance();
         }
         return $this->api;
+    }
+    
+    /**
+     * Get MailerLite integration instance
+     *
+     * @return VOF_MailerLite|null
+     */
+    public function vof_get_mailerlite() {
+        return $this->mailerlite;
     }
 
     // TODO: prepend 'vof_get_vof_' later

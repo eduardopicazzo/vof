@@ -19,6 +19,11 @@ define('VOF_PLUGIN_FILE', __FILE__);
 define('VOF_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VOF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
+// Load Composer autoloader if it exists
+if (file_exists(VOF_PLUGIN_DIR . 'vendor/autoload.php')) {
+    require_once VOF_PLUGIN_DIR . 'vendor/autoload.php';
+}
+
 // Load dependencies first
 require_once VOF_PLUGIN_DIR . 'includes/class-vof-dependencies.php';
 
@@ -27,6 +32,17 @@ require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-helper-functions.php';
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-temp-user-meta.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-config.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
+
+// Load MailerLite integration if the directory exists
+if (file_exists(VOF_PLUGIN_DIR . 'utils/vof-mailing-esps')) {
+    if (file_exists(VOF_PLUGIN_DIR . 'utils/vof-mailing-esps/class-vof-mailerlite.php')) {
+        require_once VOF_PLUGIN_DIR . 'utils/vof-mailing-esps/class-vof-mailerlite.php';
+    }
+    
+    if (file_exists(VOF_PLUGIN_DIR . 'utils/vof-mailing-esps/class-vof-mailerlite-settings.php')) {
+        require_once VOF_PLUGIN_DIR . 'utils/vof-mailing-esps/class-vof-mailerlite-settings.php';
+    }
+}
 
 // Load VOF API (if not works put back on 4th place top-down)
 require_once VOF_PLUGIN_DIR . 'api/class-vof-api.php';
