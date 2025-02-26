@@ -310,36 +310,147 @@ class VOF_Fulfillment_Handler {
         return $result;
     }
 
-    public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
-        if (!$is_vof_fulfilled) {
-            return false;
-        }
-
-        // $vof_temp_user_meta_instance = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-        // $vof_flow_started_at =  $vof_temp_user_meta_instance->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
-        $vof_flow_started_at =  $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
-
-        $price_purchased_at = $stripe_data['amount'] / 100 ?? null;
-        $vof_flow_completed_at = current_time('mysql') ?? null;
-        $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
-
-
-        $vof_updated_data = [
-                          'vof_flow_status'        => 'completed' ?? null,
-                          'vof_flow_completed_at'  => $vof_flow_completed_at,
-                          'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
-                          'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
-                          'stripe_customer_id'     => $stripe_data['customer'] ?? null,
-                          'stripe_sub_id'          => $stripe_data['subscription_id'] ?? null,
-                          'stripe_sub_status'      => $stripe_data['status'] ?? null,
-                          'stripe_prod_name'       => $stripe_data['product_name'] ?? null,
-                          'stripe_prod_lookup_key' => $stripe_data['lookup_key'] ?? null,
-                          'stripe_period_interval' => $stripe_data['interval'] ?? null,
-                          'price_purchased_at'     => $price_purchased_at
-                        ];
-
-        self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
+/**
+ * Update VOF flow status and data
+ * 
+ * @param array $stripe_data Stripe data
+ * @param bool $is_vof_fulfilled Whether fulfillment was successful
+ * @return bool Success status
+ */
+public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
+    if (!$is_vof_fulfilled) {
+        return false;
     }
+
+    $vof_flow_started_at = $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
+
+    $price_purchased_at = $stripe_data['amount'] / 100 ?? null;
+    $vof_flow_completed_at = current_time('mysql') ?? null;
+    $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
+
+    $vof_updated_data = [
+        'vof_flow_status'        => 'completed' ?? null,
+        'vof_flow_completed_at'  => $vof_flow_completed_at,
+        'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
+        'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
+        'stripe_customer_id'     => $stripe_data['customer'] ?? null,
+        'stripe_sub_id'          => $stripe_data['subscription_id'] ?? null,
+        'stripe_sub_status'      => $stripe_data['status'] ?? null,
+        'stripe_prod_name'       => $stripe_data['product_name'] ?? null,
+        'stripe_prod_lookup_key' => $stripe_data['lookup_key'] ?? null,
+        'stripe_period_interval' => $stripe_data['interval'] ?? null,
+        'price_purchased_at'     => $price_purchased_at
+    ];
+
+    // Update the VOF temp user data first
+    self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
+    
+    // Now attempt the MailerLite integration with a try/catch that won't disrupt the main flow
+    try {
+        $this->vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data);
+    } catch (\Throwable $e) {
+        // Catch ANY error (including fatal errors) and log it
+        error_log('VOF Warning: MailerLite lead capture failed but fulfillment continues - ' . $e->getMessage());
+    }
+    
+    // Return success regardless of MailerLite results
+    return true;
+}
+    
+/**
+ * Capture complete lead at stage 2
+ */
+private function vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data) {
+    try {
+        // Get MailerLite instance
+        $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
+        
+        // Only proceed if MailerLite is available and flow is completed
+        if ($mailerlite && 
+            $mailerlite->vof_is_connected() && 
+            isset($vof_updated_data['vof_flow_status']) && 
+            $vof_updated_data['vof_flow_status'] === 'completed') {
+            
+            $this->vof_process_completed_lead($stripe_data, $vof_updated_data);
+        }
+    } catch (\Throwable $e) {
+        // Catch ANY error and log it
+        error_log('VOF Warning: MailerLite lead capture stage 2 failed - ' . $e->getMessage());
+        // Re-throw to be caught by parent
+        throw $e;
+    }
+}
+
+/**
+ * Process completed lead for MailerLite
+ */
+private function vof_process_completed_lead($stripe_data, $vof_updated_data) {
+    // Main try/catch block
+    try {
+        $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
+        if (!$mailerlite || !$mailerlite->vof_is_connected()) {
+            return;
+        }
+    
+        // Get temp user data
+        $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+        $temp_user = $temp_user_meta->vof_get_temp_user_by_uuid($stripe_data['uuid']);
+    
+        if (!$temp_user || empty($temp_user['vof_email'])) {
+            error_log('VOF Error: Cannot process completed lead - no temp user data');
+            return;
+        }
+    
+        // Ensure VOF Complete group exists
+        $complete_group_id = $mailerlite->vof_ensure_group_exists('VOF Completed');
+        if (!$complete_group_id) {
+            error_log('VOF Error: Failed to ensure VOF Complete group exists');
+            return;
+        }
+    
+        // Get Stage 1 group ID
+        $stage1_group_id = get_option('vof_mailerlite_onboarding_group', '');
+        if (empty($stage1_group_id)) {
+            $stage1_group_id = $mailerlite->vof_ensure_group_exists('__VOF_Fallback__');
+        }
+    
+        // Add to VOF Complete group with enhanced data
+        $fields = [
+            'phone' => $temp_user['vof_phone'],
+            'whatsapp' => $temp_user['vof_whatsapp'],
+            // 'payment_status' => 'completed',
+            // 'tier_purchased' => $stripe_data['product_name'],
+            // 'purchase_date' => date('Y-m-d H:i:s'),
+            // 'subscription_id' => $stripe_data['subscription_id'],
+            // 'customer_id' => $stripe_data['customer'],
+            // 'amount_paid' => ($stripe_data['amount'] / 100)
+        ];
+    
+        // Add subscriber to the completed group
+        try {
+            $mailerlite->vof_add_subscriber($temp_user['vof_email'], $fields, [$complete_group_id]);
+        } catch (\Exception $e) {
+            error_log('VOF Warning: Could not add subscriber to completed group - ' . $e->getMessage());
+            // Continue processing despite this error
+        }
+    
+        // Try to remove from Stage 1 group if it exists
+        if ($stage1_group_id) {
+            try {
+                $mailerlite->vof_remove_subscriber_from_group($temp_user['vof_email'], $stage1_group_id);
+                error_log('VOF Debug: Removed subscriber from stage 1 group');
+            } catch (\Exception $e) {
+                // Just log this error but continue processing
+                error_log('VOF Warning: Could not remove subscriber from stage 1 group - ' . $e->getMessage());
+            }
+        }
+    
+        error_log('VOF Debug: Lead processed at Stage 2 (successful checkout) for: ' . $temp_user['vof_email']);
+    } catch (\Exception $e) {
+        // Log the error but don't let it affect fulfillment
+        error_log('VOF Error: Failed to process completed lead - ' . $e->getMessage());
+    }
+}
 
     public function vof_update_vof_temp_user_data($uuid, $vof_updated_data) {
         // Mark temp user as completed

@@ -61,6 +61,11 @@ class VOF_MailerLite {
 
         $this->api_key = $this->vof_get_api_key();
         $this->vof_init_client();
+
+        // Call debug method to log available methods. (only in development debugging environments)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $this->vof_debug_available_methods();
+        }
     }
     
     /**
@@ -100,44 +105,103 @@ class VOF_MailerLite {
     public function vof_is_connected() {
         return ($this->api_client !== null);
     }
-    
-    /**
-     * Add or update subscriber in MailerLite
-     *
-     * @param string $email      Subscriber email
-     * @param array  $fields     Additional fields like name, etc.
-     * @param array  $groups     Groups to add subscriber to
-     * @return bool|array        True on success or response data
-     */
-    public function vof_add_subscriber($email, $fields = [], $groups = []) {
-        if (!$this->vof_is_connected()) {
-            error_log('VOF Error: Cannot add subscriber - MailerLite not connected');
-            return false;
-        }
+
+/**
+ * Add or update subscriber in MailerLite
+ *
+ * @param string $email      Subscriber email
+ * @param array  $fields     Additional fields like name, etc.
+ * @param array  $groups     Groups to add subscriber to
+ * @return bool|array        True on success or response data
+ */
+public function vof_add_subscriber($email, $fields = [], $groups = []) {
+    if (!$this->vof_is_connected()) {
+        error_log('VOF Error: Cannot add subscriber - MailerLite not connected');
+        return false;
+    }
+
+    try {
+        $subscriber_data = [
+            'email' => $email,
+            'fields' => $fields
+        ];
         
-        try {
-            $subscriber_data = [
-                'email' => $email,
-                'fields' => $fields
-            ];
-            
-            // Create or update subscriber
-            $response = $this->api_client->subscribers->create($subscriber_data);
-            
-            // Add to groups if needed
-            if (!empty($groups) && isset($response['data']['id'])) {
-                foreach ($groups as $group_id) {
-                    $this->api_client->groups->addSubscriber($group_id, $subscriber_data);
+        // First, create or update the subscriber in the main list
+        $response = $this->api_client->subscribers->create($subscriber_data);
+        error_log('VOF Debug: Subscriber create response: ' . print_r($response, true));
+        
+        // Now assign the subscriber to each group
+        if (!empty($groups)) {
+            foreach ($groups as $group_id) {
+                try {
+                    // FIXED: The method expects the email directly as a string, not in an array
+                    $group_response = $this->api_client->groups->assignSubscriber($group_id, $email);
+                    error_log('VOF Debug: Group assignment response for group ' . $group_id . ': ' . print_r($group_response, true));
+                } catch (\Exception $e) {
+                    error_log('VOF Warning: Failed to assign subscriber to group ' . $group_id . ' - ' . $e->getMessage());
                 }
             }
-            
-            return $response;
-            
-        } catch (\Exception $e) {
-            error_log('VOF Error: Failed to add subscriber to MailerLite - ' . $e->getMessage());
-            return false;
         }
+        
+        return $response;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to add/update subscriber - ' . $e->getMessage());
+        return false;
     }
+}
+
+
+/**
+ * Debug group assignment
+ * 
+ * @param string $email Email to assign
+ * @param string $group_id Group ID to assign to
+ */
+public function vof_debug_group_assignment($email, $group_id) {
+    if (!$this->vof_is_connected()) {
+        error_log('VOF Error: Cannot debug group assignment - MailerLite not connected');
+        return;
+    }
+    
+    try {
+        // First check if the subscriber exists
+        $subscriber_response = $this->api_client->subscribers->find($email);
+        error_log('VOF Debug: Subscriber find response: ' . print_r($subscriber_response, true));
+        
+        // Then try to assign to group - passing email directly, not in an array
+        $group_response = $this->api_client->groups->assignSubscriber($group_id, $email);
+        error_log('VOF Debug: Group assignment response: ' . print_r($group_response, true));
+        
+        return $group_response;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Debug group assignment failed - ' . $e->getMessage());
+        error_log('VOF Error: Exception trace: ' . $e->getTraceAsString());
+        return false;
+    }
+}
+
+/**
+ * Debug helper to check available methods
+ */
+private function vof_debug_available_methods() {
+    if (!$this->vof_is_connected()) {
+        return;
+    }
+    
+    try {
+        // Get a reflection of the groups class
+        $reflection = new \ReflectionClass($this->api_client->groups);
+        $methods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
+        
+        $method_names = array_map(function($method) {
+            return $method->getName();
+        }, $methods);
+        
+        error_log('VOF Debug: Available Group methods: ' . print_r($method_names, true));
+    } catch (\Exception $e) {
+        error_log('VOF Debug: Could not get available methods - ' . $e->getMessage());
+    }
+}
 
     /**
      * Get all subscriber groups
@@ -149,13 +213,13 @@ class VOF_MailerLite {
             error_log('VOF Error: Cannot get groups - MailerLite not connected');
             return false;
         }
-        
+
         try {
             $response = $this->api_client->groups->get();
-            
+
             // Log the response structure for debugging
             error_log('VOF Debug: MailerLite raw groups response: ' . json_encode(array_keys($response)));
-            
+
             return $response;
         } catch (\Exception $e) {
             error_log('VOF Error: Failed to get MailerLite groups - ' . $e->getMessage());
@@ -230,4 +294,71 @@ class VOF_MailerLite {
         }
         return false;
     }
+
+/**
+ * Ensure a group exists in MailerLite, create if it doesn't
+ * 
+ * @param string $name Group name
+ * @return string|bool Group ID or false on failure
+ */
+public function vof_ensure_group_exists($name) {
+    if (!$this->vof_is_connected()) {
+        error_log('VOF Error: Cannot ensure group exists - MailerLite not connected');
+        return false;
+    }
+
+    try {
+        // First check if group already exists
+        $groups = $this->vof_get_groups();
+        error_log('VOF Debug: Checking if group exists: ' . $name);
+        error_log('VOF Debug: Groups response: ' . print_r($groups, true));
+        
+        if ($groups && isset($groups['body']['data'])) {
+            foreach ($groups['body']['data'] as $group) {
+                if ($group['name'] === $name) {
+                    error_log('VOF Debug: Found existing group: ' . $name . ' with ID: ' . $group['id']);
+                    return $group['id'];
+                }
+            }
+        }
+        
+        // Group not found, create it
+        error_log('VOF Debug: Creating new group: ' . $name);
+        $response = $this->api_client->groups->create(['name' => $name]);
+        error_log('VOF Debug: Group creation response: ' . print_r($response, true));
+        
+        if (isset($response['body']['id'])) {
+            return $response['body']['id'];
+        }
+        
+        return false;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to ensure group exists - ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Remove a subscriber from a group
+ *
+ * @param string $email  Subscriber email
+ * @param string $group_id Group ID
+ * @return bool|array    True on success or response data
+ */
+public function vof_remove_subscriber_from_group($email, $group_id) {
+    if (!$this->vof_is_connected()) {
+        error_log('VOF Error: Cannot remove subscriber from group - MailerLite not connected');
+        return false;
+    }
+    
+    try {
+        // Pass email as a string, not an array
+        $response = $this->api_client->groups->unAssignSubscriber($group_id, $email);
+        return $response;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to remove subscriber from group - ' . $e->getMessage());
+        return false;
+    }
+}
+
 }

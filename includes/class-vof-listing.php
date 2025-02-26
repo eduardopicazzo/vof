@@ -645,6 +645,24 @@ class VOF_Listing {
             ]);
             return;
         }
+
+        // Capture Lead at stage 1
+        // $vof_is_lead_captured = $this->vof_capture_lead_stage1($vof_user_data);
+
+        // if (!$vof_is_lead_captured) {
+        //     wp_send_json_error([
+        //         'message' => [__('Failed to capture lead at stage 1', 'vendor-onboarding-flow')]
+        //     ]);
+        //     return;
+        // }
+
+        // Capture Lead at stage 1
+        $vof_is_lead_captured = $this->vof_capture_lead_stage1($vof_user_data);
+
+        if (!$vof_is_lead_captured) {
+            error_log('VOF Debug: Failed to capture lead at stage 1');
+            // Continue processing anyway - don't block the main flow
+        }
         
         $new_user_id = VOF_Listing::vof_handle_user_creation($vof_user_data['vof_email'], $post_id, $uuid);
         $post_data['post_author'] = $new_user_id;
@@ -715,6 +733,42 @@ class VOF_Listing {
             ]);
         }
     }
+
+// Capture Lead at stage 1
+private function vof_capture_lead_stage1($vof_user_data) {
+    // Add MailerLite integration
+    $mailerlite = VOF_Core::instance()->vof_get_mailerlite();
+    if ($mailerlite && $mailerlite->vof_is_connected()) {
+        try {
+            // Get group ID from settings, or create fallback group
+            $group_id = get_option('vof_mailerlite_onboarding_group', '');
+            error_log('VOF Debug: Stage 1 onboarding group from settings: ' . $group_id);
+            
+            if (empty($group_id)) {
+                $group_id = $mailerlite->vof_ensure_group_exists('__VOF_Fallback__');
+                error_log('VOF Debug: Created fallback group with ID: ' . $group_id);
+            }
+            
+            if ($group_id) {
+                // Capture lead with basic info
+                $fields = [
+                    'phone' => $vof_user_data['vof_phone'],
+                    'lead_source' => 'vof listing_submission',
+                    'submission_date' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = $mailerlite->vof_add_subscriber($vof_user_data['vof_email'], $fields, [$group_id]);
+                error_log('VOF Debug: Lead capture result at Stage 1: ' . print_r($result, true));
+                error_log('VOF Debug: Lead captured at Stage 1 (vof listing submission) for: ' . $vof_user_data['vof_email']);
+            }
+            return true;
+        } catch (\Exception $e) {
+            error_log('VOF Warning: Lead capture at Stage 1 failed - ' . $e->getMessage());
+            return false;
+        }
+    }
+    return false;
+}
 
     private function vof_handle_user_creation($email, $post_id, $uuid) {
         error_log('VOF Debug: Starting user creation for email: ' . $email);

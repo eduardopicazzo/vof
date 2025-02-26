@@ -125,6 +125,11 @@ class VOF_MailerLite_Settings {
      */
     public function vof_render_groups_section() {
         echo '<p>Configure MailerLite group IDs for different user flows.</p>';
+        echo '<p>The plugin will automatically create the following groups if they don\'t exist:</p>';
+        echo '<ul>';
+        echo '<li><strong>VOF_Fallback</strong> - Used when no onboarding group is selected below</li>';
+        echo '<li><strong>VOF Complete</strong> - Used for users who complete the checkout process</li>';
+        echo '</ul>';
     }
     
     /**
@@ -181,10 +186,10 @@ class VOF_MailerLite_Settings {
             error_log('VOF Debug: MailerLite not connected when trying to get groups');
             return [];
         }
-        
+
         try {
             $response = $this->mailerlite->vof_get_groups();
-            
+
             if ($response && isset($response['body']['data']) && is_array($response['body']['data'])) {
                 $groups = [];
                 foreach ($response['body']['data'] as $group) {
@@ -195,10 +200,10 @@ class VOF_MailerLite_Settings {
                 }
                 return $groups;
             }
-            
+
             error_log('VOF Debug: Groups structure not as expected in response');
             return [];
-            
+
         } catch (\Exception $e) {
             error_log('VOF Error: Failed to get MailerLite groups - ' . $e->getMessage());
             return [];
