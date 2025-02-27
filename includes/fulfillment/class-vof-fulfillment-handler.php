@@ -362,6 +362,13 @@ public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
  */
 private function vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data) {
     try {
+
+        // Skip if MailerLite integration is disabled
+        if (!get_option('vof_mailerlite_enabled', false)) {
+            error_log('VOF Debug: MailerLite integration is disabled, skipping lead capture at Stage 2');
+            return; // Simply return without attempting to capture
+        }
+                
         // Get MailerLite instance
         $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
         

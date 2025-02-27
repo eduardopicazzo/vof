@@ -736,6 +736,12 @@ class VOF_Listing {
 
 // Capture Lead at stage 1
 private function vof_capture_lead_stage1($vof_user_data) {
+    // Skip if MailerLite integration is disabled
+    if (!get_option('vof_mailerlite_enabled', false)) {
+        error_log('VOF Debug: MailerLite integration is disabled, skipping lead capture at Stage 1');
+        return true; // Return true to prevent blocking the main flow
+    }
+    
     // Add MailerLite integration
     $mailerlite = VOF_Core::instance()->vof_get_mailerlite();
     if ($mailerlite && $mailerlite->vof_is_connected()) {

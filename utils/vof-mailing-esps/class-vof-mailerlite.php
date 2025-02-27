@@ -59,6 +59,12 @@ class VOF_MailerLite {
             return;
         }
 
+        // Check if the integration is enabled
+        if (!get_option('vof_mailerlite_enabled', false)) {
+            error_log('VOF Debug: MailerLite integration is disabled in settings');
+            return;
+        }
+
         $this->api_key = $this->vof_get_api_key();
         $this->vof_init_client();
 
@@ -103,6 +109,11 @@ class VOF_MailerLite {
      * @return bool
      */
     public function vof_is_connected() {
+        // First check if the integration is enabled
+        if (!get_option('vof_mailerlite_enabled', false)) {
+            return false;
+        }
+                
         return ($this->api_client !== null);
     }
 

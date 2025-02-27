@@ -31,7 +31,7 @@ class VOF_MailerLite_Settings {
     /**
      * Constructor
      */
-    public function __construct() {
+    public function __construct_OLD() {
         $this->mailerlite = VOF_MailerLite::vof_get_instance();
         
         // Add settings page
@@ -43,6 +43,49 @@ class VOF_MailerLite_Settings {
         // Add AJAX handler for testing API connection
         add_action('wp_ajax_vof_test_mailerlite_connection', [$this, 'vof_ajax_test_connection']);
     }
+
+    /**
+ * Constructor
+ */
+public function __construct() {
+    $this->mailerlite = VOF_MailerLite::vof_get_instance();
+    
+    // Add settings page
+    add_action('admin_menu', [$this, 'vof_add_settings_page'], 100);
+    
+    // Register settings
+    add_action('admin_init', [$this, 'vof_register_settings']);
+    
+    // Add AJAX handlers
+    add_action('wp_ajax_vof_test_mailerlite_connection', [$this, 'vof_ajax_test_connection']);
+    add_action('wp_ajax_vof_toggle_mailerlite_enabled', [$this, 'vof_ajax_toggle_enabled']);
+}
+
+/**
+ * AJAX handler for toggling the enabled setting
+ */
+public function vof_ajax_toggle_enabled() {
+    // Verify nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'vof_toggle_mailerlite_enabled')) {
+        wp_send_json_error('Security check failed');
+    }
+
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+
+    // Get the enabled state from the request
+    $enabled = isset($_POST['enabled']) ? (bool)$_POST['enabled'] : false;
+    
+    // Update the option
+    update_option('vof_mailerlite_enabled', $enabled);
+    
+    // Send success response
+    wp_send_json_success([
+        'enabled' => $enabled
+    ]);
+}
     
     /**
      * Add settings page to admin menu
@@ -57,11 +100,88 @@ class VOF_MailerLite_Settings {
             [$this, 'vof_render_settings_page']
         );
     }
+
+/**
+ * Register settings
+ */
+public function vof_register_settings() {
+    // Add the new setting for activation status
+    register_setting(
+        $this->option_group,
+        'vof_mailerlite_enabled',
+        [
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default' => false
+        ]
+    );
+    
+    // API key setting
+    register_setting(
+        $this->option_group,
+        'vof_mailerlite_api_key',
+        [
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => ''
+        ]
+    );
+    
+    // Onboarding group setting
+    register_setting(
+        $this->option_group,
+        'vof_mailerlite_onboarding_group',
+        [
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => ''
+        ]
+    );
+    
+    // API Key Section
+    add_settings_section(
+        'vof_mailerlite_api_section',
+        'API Configuration',
+        [$this, 'vof_render_api_section'],
+        'vof_mailerlite_settings'
+    );
+    
+    add_settings_field(
+        'vof_mailerlite_api_key',
+        'API Key',
+        [$this, 'vof_render_api_key_field'],
+        'vof_mailerlite_settings',
+        'vof_mailerlite_api_section'
+    );
+    
+    // Group Settings Section
+    add_settings_section(
+        'vof_mailerlite_groups_section',
+        'Group Configuration',
+        [$this, 'vof_render_groups_section'],
+        'vof_mailerlite_settings'
+    );
+    
+    add_settings_field(
+        'vof_mailerlite_onboarding_group',
+        'Onboarding Group',
+        [$this, 'vof_render_onboarding_group_field'],
+        'vof_mailerlite_settings',
+        'vof_mailerlite_groups_section'
+    );
+}    
     
     /**
      * Register settings
      */
-    public function vof_register_settings() {
+    public function vof_register_settings_OLD() {
+        // Add the new setting for activation status
+        register_setting(
+            $this->option_group,
+            'vof_mailerlite_enabled',
+            [
+                'sanitize_callback' => 'rest_sanitize_boolean',
+                'default' => false
+            ]
+        );
+
         register_setting(
             $this->option_group,
             'vof_mailerlite_api_key',
@@ -78,6 +198,23 @@ class VOF_MailerLite_Settings {
                 'sanitize_callback' => 'sanitize_text_field',
                 'default' => ''
             ]
+        );
+
+        // Add new section for general settings
+        add_settings_section(
+            'vof_mailerlite_general_section',
+            'General Settings',
+            [$this, 'vof_render_general_section'],
+            'vof_mailerlite_settings'
+        );
+    
+        // Add the enable/disable field
+        add_settings_field(
+            'vof_mailerlite_enabled',
+            'Enable MailerLite Integration',
+            [$this, 'vof_render_enabled_field'],
+            'vof_mailerlite_settings',
+            'vof_mailerlite_general_section'
         );
         
         // API Key Section
@@ -113,6 +250,33 @@ class VOF_MailerLite_Settings {
         );
     }
     
+    /**
+     * Render the general section description
+     */
+    public function vof_render_general_section() {
+        echo '<p>Configure general settings for the MailerLite integration.</p>';
+    }
+
+    /**
+    * Render the enabled checkbox field
+    */
+    public function vof_render_enabled_field() {
+        $enabled = get_option('vof_mailerlite_enabled', false);
+        ?>
+        <label>
+            <input type="checkbox" 
+                   name="vof_mailerlite_enabled" 
+                   id="vof_mailerlite_enabled" 
+                   value="1" 
+                   <?php checked($enabled, true); ?>>
+            <?php esc_html_e('Enable MailerLite integration for the Vendor Onboarding Flow', 'vendor-onboarding-flow'); ?>
+        </label>
+        <p class="description">
+            <?php esc_html_e('When disabled, no data will be sent to MailerLite, even if API keys are configured.', 'vendor-onboarding-flow'); ?>
+        </p>
+        <?php
+    }
+
     /**
      * Render the API section description
      */
@@ -209,11 +373,271 @@ class VOF_MailerLite_Settings {
             return [];
         }
     }
+
+/**
+ * Render the settings page
+ */
+public function vof_render_settings_page() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
     
+    $is_enabled = get_option('vof_mailerlite_enabled', false);
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        
+        <form action="options.php" method="post">
+            <?php settings_fields($this->option_group); ?>
+            
+            <!-- Always show the General Settings section with the enable/disable checkbox -->
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Enable MailerLite Integration', 'vendor-onboarding-flow'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" 
+                                       name="vof_mailerlite_enabled" 
+                                       id="vof_mailerlite_enabled" 
+                                       value="1" 
+                                       <?php checked($is_enabled, true); ?>>
+                                <?php esc_html_e('Enable MailerLite integration for the Vendor Onboarding Flow', 'vendor-onboarding-flow'); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e('When disabled, no data will be sent to MailerLite.', 'vendor-onboarding-flow'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <!-- Only show the API settings when enabled -->
+            <div id="vof-mailerlite-settings-container" style="<?php echo $is_enabled ? '' : 'display: none;'; ?>">
+                <?php 
+                // Render API settings section and fields
+                do_settings_sections('vof_mailerlite_settings'); 
+                ?>
+            </div>
+            
+            <!-- Save button (only shown when enabled) -->
+            <div id="vof-mailerlite-submit-container" style="<?php echo $is_enabled ? '' : 'display: none;'; ?>">
+                <?php submit_button(); ?>
+            </div>
+        </form>
+    </div>
+    
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Toggle visibility of settings when checkbox is changed
+            $('#vof_mailerlite_enabled').on('change', function() {
+                var isChecked = $(this).is(':checked');
+                
+                // Update visibility of settings and save button
+                if (isChecked) {
+                    $('#vof-mailerlite-settings-container').show();
+                    $('#vof-mailerlite-submit-container').show();
+                } else {
+                    $('#vof-mailerlite-settings-container').hide();
+                    $('#vof-mailerlite-submit-container').hide();
+                }
+                
+                // Save the setting via AJAX without full form submission
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'vof_toggle_mailerlite_enabled',
+                        enabled: isChecked ? 1 : 0,
+                        nonce: '<?php echo wp_create_nonce('vof_toggle_mailerlite_enabled'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Flash a quick success message
+                            var $notice = $('<div class="notice notice-success is-dismissible"><p>' + 
+                                           (isChecked ? 'MailerLite integration enabled.' : 'MailerLite integration disabled.') + 
+                                           '</p></div>');
+                                           
+                            $('.wrap h1').after($notice);
+                            
+                            // Auto-dismiss after 2 seconds
+                            setTimeout(function() {
+                                $notice.fadeOut(function() {
+                                    $(this).remove();
+                                });
+                            }, 2000);
+                        }
+                    }
+                });
+            });
+            
+            // Rest of your existing JavaScript for API testing...
+            $('#vof_test_api_connection').on('click', function() {
+                var apiKey = $('#vof_mailerlite_api_key').val();
+                var statusSpan = $('#vof_api_connection_status');
+                
+                if (!apiKey) {
+                    statusSpan.html('<span style="color: red;">Please enter an API key</span>');
+                    return;
+                }
+                
+                statusSpan.html('<span style="color: blue;">Testing connection...</span>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'vof_test_mailerlite_connection',
+                        api_key: apiKey,
+                        nonce: '<?php echo wp_create_nonce('vof_test_mailerlite_connection'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            statusSpan.html('<span style="color: green;">Connection successful!</span>');
+                            
+                            // If we have groups, refresh the dropdown
+                            if (response.data && response.data.groups) {
+                                var selectField = $('#vof_mailerlite_onboarding_group');
+                                var currentValue = selectField.val();
+                                
+                                selectField.empty();
+                                selectField.append('<option value="">-- Select Group --</option>');
+                                
+                                $.each(response.data.groups, function(i, group) {
+                                    var selected = (group.id == currentValue) ? 'selected' : '';
+                                    selectField.append('<option value="' + group.id + '" ' + selected + '>' + group.name + '</option>');
+                                });
+                            }
+                        } else {
+                            statusSpan.html('<span style="color: red;">Connection failed: ' + response.data + '</span>');
+                        }
+                    },
+                    error: function() {
+                        statusSpan.html('<span style="color: red;">Connection test failed</span>');
+                    }
+                });
+            });
+        });
+    </script>
+    <?php
+}    
+    
+/**
+ * Render the settings page
+ */
+public function vof_render_settings_page_ToggleViewSave() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    $is_enabled = get_option('vof_mailerlite_enabled', false);
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        
+        <form action="options.php" method="post">
+            <?php settings_fields($this->option_group); ?>
+            
+            <!-- Always show the General Settings section with the enable/disable checkbox -->
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Enable MailerLite Integration', 'vendor-onboarding-flow'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" 
+                                       name="vof_mailerlite_enabled" 
+                                       id="vof_mailerlite_enabled" 
+                                       value="1" 
+                                       <?php checked($is_enabled, true); ?>>
+                                <?php esc_html_e('Enable MailerLite integration for the Vendor Onboarding Flow', 'vendor-onboarding-flow'); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e('When disabled, no data will be sent to MailerLite.', 'vendor-onboarding-flow'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <!-- Only show the API settings when enabled -->
+            <div id="vof-mailerlite-settings-container" style="<?php echo $is_enabled ? '' : 'display: none;'; ?>">
+                <?php 
+                // Render API settings section and fields
+                do_settings_sections('vof_mailerlite_settings'); 
+                ?>
+            </div>
+            
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Toggle visibility of settings when checkbox is changed
+            $('#vof_mailerlite_enabled').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#vof-mailerlite-settings-container').show();
+                } else {
+                    $('#vof-mailerlite-settings-container').hide();
+                }
+            });
+            
+            // Rest of your existing JavaScript...
+            $('#vof_test_api_connection').on('click', function() {
+                var apiKey = $('#vof_mailerlite_api_key').val();
+                var statusSpan = $('#vof_api_connection_status');
+                
+                if (!apiKey) {
+                    statusSpan.html('<span style="color: red;">Please enter an API key</span>');
+                    return;
+                }
+                
+                statusSpan.html('<span style="color: blue;">Testing connection...</span>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'vof_test_mailerlite_connection',
+                        api_key: apiKey,
+                        nonce: '<?php echo wp_create_nonce('vof_test_mailerlite_connection'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            statusSpan.html('<span style="color: green;">Connection successful!</span>');
+                            
+                            // If we have groups, refresh the dropdown
+                            if (response.data && response.data.groups) {
+                                var selectField = $('#vof_mailerlite_onboarding_group');
+                                var currentValue = selectField.val();
+                                
+                                selectField.empty();
+                                selectField.append('<option value="">-- Select Group --</option>');
+                                
+                                $.each(response.data.groups, function(i, group) {
+                                    var selected = (group.id == currentValue) ? 'selected' : '';
+                                    selectField.append('<option value="' + group.id + '" ' + selected + '>' + group.name + '</option>');
+                                });
+                            }
+                        } else {
+                            statusSpan.html('<span style="color: red;">Connection failed: ' + response.data + '</span>');
+                        }
+                    },
+                    error: function() {
+                        statusSpan.html('<span style="color: red;">Connection test failed</span>');
+                    }
+                });
+            });
+        });
+    </script>
+    <?php
+}
+
     /**
      * Render the settings page
      */
-    public function vof_render_settings_page() {
+    public function vof_render_settings_page_OLD() {
         if (!current_user_can('manage_options')) {
             return;
         }
