@@ -1,15 +1,15 @@
-// File: vof-pricing-modal-script.js This script handles the modal logic for both monthly and yearly pricing schemes.
+// File: vof-pricing-modal-script.js
 console.log('VOF Debug: Pricing Modal script loaded');
 
 const VOF_MODAL_CONFIG = {
     enableFallback: false
 };
 
-// Global state with fallback data updated to include both monthly and yearly pricing options
+// Global state with fallback data
 const defaultState = {
-    isMultiPricingOn: true,
+    isMultiPricingOn: false,
     isApiData: false,
-    monthlyTiers: [
+    tiers: [
         {
             name: "biz",
             description: "Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.",
@@ -55,66 +55,10 @@ const defaultState = {
             isRecommended: false,
             isGrayOut: false
         }
-    ],
-    yearlyTiers: [
-        {
-            name: "biz-yearly",
-            description: "Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.",
-            price: 3490, // 10 months price (2 months free)
-            interval: "year",
-            features: [
-                "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "8 listados/mes",
-                "Publica en la mayoría de categorías excepto autos e inmuebles",
-                "2 destacadores Top/mes",
-                "3 destacadores BumpUp/mes",
-                "2 destacadores Destacados/mes",
-                "2 meses gratis"
-            ],
-            isRecommended: true,
-            isGrayOut: false
-        },
-        {
-            name: "noise-yearly",
-            description: "Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.",
-            price: 5490, // 10 months price (2 months free)
-            features: [
-                "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "16 Listados/mes",
-                "Publica en todas las categorías",
-                "5 destacadores Top/mes",
-                "3 destacadores BumpUp/mes",
-                "2 destacadores Destacados/mes"
-            ],
-            isRecommended: false,
-            isGrayOut: false
-        },
-        {
-            name: "noise+-yearly",
-            description: "Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.",
-            price: 15670, // 10 months price (2 months free) 
-            features: [
-                "Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios",
-                "30 listados/mes",
-                "Publica en todas las categorías",
-                "10 destacadores Top/mes",
-                "6 destacadores BumpUp/mes",
-                "6 destacadores Destacados/mes"
-            ],
-            isRecommended: false,
-            isGrayOut: false
-        }        
     ]
 };
 
-// Update modalState structure to support both pricing schemes
-let modalState = {
-    isMultiPricingOn: defaultState.isMultiPricingOn,
-    isApiData: defaultState.isApiData,
-    monthlyTiers: [...defaultState.monthlyTiers],
-    yearlyTiers: [...defaultState.yearlyTiers],
-    selectedInterval: "month", // Default to monthly pricing scheme
-}
+let modalState = { ...defaultState };
 
 function sanitizeId(input) {
     return input
@@ -125,16 +69,14 @@ function sanitizeId(input) {
       .replace(/[\[\]]/g, ''); // Remove "[" and "]"
   }
 
-// Update createTierElement function to include interval data
+// Helper Functions
 function createTierElement(tier, index) {
     const tierElement = document.createElement('div');
     tierElement.className = `vof-pm-tier ${tier.isRecommended ? 'vof-pm-recommended' : ''} ${tier.isGrayOut ? 'vof-pm-gray-out' : ''}`;
     
     // Store the tier's data for the click handler
     // const subscribeBtnId = `vof-pm-subscribe-${tier.name.toLowerCase().replace('+', '_plus')}`;
-    // TO-DO:add currency option on dashboard
     const subscribeBtnId = `vof-pm-subscribe-${sanitizeId(tier.name)}`;
-    const intervalText = tier.interval === "year" ? "por año" : "por mes";
     
     tierElement.innerHTML = `
         <div class="vof-pm-tier-header">
@@ -143,7 +85,7 @@ function createTierElement(tier, index) {
             <p class="vof-pm-tier-description">${tier.description}</p>
         </div>
         <div class="vof-pm-tier-price">
-            MXN ${tier.price} <span>${intervalText}</span>
+            MXN ${tier.price} <span>por mes</span>
         </div>
         <button 
             id="${subscribeBtnId}"
@@ -151,7 +93,6 @@ function createTierElement(tier, index) {
             ${tier.isGrayOut ? 'disabled' : ''}
             data-tier-name="${tier.name}"
             data-tier-price="${tier.price}"
-            data-tier-interval="${tier.interval || 'month'}"
         >
             <span>${tier.isGrayOut ? 'No disponible' : `Continuar con ${tier.name}`}</span>
         </button>
@@ -163,20 +104,18 @@ function createTierElement(tier, index) {
         </div>
     `;
     
-    // Update button click handler to include interval information
+    // Add button click handler after the element is created
     setTimeout(() => {
         const subscribeBtn = tierElement.querySelector(`#${subscribeBtnId}`);
         if (subscribeBtn && !tier.isGrayOut) {
             subscribeBtn.addEventListener('click', () => {
                 console.log('VOF Debug: Tier button clicked:', {
                     name: subscribeBtn.getAttribute('data-tier-name'),
-                    price: subscribeBtn.getAttribute('data-tier-price'),
-                    interval: subscribeBtn.getAttribute('data-tier-interval')
+                    price: subscribeBtn.getAttribute('data-tier-price')
                 });
                 handleTierSelection(
                     subscribeBtn.getAttribute('data-tier-name'),
-                    parseFloat(subscribeBtn.getAttribute('data-tier-price')),
-                    subscribeBtn.getAttribute('data-tier-interval')
+                    parseFloat(subscribeBtn.getAttribute('data-tier-price'))
                 );
             });
         }
@@ -186,19 +125,17 @@ function createTierElement(tier, index) {
     return tierElement;
 }
 
-// Update handleTierSelection to include interval
-function handleTierSelection(tierName, tierPrice, tierInterval) {
-    console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice, 'Interval:', tierInterval);
+function handleTierSelection(tierName, tierPrice) {
+    console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice);
     console.log('VOF Debug: Modal state:', modalState);
     console.log('VOF Debug: handleTierSelection called with:', {
         tierName,
         tierPrice,
-        tierInterval,
         modalState: modalState
     });
 
     // Validate we have customer data
-    if (!modalState.customer_meta?.uuid) { // array from the post listing api response
+    if (!modalState.customer_meta?.uuid) {
         console.error('VOF Debug: No UUID found for customer');
         return;
     }
@@ -209,16 +146,14 @@ function handleTierSelection(tierName, tierPrice, tierInterval) {
         return;
     }
 
+
     // Get VOF handler instance (from orchestrator)
     if (window.handleCheckoutStart) {
         window.handleCheckoutStart({
             uuid: modalState.customer_meta.uuid,
             tier_selected: {
                 name: tierName.replace('+', '_plus'),
-                price: tierPrice,
-                interval: tierInterval || 'month',
-                // stripe_lookup_key: 'stripe_lookup_key', // pass later when admin dashboard ready
-                // stripe_price_id: 'stripe_price_id'      // pass later when admin dashboard ready
+                price: tierPrice
             }
         });
     } else {
@@ -236,16 +171,6 @@ function renderTabs() {
             <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
             <button class="vof-pm-tab-btn" data-tab="yearly">Anualmente</button>
         `;
-
-        // Ensure yearly content has the proper structure
-        const yearlyContent = document.getElementById('vof-pm-yearlyContent');
-        if (yearlyContent && modalState.yearlyTiers && modalState.yearlyTiers.length > 0 ) {
-            yearlyContent.innerHTML = `
-                <div class="vof-pm-tier-container yearly-container">
-                    <!-- Yearly tiers will be rendered here -->
-                </div>
-            `;
-        }
     } else {
         tabsContainer.classList.add('vof-pm-single-tab');
         tabsContainer.innerHTML = `
@@ -257,70 +182,21 @@ function renderTabs() {
     newTabBtns.forEach(btn => {
         btn.addEventListener('click', switchTab);
     });
-
-    // Initialize both containers
-    const monthlyContainer = document.querySelector('#vof-pm-monthlyContent .vof-pm-tier-container');
-    if(monthlyContainer) {
-        monthlyContainer.innerHTML = '';
-        modalState.monthlyTiers.forEach((tier, index) => {
-            const tierElement = createTierElement(tier, index);
-            monthlyContainer.appendChild(tierElement);
-        });
-    }
-    // Initialize yearly container (if needed)
-    if(modalState.isMultiPricingOn) {
-        const yearlyContainer = document.querySelector('#vof-pm-yearlyContent .vof-pm-tier-container');
-        if(yearlyContainer) {
-            yearlyContainer.innerHTML = '';
-            modalState.yearlyTiers.forEach((tier, index) => {
-                const tierElement = createTierElement(tier, index);
-                yearlyContainer.appendChild(tierElement);
-            });
-        }
-    }
 }
 
-// Update renderTiers function to render appropriate tiers based on selected tab
 function renderTiers() {
     const tierContainer = document.querySelector('.vof-pm-tier-container');
     if (!tierContainer) return;
 
     tierContainer.innerHTML = '';
-
-    // Use the appropriate tier list based on selected interval
-    const tiersToRender = modalState.selectedInterval === "month" ? 
-        modalState.monthlyTiers: modalState.yearlyTiers;
-    
-        // Render the tiers
-
-    // modalState.tiers.forEach((tier, index) => {
-    tiersToRender.forEach((tier, index) => {
+    modalState.tiers.forEach((tier, index) => {
         const tierElement = createTierElement(tier, index);
         tierContainer.appendChild(tierElement);
     });
 }
 
-// Update the renderYearlyContent tab to show actual yearly tiers
-function renderYearlyContent() {
-    const yearlyContent = document.getElementById('vof-pm-yearlyContent');
-    if(!yearlyContent) return;
-
-    // Only replace the placeholder message if we have yearly tiers
-    if(modalState.yearlyTiers && modalState.yearlyTiers.length > 0) {
-        yearlyContent.innerHTML = `
-            <div class="vof-pm-tier-container yearly-container">
-                <!-- Yearly tiers will be rendered here -->
-            </div>
-        `;
-    }
-}
-
-// Update switchTab function to track selected interval
 function switchTab(event) {
     const tabName = event.target.getAttribute('data-tab');
-
-    // Update selected interval based on tab selection
-    modalState.selectedInterval = tabName === "monthly" ? "month" : "year";
     
     const currentTabBtns = document.querySelectorAll('.vof-pm-tab-btn');
     const currentTabContents = document.querySelectorAll('.vof-pm-tab-content');
@@ -330,72 +206,34 @@ function switchTab(event) {
     
     event.target.classList.add('vof-pm-active');
     document.getElementById(`vof-pm-${tabName}Content`).classList.add('vof-pm-active');
-
-    // Render the appropriate tiers for the selected tab
-    if(tabName === "monthly") { // monthly
-        const monthlyContainer = document.querySelector('#vof-pm-monthlyContent .vof-pm-tier-container');
-        if(monthlyContainer){
-            monthlyContainer.innerHTML = '';
-            modalState.monthlyTiers.forEach((tier, index) => {
-                const tierElement = createTierElement(tier,index);
-                monthlyContainer.appendChild(tierElement);
-            });
-        }
-    } else { // yearly
-        const yearlyContainer = document.querySelector('#vof-pm-yearlyContent .vof-pm-tier-container');
-        if(yearlyContainer){
-            yearlyContainer.innerHTML = '';
-            modalState.yearlyTiers.forEach((tier, index) => {
-                const tierElement = createTierElement(tier,index);
-                yearlyContainer.appendChild(tierElement);
-            });
-        }
-    }
-
-    // Re-render tiers with appropriate pricing (based on selected interval)
-    // renderTiers();
 }
 
-// Core Modal Functions - Updated to handle multiPricing Structure
+// Core Modal Functions
 function updateModalState(response) {
     console.log('VOF Debug: Updating modal state with response:', response);
 
     try {
         if (response && response.pricing_data) {
             // Extract pricing data from API response
-            const { is_multi_pricing_on, monthly_tiers, yearly_tiers } = response.pricing_data;
+            const { is_multi_pricing_on, tiers } = response.pricing_data;
             
             modalState = {
                 isMultiPricingOn: is_multi_pricing_on,
                 isApiData: true,
-                monthlyTiers: monthly_tiers || defaultState.monthlyTiers,
-                yearlyTiers: yearly_tiers || defaultState.yearlyTiers,
-                selectedInterval: "month",            // default to monthly pricing scheme
+                tiers: tiers,
                 customer_meta: response.customer_meta // Make sure this exists
             };
             console.log('VOF Debug: Updated modal state:', modalState);
         } else {
             console.warn('VOF Debug: Invalid API response format, using fallback data');
-            modalState = { 
-                isMultiPricingOn: defaultState.isMultiPricingOn,
-                isApiData: defaultState.isApiData,
-                monthlyTiers: [...defaultState.monthlyTiers],
-                yearlyTiers: [...defaultState.yearlyTiers],
-                selectedInterval: "month", // default to monthly pricing scheme
-            };
+            modalState = { ...defaultState };
         }
 
         renderTabs();
         renderTiers();
     } catch (error) {
         console.error('VOF Debug: Error updating modal state:', error);
-        modalState = { 
-            isMultiPricingOn: defaultState.isMultiPricingOn,
-            isApiData: defaultState.isApiData,
-            monthlyTiers: [...defaultState.monthlyTiers],
-            yearlyTiers: [...defaultState.yearlyTiers],
-            selectedInterval: "month", // default to monthly pricing scheme
-        };
+        modalState = { ...defaultState };
         renderTabs();
         renderTiers();
     }

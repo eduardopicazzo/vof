@@ -486,7 +486,7 @@ class VOF_Listing {
         }
     }
 
-    public function vof_get_available_tiers($parent_cat_id) {
+    public function vof_get_available_tiers($parent_cat_id) { // KEEP VERY IMPORTANT
         switch($parent_cat_id) {
             case '415': // bicicletas
             case '413': // autopartes, acc, refaccs

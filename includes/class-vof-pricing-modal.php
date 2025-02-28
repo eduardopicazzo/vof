@@ -37,11 +37,14 @@ class VOF_Pricing_Modal {
                     </div>
                     <div id="vof-pm-monthlyContent" class="vof-pm-tab-content vof-pm-active">
                         <div class="vof-pm-tier-container">
-                            <!-- Tier content will be dynamically inserted here -->
+                            <!-- Monthly Tier content will be dynamically inserted here -->
                         </div>
                     </div>
                     <div id="vof-pm-yearlyContent" class="vof-pm-tab-content">
-                        <div class="vof-pm-yearly-message">Precios anuales próximamente disponibles</div>
+                        <!-- <div class="vof-pm-yearly-message">Precios anuales próximamente disponibles</div> -->
+                         <div class="vof-pm-tier-container yearly-container">
+                            <!-- Yearly Tier content will be dynamically inserted here -->
+                        </div>
                     </div>
                     <div class="vof-pm-modal-footer">
                         <button id="vof-pm-cancelBtn" class="vof-pm-btn-footer vof-pm-btn-ghost">Cancelar</button>

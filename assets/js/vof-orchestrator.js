@@ -76,17 +76,19 @@
         console.log('VOF Debug: Starting checkout with data:', checkoutData);
 
         const formData = new FormData();
-        formData.append('action', 'vof_start_checkout');
+        formData.append('action', 'vof_start_checkout'); // how come this works (no name like this anywhere)? if in form handler ? wp_ajax_nopriv_vof_start_checkout : wp_ajax_vof_start_checkout
         formData.append('uuid', checkoutData.uuid);
         formData.append('tier_name', checkoutData.tier_selected.name);
         formData.append('tier_price', checkoutData.tier_selected.price);
+        formData.append('tier_interval', checkoutData.tier_selected.interval);
         formData.append('security', vofSettings.security); // From wp_localize_script
 
         console.log('VOF Debug: Sending AJAX request with formData:', {
             action: formData.get('action'),
             uuid: formData.get('uuid'),
             tier_name: formData.get('tier_name'),
-            tier_price: formData.get('tier_price')
+            tier_price: formData.get('tier_price'),
+            tier_interval: formData.get('tier_interval')
         });
     
         // Submit to WordPress AJAX endpoint

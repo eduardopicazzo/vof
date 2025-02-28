@@ -166,15 +166,14 @@ class VOF_API {
 
         switch($vof_tier) {
             case'limit_tiers':
-                // TODO: add conditional checking for multiprice...
                 $pricing_data = [
-                    'is_multi_pricing_on' => false,
-                    'tiers' => [ 
-                        [ // tier biz
+                    'is_multi_pricing_on' => true,
+                    'monthly_tiers' => [ 
+                        [ // tier biz (monthly)
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler',
+                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
-                            'price' => 44,
+                            'price' => 44, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '8 listados/mes',
@@ -185,12 +184,15 @@ class VOF_API {
                             ],
                             'isRecommended' => false,
                             'isGrayOut' => true,
+                            'interval' => 'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
                         ],
-                        [ // tier noise
+                        [ // tier noise (monthly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler',
+                            'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
-                            'price' => 444,
+                            'price' => 444, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '16 Listados/mes',
@@ -201,12 +203,15 @@ class VOF_API {
                             ],
                             'isRecommended' => true,
                             'isGrayOut' => false,
+                            'interval' => 'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
                         ],
-                        [ // tier noise+
+                        [ // tier noise+ (monthly)
                             // 'name' => 'noise+',
-                            'name' => 'noise+ Test Subscription Handler',
+                            'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
-                            'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
+                            'price' => 4444, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '30 listados/mes',
@@ -217,20 +222,81 @@ class VOF_API {
                             ],
                             'isRecommended' => false,
                             'isGrayOut' => false,
+                            'interval' => 'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
+                        ],
+                    ],
+                    'yearly_tiers' => [ 
+                        [ // tier biz (yearly)
+                            // 'name' => 'biz',
+                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
+                            'price' => 440, // * 10 2 months free retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '8 listados/mes',
+                                'Publica en la mayoría de categorías excepto autos, inmuebles y maquinaria',
+                                '2 destacadores Top/mes',
+                                '3 destacadores BumpUp/mes',
+                                '2 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => false,
+                            'isGrayOut' => true,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
+                        ],
+                        [ // tier noise (yearly)
+                            // 'name' => 'noise',
+                            'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
+                            'price' => 4440, // * 10 2 months free  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '16 Listados/mes',
+                                'Publica en todas las categorías',
+                                '5 destacadores Top/mes',
+                                '3 destacadores BumpUp/mes',
+                                '2 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => true,
+                            'isGrayOut' => false,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
+                        ],
+                        [ // tier noise+ (yearly)
+                            // 'name' => 'noise+',
+                            'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
+                            'price' => 44400,  // * 10 2 months free // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '30 listados/mes',
+                                'Publica en todas las categorías',
+                                '10 destacadores Top/mes',
+                                '6 destacadores BumpUp/mes',
+                                '6 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
                         ],
                     ]
                 ];
                 break;
             default: 
-                // TODO: add conditional checking for multiprice...
                 $pricing_data = [
-                    'is_multi_pricing_on' => false,
-                    'tiers' => [ 
-                        [ // tier biz, 
+                    'is_multi_pricing_on' => true,
+                    'monthly_tiers' => [ 
+                        [ // tier biz (monthly) 
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler',
+                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
-                            'price' => 44,
+                            'price' => 44, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '8 listados/mes',
@@ -241,12 +307,15 @@ class VOF_API {
                             ],
                             'isRecommended' => true,
                             'isGrayOut' => false,
+                            'interval' => 'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx' // set by user via admin dashboard (in the future)  
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx // set by user via admin dashboard (in the future) 
                         ],
-                        [ // tier noise
+                        [ // tier noise (monthly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler',
+                            'name' => 'noise Test Subscription Handler',  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
-                            'price' => 444,
+                            'price' => 444,  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '16 Listados/mes',
@@ -257,12 +326,15 @@ class VOF_API {
                             ],
                             'isRecommended' => false,
                             'isGrayOut' => false,
+                            'interval' =>'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx' // set by user via admin dashboard (in the future) 
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx  // set by user via admin dashboard (in the future) 
                         ],
-                        [ // tier noise+
+                        [ // tier noise+ (monthly)
                             // 'name' => 'noise+',
                             'name' => 'noise+ Test Subscription Handler',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
-                            'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)
+                            'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)   // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
                                 'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
                                 '30 listados/mes',
@@ -273,6 +345,68 @@ class VOF_API {
                             ],
                             'isRecommended' => false,
                             'isGrayOut' => false,
+                            'interval' =>'month', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx' // set by user via admin dashboard (in the future) 
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx  // set by user via admin dashboard (in the future) 
+                        ],
+                    ],
+                    'yearly_tiers' => [ 
+                        [ // tier biz (yearly)
+                            // 'name' => 'biz',
+                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
+                            'price' => 440, // x10 2 months free; Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '8 listados/mes',
+                                'Publica en la mayoría de categorías excepto autos, inmuebles y maquinaria',
+                                '2 destacadores Top/mes',
+                                '3 destacadores BumpUp/mes',
+                                '2 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
+                        ],
+                        [ // tier noise (yearly)
+                            // 'name' => 'noise',
+                            'name' => 'noise Test Subscription Handler', // Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
+                            'price' => 4440, // * 10 2 months free; Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '16 Listados/mes',
+                                'Publica en todas las categorías',
+                                '5 destacadores Top/mes',
+                                '3 destacadores BumpUp/mes',
+                                '2 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => true,
+                            'isGrayOut' => false,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
+                        ],
+                        [ // tier noise+ (yearly)
+                            // 'name' => 'noise+',
+                            'name' => 'noise+ Test Subscription Handler',
+                            'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
+                            'price' => 44400,  // * 10 2 months free
+                            'features' => [
+                                'Acceso como vendedor a noisemarkets marketplace y sus 7 beneficios',
+                                '30 listados/mes',
+                                'Publica en todas las categorías',
+                                '10 destacadores Top/mes',
+                                '6 destacadores BumpUp/mes',
+                                '6 destacadores Destacados/mes'
+                            ],
+                            'isRecommended' => false,
+                            'isGrayOut' => false,
+                            'interval' => 'year', // set by user via admin dashboard (in the future) -> explicit interval to be passed on to stripe (will be use as function arg)
+                            // 'stripe_price_id' => 'price_xxxxxxxxx',
+                            // 'stripe_lookup_key' => 'xxxxxxxxxxxxx'
                         ],
                     ]
                 ];
@@ -343,41 +477,37 @@ class VOF_API {
             // Get proper checkout data for selected tier
             $checkout_data = $this->vof_get_stripe_checkout_data($tier_selected);
 
+            // Add interval metadata
+            $interval = isset($tier_selected['interval']) ? $tier_selected['interval']: 'month';
+
             // Create Stripe checkout session
             $session = $stripe->checkout->sessions->create([
                 'success_url' => site_url('/my-account?checkout=success&session_id={CHECKOUT_SESSION_ID}'),
                 'cancel_url' => site_url('/my-account?checkout=cancelled'),
-                'mode' => 'subscription',
+                'mode' => 'subscription', // TO DO: can change this to handle one-time payments
                 'customer_email' => $user_data['vof_email'],
                 'subscription_data' => [ // test iff uuid persists
                     'metadata' => [
-                        'uuid'    => $user_data['uuid'],
-                        'tier'    => $tier_selected['name'],
-                        'post_id' => $user_data['post_id'],
-                        'phone'   => $user_data['vof_phone'],
-                        'wp_user_id' => $user_data['true_user_id'] // TODO: CHECK IF WORKS
+                        'uuid'       => $user_data['uuid'],
+                        'tier'       => $tier_selected['name'],
+                        'post_id'    => $user_data['post_id'],
+                        'phone'      => $user_data['vof_phone'],
+                        'wp_user_id' => $user_data['true_user_id'],
+                        'interval'   => $interval
                     ],
                 ],
                 'metadata' => [
-                    'uuid'    => $user_data['uuid'],
-                    'tier'    => $tier_selected['name'],
-                    'post_id' => $user_data['post_id'],
-                    'phone'   => $user_data['vof_phone'], // Pre-fill the customer's phone number
-                    'wp_user_id' => $user_data['true_user_id'] // TODO: CHECK IF WORKS
+                    'uuid'       => $user_data['uuid'],
+                    'tier'       => $tier_selected['name'],
+                    'post_id'    => $user_data['post_id'],
+                    'phone'      => $user_data['vof_phone'],
+                    'wp_user_id' => $user_data['true_user_id'],
+                    'interval'   => $interval
                 ],
                 'line_items' => [$checkout_data['line_items']],
                 'allow_promotion_codes' => true,
-                // 'billing_address_collection' => 'required',
-                // 'phone_number_collection' => [
-                //     'enabled' => true,
-                // ],
-                // 'customer_creation' => 'always', // available in payment mode only
-                'payment_method_types' => ['card', 'apple_pay', 'google_pay'],
+                // 'payment_method_types' => ['card', 'apple_pay', 'google_pay'],
                 'payment_method_types' => ['card'],
-                // 'custom_fields' => [
-                //     'applePay'=> true,
-                //     'googlePay'=> true
-                // ],
                 'locale' => 'es'
             ]);
 
@@ -390,8 +520,9 @@ class VOF_API {
     }
 
     public function vof_get_stripe_checkout_data($tier_selected) {
-        // Normalize tier name by reaplacing + with _plus
+        // Normalize tier name by reaplacing + with _plus if needed
         $tier_name = str_replace('+', '_plus', $tier_selected['name']);
+        $interval = isset($tier_selected['interval']) ? $tier_selected['interval']: 'month';
 
         // Get proper price ID and configuration based on tier
         switch($tier_selected['name']) {
@@ -400,7 +531,7 @@ class VOF_API {
                 return [
                     'line_items' => [
                         // 'price' => $this->vof_get_price_id('biz'),
-                        'price' => $this->vof_get_price_id('biz Test Subscription Handler'),
+                        'price' => $this->vof_get_price_id('biz Test Subscription Handler', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -420,7 +551,7 @@ class VOF_API {
                 return [
                     'line_items' => [
                         // 'price' => $this->vof_get_price_id('noise'),
-                        'price' => $this->vof_get_price_id('noise Test Subscription Handler'),
+                        'price' => $this->vof_get_price_id('noise Test Subscription Handler', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -439,7 +570,7 @@ class VOF_API {
             case 'noise_plus Test Subscription Handler': // changed from noise+ to normalized name noise_plus
                 return [
                     'line_items' => [
-                        'price' => $this->vof_get_price_id('noise_plus Test Subscription Handler'),
+                        'price' => $this->vof_get_price_id('noise_plus Test Subscription Handler', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -456,33 +587,50 @@ class VOF_API {
                 ];
             
             default:
-                throw new \Exception('Invalid tier selected');
+                throw new \Exception('Invalid tier selected: ' . $tier_selected['name']);
         }
     }
 
-    // Helper to get price IDs based on environment
-    private function vof_get_price_id($tier) {
+    // Updated to handle different pricing scheme intervals
+    private function vof_get_price_id($tier, $interval='month') {
         $is_test = VOF_Core::instance()->vof_get_stripe_config()->vof_is_stripe_test_mode();
         
         // Price IDs for each environment and tier
         $price_ids = [
-            'test' => [
-                // 'biz' => 'price_1QhSfAF1Da8bBQoXOMYG2Kb3',
-                'biz Test Subscription Handler' => 'price_1QushhF1Da8bBQoXx6owQdne',
-                // 'noise' => 'price_1QhSnRF1Da8bBQoXGxUNerFq',
-                'noise Test Subscription Handler' => 'price_1QusjwF1Da8bBQoXRXJTb8ie',
-                // 'noise_plus' => 'price_1QhSsJF1Da8bBQoXzYViJiS2'
-                'noise_plus Test Subscription Handler' => 'price_1QuslaF1Da8bBQoXmDNcAzuM'
+            'test' => [ // this is $env
+                'monthly' => [
+                    'biz Test Subscription Handler'        => 'price_1QushhF1Da8bBQoXx6owQdne',
+                    'noise Test Subscription Handler'      => 'price_1QusjwF1Da8bBQoXRXJTb8ie',
+                    'noise_plus Test Subscription Handler' => 'price_1QuslaF1Da8bBQoXmDNcAzuM'
+
+                ],
+                'yearly' => [
+                    'biz Test Subscription Handler'        => 'price_1QxSS0F1Da8bBQoXOvRkOMoP',
+                    'noise Test Subscription Handler'      => 'price_xxxxxxxxxx',
+                    'noise_plus Test Subscription Handler' => 'price_xxxxxxxxxx'
+                ],
             ],
             'live' => [
-                'biz' => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',
-                'noise' => 'price_1PPtRLF1Da8bBQoXsqXkk1XK',
-                'noise_plus' => 'price_1PPtUTF1Da8bBQoXhtr8xZnd'
+                'monthly' => [
+                    'biz'        => 'price_1Pa4qHF1Da8bBQoXBrnH9I98',
+                    'noise'      => 'price_1PPtRLF1Da8bBQoXsqXkk1XK',
+                    'noise_plus' => 'price_1PPtUTF1Da8bBQoXhtr8xZnd'
+                ],
+                'yearly' => [
+                    'biz'        => 'price_xxxxxxxxxx',
+                    'noise'      => 'price_xxxxxxxxxx',
+                    'noise_plus' => 'price_xxxxxxxxxx'
+                ]
             ]
         ];
 
         $env = $is_test ? 'test' : 'live';
-        return $price_ids[$env][$tier] ?? throw new \Exception('Invalid tier or environment');
+        $interval_type = $interval === 'year' ? 'yearly' : 'monthly';
+        if(!isset($price_ids[$env][$interval_type][$tier])) {
+            throw new \Exception('Invalid tier or interval: ' .$tier . '-' . $interval);
+        }
+
+        return $price_ids[$env][$interval_type][$tier];
     }
 
     public function vof_handle_webhook(\WP_REST_Request $request) {

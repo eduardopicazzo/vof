@@ -300,7 +300,7 @@ class VOF_Form_Handler {
      * This method acts as a bridge between the frontend modal selection
      * and our VOF API that creates the Stripe checkout session.
      */
-    public function vof_handle_checkout_start() { // KEEP super important
+    public function vof_handle_checkout_start_OLD_MONTHLY_ONLY() {
         try {
 			error_log('VOF Debug: Checkout started with POST data: ' . print_r($_POST, true));
 
@@ -370,6 +370,92 @@ class VOF_Form_Handler {
                 'data' => [
                     'checkout_url' => $response_data['data']['checkout_url'],
                     'session_id' => $response_data['data']['session_id']
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            error_log('VOF Error: Checkout process failed - ' . $e->getMessage());
+            
+            wp_send_json_error([
+                'message' => __('Failed to create checkout session. Please try again.', 'vendor-onboarding-flow'),
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+	// Upated to handle different pricing schemes (monthly/yearly)
+    public function vof_handle_checkout_start() { // KEEP super important
+        try {
+			error_log('VOF Debug: Checkout started with POST data: ' . print_r($_POST, true));
+
+            // Verify nonce
+            if (!check_ajax_referer('vof_temp_listing_nonce', 'security', false)) {
+                wp_send_json_error([
+                    'message' => __('Security check failed', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
+
+        	// Add more logging
+        	error_log('VOF Debug: Security check passed at vof_handle_checkout_start()');			
+
+            // Validate required data
+            $uuid = isset($_POST['uuid']) ? sanitize_text_field($_POST['uuid']) : '';
+            $tier_name = isset($_POST['tier_name']) ? sanitize_text_field($_POST['tier_name']) : '';
+            $tier_price = isset($_POST['tier_price']) ? floatval($_POST['tier_price']) : 0;
+			$tier_interval = isset($_POST['tier_interval']) ? sanitize_text_field($_POST['tier_interval']) : 'month';
+
+            if (!$uuid || !$tier_name || !$tier_price) {
+                wp_send_json_error([
+                    'message' => __('Missing required checkout data', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
+
+            // Get temp user data to verify UUID
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $user_data = $temp_user_meta->vof_get_temp_user_by_uuid($uuid);
+
+            if (!$user_data) {
+                wp_send_json_error([
+                    'message' => __('Invalid or expired session', 'vendor-onboarding-flow')
+                ]);
+                return;
+            }
+
+            // Create REST request to our API
+            $api = VOF_Core::instance()->vof_get_vof_api();
+            $request = new \WP_REST_Request('POST', '/vof/v1/checkout');
+            
+            // Pass all necessary data for checkout session creation
+            $request->set_param('uuid', $uuid);
+            $request->set_param('tier_selected', [
+                'name'     => $tier_name,
+                'price'    => $tier_price,
+				'interval' => $tier_interval
+            ]);
+
+            // Process the request through our API
+            $response = $api->vof_process_checkout($request);
+
+            // Handle API response
+            if (is_wp_error($response)) {
+                throw new \Exception($response->get_error_message());
+            }
+
+            $response_data = $response->get_data();
+
+            // Validate response contains checkout URL
+            if (empty($response_data['data']['checkout_url'])) {
+                throw new \Exception('No checkout URL returned from Stripe');
+            }
+
+            // Return successful response with checkout URL
+            wp_send_json_success([
+                'message' => __('Checkout session created successfully', 'vendor-onboarding-flow'),
+                'data' => [
+                    'checkout_url' => $response_data['data']['checkout_url'],
+                    'session_id'   => $response_data['data']['session_id']
                 ]
             ]);
 
