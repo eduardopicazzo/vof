@@ -332,49 +332,60 @@ public function vof_render_stripe_settings_page() {
         <?php
     }
 
-    /**
-     * Process the manual membership fulfillment form
-     */
-    private function vof_process_manual_membership_form() {
-        // Check if user has admin capabilities
-        if (!current_user_can('manage_options')) {
-            echo '<div class="error"><p>You do not have permission to perform this action.</p></div>';
-            return;
-        }
-
-        // Get form data
-        $user_id = isset($_POST['vof_user_id']) ? intval($_POST['vof_user_id']) : 0;
-        $subscription_id = isset($_POST['vof_subscription_id']) ? sanitize_text_field($_POST['vof_subscription_id']) : '';
-        $product_name = isset($_POST['vof_product_name']) ? sanitize_text_field($_POST['vof_product_name']) : null;
-        $pricing_id = isset($_POST['vof_pricing_id']) ? intval($_POST['vof_pricing_id']) : null;
-
-        // Basic validation
-        if (!$user_id || !$subscription_id) {
-            echo '<div class="error"><p>User ID and Subscription ID are required fields.</p></div>';
-            return;
-        }
-
-        // Verify user exists
-        if (!get_user_by('ID', $user_id)) {
-            echo '<div class="error"><p>User ID does not exist: ' . esc_html($user_id) . '</p></div>';
-            return;
-        }
-
-        // Call the helper function
-        $result = \VOF\Utils\Helpers\VOF_Helper_Functions::vof_manually_fulfill_subscription(
-            $user_id,
-            $subscription_id,
-            $product_name,
-            $pricing_id
-        );
-
-        if (is_wp_error($result)) {
-            echo '<div class="error"><p>Error: ' . esc_html($result->get_error_message()) . '</p></div>';
-            return;
-        }
-
-        // Success message
-        echo '<div class="updated"><p>Membership manually fulfilled successfully for User ID: ' . esc_html($user_id) . '</p></div>';
+/**
+ * Process the manual membership fulfillment form
+ */
+private function vof_process_manual_membership_form() {
+    // Check if user has admin capabilities
+    if (!current_user_can('manage_options')) {
+        echo '<div class="error"><p>You do not have permission to perform this action.</p></div>';
+        return;
     }
+    
+    // Get form data
+    $user_id = isset($_POST['vof_user_id']) ? intval($_POST['vof_user_id']) : 0;
+    $subscription_id = isset($_POST['vof_subscription_id']) ? sanitize_text_field($_POST['vof_subscription_id']) : '';
+    $product_name = isset($_POST['vof_product_name']) ? sanitize_text_field($_POST['vof_product_name']) : null;
+    $pricing_id = isset($_POST['vof_pricing_id']) ? intval($_POST['vof_pricing_id']) : null;
+    
+    // Basic validation
+    if (!$user_id || !$subscription_id) {
+        echo '<div class="error"><p>User ID and Subscription ID are required fields.</p></div>';
+        return;
+    }
+    
+    // Verify user exists
+    if (!get_user_by('ID', $user_id)) {
+        echo '<div class="error"><p>User ID does not exist: ' . esc_html($user_id) . '</p></div>';
+        return;
+    }
+    
+    // Build subscription data
+    $subscription_data = [
+        'subscription_id' => $subscription_id,
+        'product_name' => $product_name ?: 'Manually Restored Subscription',
+        'status' => 'active',
+    ];
+    
+    // Add pricing ID if provided
+    if ($pricing_id) {
+        $subscription_data['rtcl_pricing_tier_id'] = $pricing_id;
+    }
+    
+    error_log('VOF Debug: Calling manual fulfillment with data: ' . print_r($subscription_data, true));
+    
+    // Call the fulfillment handler directly
+    $fulfillment_handler = \VOF\Includes\Fulfillment\VOF_Fulfillment_Handler::getInstance();
+    $result = $fulfillment_handler->vof_manual_fulfill_membership($user_id, $subscription_data);
+    
+    if (is_wp_error($result)) {
+        echo '<div class="error"><p>Error: ' . esc_html($result->get_error_message()) . '</p></div>';
+        return;
+    }
+    
+    // Success message
+    echo '<div class="updated"><p>Membership manually fulfilled successfully for User ID: ' . esc_html($user_id) . '</p></div>';
+}
+
 
 }
