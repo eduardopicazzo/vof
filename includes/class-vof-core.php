@@ -78,7 +78,6 @@ class VOF_Core {
     public static function vof_deactivate() {
         // Clear scheduled cron
         // wp_clear_scheduled_hook( 'vof_cleanup_temp_data' );
-        // Maybe add other cleanup tasks
         do_action( 'vof_deactivated' );
     }
 
@@ -95,19 +94,12 @@ class VOF_Core {
         add_action('init', [$this, 'init_components'], 0);
         add_action('init', [$this, 'load_textdomain']);                          // Load text domain
         // add_action( 'vof_cleanup_temp_data', [$this, 'vof_cleanup_temp_data'] ); // Add cleanup hook
+        
+        // Add cron registration: for monthly fulfillment for larger interval billings @fulfillment-handler.php
+        // add_action('init', [$this, 'vof_register_cron_schedules'], 0);
 
         // override myaccount dashboard templates
         add_filter('rtcl_locate_template', [$this, 'vof_override_templates'], 10, 4);
-
-        // ###########################################################
-        // ################ R E M O V E   S O O N ###################
-        // ##########################################################
-        // add_action( 'rtcl_account_dashboard_report', [ &$this, 'vof_subscription_report' ], 19 );               // before 20
-        // if (  StoreFunctions::is_membership_enabled() ) {
-			// add_action( 'rtcl_account_dashboard_report', [ __CLASS__, 'vof_membership_statistic_report' ], 9 ); // before 10
-			// add_action( 'rtcl_account_dashboard_report', [ $this, 'vof_membership_statistic_report' ], 9 ); // before 10
-		// }
-        
     }
 
     /**

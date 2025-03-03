@@ -26,6 +26,21 @@ class VOF_Fulfillment_Handler {
     private function __construct() {
         $this->temp_user_meta       = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
+        // Hook the fulfillment handler to process the scheduled event
+        if ($this->vof_is_interim_fulfillment_enabled()) {
+            // add_action('vof_monthly_subscription_fulfillment', [$this, 'vof_process_monthly_benefits']);
+            
+            // Set up mesh-timer hooks
+            add_action('admin_init', [$this, 'vof_check_pending_fulfillments']);
+            add_action('wp', [$this, 'vof_check_pending_fulfillments']);
+            add_action('rest_api_init', [$this, 'vof_check_pending_fulfillments']);
+        
+            // Add a 5-minute transient lock to prevent excessive checks
+            add_action('vof_fulfillment_check_completed', [$this, 'vof_set_check_lock'], 10, 0);
+        } else {
+            // Remove any scheduled events if disabled
+            wp_clear_scheduled_hook('vof_monthly_subscription_fulfillment');
+        }
     }
 
     /**
@@ -310,154 +325,190 @@ class VOF_Fulfillment_Handler {
         return $result;
     }
 
-/**
- * Update VOF flow status and data
- * 
- * @param array $stripe_data Stripe data
- * @param bool $is_vof_fulfilled Whether fulfillment was successful
- * @return bool Success status
- */
-public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
-    if (!$is_vof_fulfilled) {
-        return false;
-    }
-
-    $vof_flow_started_at = $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
-
-    $price_purchased_at = $stripe_data['amount'] / 100 ?? null;
-    $vof_flow_completed_at = current_time('mysql') ?? null;
-    $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
-
-    $vof_updated_data = [
-        'vof_flow_status'        => 'completed' ?? null,
-        'vof_flow_completed_at'  => $vof_flow_completed_at,
-        'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
-        'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
-        'stripe_customer_id'     => $stripe_data['customer'] ?? null,
-        'stripe_sub_id'          => $stripe_data['subscription_id'] ?? null,
-        'stripe_sub_status'      => $stripe_data['status'] ?? null,
-        'stripe_prod_name'       => $stripe_data['product_name'] ?? null,
-        'stripe_prod_lookup_key' => $stripe_data['lookup_key'] ?? null,
-        'stripe_period_interval' => $stripe_data['interval'] ?? null,
-        'price_purchased_at'     => $price_purchased_at
-    ];
-
-    // Update the VOF temp user data first
-    self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
-    
-    // Now attempt the MailerLite integration with a try/catch that won't disrupt the main flow
-    try {
-        $this->vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data);
-    } catch (\Throwable $e) {
-        // Catch ANY error (including fatal errors) and log it
-        error_log('VOF Warning: MailerLite lead capture failed but fulfillment continues - ' . $e->getMessage());
-    }
-    
-    // Return success regardless of MailerLite results
-    return true;
-}
-    
-/**
- * Capture complete lead at stage 2
- */
-private function vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data) {
-    try {
-
-        // Skip if MailerLite integration is disabled
-        if (!get_option('vof_mailerlite_enabled', false)) {
-            error_log('VOF Debug: MailerLite integration is disabled, skipping lead capture at Stage 2');
-            return; // Simply return without attempting to capture
+    /**
+     * Update VOF flow status and data
+     * 
+     * @param array $stripe_data Stripe data
+     * @param bool $is_vof_fulfilled Whether fulfillment was successful
+     * @return bool Success status
+     */
+    public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
+        if (!$is_vof_fulfilled) {
+            return false;
         }
-                
-        // Get MailerLite instance
-        $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
+
+        $vof_flow_started_at = $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
+
+        $price_purchased_at    = $stripe_data['amount'] / 100 ?? null;
+        $vof_flow_completed_at = current_time('mysql') ?? null;
+        $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
+        $vof_sub_start_date    = date('Y-m-d H:i:s', $stripe_data['current_period_start']) ?? null; 
+        $vof_sub_expiry_date   = date('Y-m-d H:i:s', $stripe_data['current_period_end']) ?? null;
+
+        // Check if this is a longer-than-monthly subscription and interim fulfillment is enabled
+        $is_long_term_subscription = false;
+        $next_fulfillment_date = null;
+        $current_timestamp = strtotime(current_time('mysql'));
         
-        // Only proceed if MailerLite is available and flow is completed
-        if ($mailerlite && 
-            $mailerlite->vof_is_connected() && 
-            isset($vof_updated_data['vof_flow_status']) && 
-            $vof_updated_data['vof_flow_status'] === 'completed') {
+        if ($this->vof_is_interim_fulfillment_enabled() && 
+            isset($stripe_data['interval']) && 
+            $stripe_data['interval'] !== 'month') {
             
-            $this->vof_process_completed_lead($stripe_data, $vof_updated_data);
+            $is_long_term_subscription = true;
+            // [PRODUCTION] Set next fulfillment date to 30 days from now
+            // $next_fulfillment_date = date('Y-m-d H:i:s', strtotime('+30 days'));
+            // [TEST ONLY] Set next fulfillment date to 2 minutes from now
+            $next_fulfillment_date = date('Y-m-d H:i:s', $current_timestamp + (2 * MINUTE_IN_SECONDS));
         }
-    } catch (\Throwable $e) {
-        // Catch ANY error and log it
-        error_log('VOF Warning: MailerLite lead capture stage 2 failed - ' . $e->getMessage());
-        // Re-throw to be caught by parent
-        throw $e;
-    }
-}
 
-/**
- * Process completed lead for MailerLite
- */
-private function vof_process_completed_lead($stripe_data, $vof_updated_data) {
-    // Main try/catch block
-    try {
-        $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
-        if (!$mailerlite || !$mailerlite->vof_is_connected()) {
-            return;
-        }
-    
-        // Get temp user data
-        $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-        $temp_user = $temp_user_meta->vof_get_temp_user_by_uuid($stripe_data['uuid']);
-    
-        if (!$temp_user || empty($temp_user['vof_email'])) {
-            error_log('VOF Error: Cannot process completed lead - no temp user data');
-            return;
-        }
-    
-        // Ensure VOF Complete group exists
-        $complete_group_id = $mailerlite->vof_ensure_group_exists('VOF Completed');
-        if (!$complete_group_id) {
-            error_log('VOF Error: Failed to ensure VOF Complete group exists');
-            return;
-        }
-    
-        // Get Stage 1 group ID
-        $stage1_group_id = get_option('vof_mailerlite_onboarding_group', '');
-        if (empty($stage1_group_id)) {
-            $stage1_group_id = $mailerlite->vof_ensure_group_exists('__VOF_Fallback__');
-        }
-    
-        // Add to VOF Complete group with enhanced data
-        $fields = [
-            'phone' => $temp_user['vof_phone'],
-            'whatsapp' => $temp_user['vof_whatsapp'],
-            // 'payment_status' => 'completed',
-            // 'tier_purchased' => $stripe_data['product_name'],
-            // 'purchase_date' => date('Y-m-d H:i:s'),
-            // 'subscription_id' => $stripe_data['subscription_id'],
-            // 'customer_id' => $stripe_data['customer'],
-            // 'amount_paid' => ($stripe_data['amount'] / 100)
+        $vof_updated_data = [
+            'vof_flow_status'        => 'completed' ?? null,
+            'vof_flow_completed_at'  => $vof_flow_completed_at,
+            'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
+            'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
+            'stripe_customer_id'     => $stripe_data['customer'] ?? null,
+            'stripe_sub_id'          => $stripe_data['subscription_id'] ?? null,
+            'stripe_sub_status'      => $stripe_data['status'] ?? null,
+            'stripe_prod_name'       => $stripe_data['product_name'] ?? null,
+            'stripe_prod_lookup_key' => $stripe_data['lookup_key'] ?? null,
+            'stripe_period_interval' => $stripe_data['interval'] ?? null,
+            'price_purchased_at'     => $price_purchased_at,
+            'stripe_sub_start_date'  => $vof_sub_start_date,
+            'stripe_sub_expiry_date' => $vof_sub_expiry_date
         ];
-    
-        // Add subscriber to the completed group
+
+        // Update the VOF temp user data first
+        self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
+
+        // Store next fulfillment date for long-term subscriptions if interim fulfillment is enabled
+        if ($is_long_term_subscription && $next_fulfillment_date) {
+            $this->temp_user_meta->vof_update_custom_meta(
+                $stripe_data['uuid'], 
+                'next_interim_fulfillment', 
+                $next_fulfillment_date
+            );
+
+            // Also store last fulfillment date as current time (initial fulfillment)
+            $this->temp_user_meta->vof_update_custom_meta(
+                $stripe_data['uuid'], 
+                'last_interim_fulfillment', 
+                current_time('mysql')
+            );
+        }
+
+        // Now attempt the MailerLite integration with a try/catch that won't disrupt the main flow
         try {
-            $mailerlite->vof_add_subscriber($temp_user['vof_email'], $fields, [$complete_group_id]);
-        } catch (\Exception $e) {
-            error_log('VOF Warning: Could not add subscriber to completed group - ' . $e->getMessage());
-            // Continue processing despite this error
+            $this->vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data);
+        } catch (\Throwable $e) {
+            // Catch ANY error (including fatal errors) and log it
+            error_log('VOF Warning: MailerLite lead capture failed but fulfillment continues - ' . $e->getMessage());
         }
-    
-        // Try to remove from Stage 1 group if it exists
-        if ($stage1_group_id) {
-            try {
-                $mailerlite->vof_remove_subscriber_from_group($temp_user['vof_email'], $stage1_group_id);
-                error_log('VOF Debug: Removed subscriber from stage 1 group');
-            } catch (\Exception $e) {
-                // Just log this error but continue processing
-                error_log('VOF Warning: Could not remove subscriber from stage 1 group - ' . $e->getMessage());
-            }
-        }
-    
-        error_log('VOF Debug: Lead processed at Stage 2 (successful checkout) for: ' . $temp_user['vof_email']);
-    } catch (\Exception $e) {
-        // Log the error but don't let it affect fulfillment
-        error_log('VOF Error: Failed to process completed lead - ' . $e->getMessage());
+
+        // Return success regardless of MailerLite results
+        return true;
     }
-}
+    
+    /**
+     * Capture complete lead at stage 2
+     */
+    private function vof_capture_complete_lead_stage2($stripe_data, $vof_updated_data) {
+        try {
+
+            // Skip if MailerLite integration is disabled
+            if (!get_option('vof_mailerlite_enabled', false)) {
+                error_log('VOF Debug: MailerLite integration is disabled, skipping lead capture at Stage 2');
+                return; // Simply return without attempting to capture
+            }
+
+            // Get MailerLite instance
+            $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
+
+            // Only proceed if MailerLite is available and flow is completed
+            if ($mailerlite && 
+                $mailerlite->vof_is_connected() && 
+                isset($vof_updated_data['vof_flow_status']) && 
+                $vof_updated_data['vof_flow_status'] === 'completed') {
+                
+                $this->vof_process_completed_lead($stripe_data, $vof_updated_data);
+            }
+        } catch (\Throwable $e) {
+            // Catch ANY error and log it
+            error_log('VOF Warning: MailerLite lead capture stage 2 failed - ' . $e->getMessage());
+            // Re-throw to be caught by parent
+            throw $e;
+        }
+    }
+
+    /**
+     * Process completed lead for MailerLite
+     */
+    private function vof_process_completed_lead($stripe_data, $vof_updated_data) {
+        // Main try/catch block
+        try {
+            $mailerlite = \VOF\VOF_Core::instance()->vof_get_mailerlite();
+            if (!$mailerlite || !$mailerlite->vof_is_connected()) {
+                return;
+            }
+        
+            // Get temp user data
+            $temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $temp_user = $temp_user_meta->vof_get_temp_user_by_uuid($stripe_data['uuid']);
+        
+            if (!$temp_user || empty($temp_user['vof_email'])) {
+                error_log('VOF Error: Cannot process completed lead - no temp user data');
+                return;
+            }
+        
+            // Ensure VOF Complete group exists
+            $complete_group_id = $mailerlite->vof_ensure_group_exists('VOF Completed');
+            if (!$complete_group_id) {
+                error_log('VOF Error: Failed to ensure VOF Complete group exists');
+                return;
+            }
+        
+            // Get Stage 1 group ID
+            $stage1_group_id = get_option('vof_mailerlite_onboarding_group', '');
+            if (empty($stage1_group_id)) {
+                $stage1_group_id = $mailerlite->vof_ensure_group_exists('__VOF_Fallback__');
+            }
+        
+            // Add to VOF Complete group with enhanced data
+            $fields = [
+                'phone' => $temp_user['vof_phone'],
+                'whatsapp' => $temp_user['vof_whatsapp'],
+                // 'payment_status' => 'completed',
+                // 'tier_purchased' => $stripe_data['product_name'],
+                // 'purchase_date' => date('Y-m-d H:i:s'),
+                // 'subscription_id' => $stripe_data['subscription_id'],
+                // 'customer_id' => $stripe_data['customer'],
+                // 'amount_paid' => ($stripe_data['amount'] / 100)
+            ];
+        
+            // Add subscriber to the completed group
+            try {
+                $mailerlite->vof_add_subscriber($temp_user['vof_email'], $fields, [$complete_group_id]);
+            } catch (\Exception $e) {
+                error_log('VOF Warning: Could not add subscriber to completed group - ' . $e->getMessage());
+                // Continue processing despite this error
+            }
+        
+            // Try to remove from Stage 1 group if it exists
+            if ($stage1_group_id) {
+                try {
+                    $mailerlite->vof_remove_subscriber_from_group($temp_user['vof_email'], $stage1_group_id);
+                    error_log('VOF Debug: Removed subscriber from stage 1 group');
+                } catch (\Exception $e) {
+                    // Just log this error but continue processing
+                    error_log('VOF Warning: Could not remove subscriber from stage 1 group - ' . $e->getMessage());
+                }
+            }
+        
+            error_log('VOF Debug: Lead processed at Stage 2 (successful checkout) for: ' . $temp_user['vof_email']);
+        } catch (\Exception $e) {
+            // Log the error but don't let it affect fulfillment
+            error_log('VOF Error: Failed to process completed lead - ' . $e->getMessage());
+        }
+    }
 
     public function vof_update_vof_temp_user_data($uuid, $vof_updated_data) {
         // Mark temp user as completed
@@ -511,41 +562,486 @@ private function vof_process_completed_lead($stripe_data, $vof_updated_data) {
             $subscription_id
         ));
     }
+
+    // ################## CRON FULFILLMENT SECTION ######################
+
+    /**
+     * Check if interim fulfillment is enabled
+     * @return bool Whether interim fulfillment is enabled
+     */
+    public function vof_is_interim_fulfillment_enabled() {
+        return get_option('vof_enable_interim_fulfillment', true); // Default to enabled
+    }
+
+    /**
+     * Set a short-term lock to prevent excessive fulfillment checks
+     */
+    public function vof_set_check_lock() {
+        // [PRODUCTION] Set check lock idle to 5 minutes
+        // set_transient('vof_fulfillment_check_lock', true, 5 * MINUTE_IN_SECONDS);
+
+        // [TEST ONLY] Set check lock idle to 30 seconds for testing purposes
+        set_transient('vof_fulfillment_check_lock', true, 30);
+    }
+
+    /**
+     * Check for pending fulfillments
+     */
+    public function vof_check_pending_fulfillments() {
+        // Skip if a lock is in place
+        if (get_transient('vof_fulfillment_check_lock')) {
+            error_log('VOF Debug: Fulfillment check skipped due to lock');
+            return;
+        }
+
+        error_log('VOF Debug: Starting fulfillment check at ' . current_time('mysql'));
+
+        // Skip if interim fulfillment is disabled
+        if (!$this->vof_is_interim_fulfillment_enabled()) {
+            error_log('VOF Debug: Interim fulfillment is disabled');
+            return;
+        }
+
+        // Process batch of pending fulfillments TODO: Rename to proces_pendind_interim_fulfillments
+        $this->vof_process_pending_fulfillments();
+
+        // Set a lock to prevent excessive checks
+        do_action('vof_fulfillment_check_completed');
+    }
+
+    /**
+     * Process pending interim fulfillments
+     */
+    private function vof_process_pending_fulfillments() {
+        global $wpdb;
+
+        try {
+            // Get current time
+            $current_time = current_time('mysql');
+
+            // Get all custom meta entries with next_interim_fulfillment dates in the past
+            $meta_table = $wpdb->prefix . 'vof_custom_meta';
+            $pending_fulfillments = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT m.uuid, m.meta_value AS next_fulfillment_date
+                    FROM {$meta_table} m
+                    WHERE m.meta_key = %s 
+                    AND m.meta_value <= %s
+                    LIMIT 10", // Process in batches to avoid timeouts
+                    'next_interim_fulfillment',
+                    $current_time
+                ),
+                ARRAY_A
+            );
+
+            if (empty($pending_fulfillments)) {
+                return;
+            }
+
+            foreach ($pending_fulfillments as $fulfillment) {
+                // Get subscription data
+                $subscription = $this->temp_user_meta->vof_get_temp_user_by_uuid($fulfillment['uuid']);
+
+                if (!$subscription || empty($subscription['stripe_sub_id'])) {
+                    // Clean up orphaned meta if subscription doesn't exist
+                    $this->temp_user_meta->vof_delete_custom_meta($fulfillment['uuid'], 'next_interim_fulfillment');
+                    continue;
+                }
+
+                // Skip if subscription is not active
+                if ($subscription['stripe_sub_status'] !== 'active') {
+                    continue;
+                }
+
+                // Process the interim fulfillment
+                $this->vof_process_interim_fulfillment($subscription);
+            }
+
+            error_log('VOF Debug: Processed ' . count($pending_fulfillments) . ' pending fulfillments');
+
+        } catch (\Exception $e) {
+            error_log('VOF Error: Failed to process pending fulfillments - ' . $e->getMessage());
+        }
+    }    
+
+/**
+ * Process interim fulfillment for a subscription
+ */
+private function vof_process_interim_fulfillment($subscription) {
+    try {
+        error_log('VOF Debug: Processing interim fulfillment for subscription: ' . print_r($subscription, true));
+        
+        // Validate subscription data
+        if (empty($subscription['stripe_sub_id'])) {
+            error_log('VOF Error: Missing stripe_sub_id in subscription data');
+            return false;
+        }
+        
+        if (empty($subscription['stripe_sub_status'])) {
+            error_log('VOF Error: Missing stripe_sub_status in subscription data');
+            return false;
+        }
+
+        $current_timestamp = strtotime(current_time('mysql'));
+
+        // Process subscription benefits
+        $result = $this->vof_process_customer_subscription_updated([
+            'sub_id'      => $subscription['stripe_sub_id'],
+            'status'      => $subscription['stripe_sub_status'],
+            'expiry_date' => isset($subscription['stripe_sub_expiry_date']) ? $subscription['stripe_sub_expiry_date'] : null,
+        ]);
+        
+        if (!$result) {
+            error_log('VOF Warning: Interim fulfillment failed for subscription: ' . $subscription['stripe_sub_id']);
+            return false;
+        }
+        
+        // Update last fulfillment date
+        $this->temp_user_meta->vof_update_custom_meta(
+            $subscription['uuid'], 
+            'last_interim_fulfillment', 
+            current_time('mysql')
+        );
+        
+        // [PRODUCTION] Set next fulfillment date to 30 days from now
+        // $next_fulfillment = date('Y-m-d H:i:s', strtotime('+30 days'));
+        // [TEST ONLY] Set next fulfillment date to 2 minutes from now
+        $next_fulfillment = date('Y-m-d H:i:s', $current_timestamp + (2 * MINUTE_IN_SECONDS));
+        
+        $this->temp_user_meta->vof_update_custom_meta(
+            $subscription['uuid'], 
+            'next_interim_fulfillment', 
+            $next_fulfillment
+        );
+        
+        error_log('VOF Debug: Successfully processed interim fulfillment. Next fulfillment set for: ' . $next_fulfillment);
+        return true;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to process interim fulfillment - ' . $e->getMessage());
+        error_log('VOF Error: ' . $e->getTraceAsString());
+        return false;
+    }
+}
+
+private function vof_process_interim_fulfillment_OLD_NO_LOGGING($subscription) {
+
+    
+    try {
+        $current_timestamp = strtotime(current_time('mysql'));
+        
+        // Process subscription benefits
+        $result = $this->vof_process_customer_subscription_updated([
+            'sub_id'      => $subscription['stripe_sub_id'],
+            'status'      => $subscription['stripe_sub_status'],
+            'expiry_date' => $subscription['stripe_sub_expiry_date'],
+        ]);
+        
+        if (!$result) {
+            error_log('VOF Warning: Interim fulfillment failed for subscription: ' . $subscription['stripe_sub_id']);
+            return false;
+        }
+        
+        // Update last fulfillment date
+        $this->temp_user_meta->vof_update_custom_meta(
+            $subscription['uuid'], 
+            'last_interim_fulfillment', 
+            $current_timestamp
+        );
+        
+        // [PRODUCTION] Set next fulfillment date to 30 days from now
+        // $next_fulfillment = date('Y-m-d H:i:s', strtotime('+30 days'));
+        // [TEST ONLY] Set next fulfillment date to 2 minutes from now
+        $next_fulfillment = date('Y-m-d H:i:s', $current_timestamp + (2 * MINUTE_IN_SECONDS));
+        
+        $this->temp_user_meta->vof_update_custom_meta(
+            $subscription['uuid'], 
+            'next_interim_fulfillment', 
+            $next_fulfillment
+        );
+        
+        error_log('VOF Debug: Processed interim fulfillment for subscription: ' . $subscription['stripe_sub_id']);
+        return true;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to process interim fulfillment - ' . $e->getMessage());
+        return false;
+    }
+}
+
+    /**
+     * Process monthly benefits for yearly subscribers
+     */
+    public function vof_process_monthly_benefits() { // MAYBE NOT NEEDED ANYMORE
+        global $wpdb;
+        
+        // Get all active yearly (or custom) subscriptions intervals
+        $subscriptions = $wpdb->get_results(
+            "SELECT * FROM {$wpdb->prefix}vof_temp_user_meta 
+            WHERE stripe_sub_status = 'active' 
+            AND stripe_sub_id IS NOT NULL
+            AND stripe_period_interval IS NOT NULL 
+            AND stripe_period_interval != 'month'",
+            ARRAY_A
+        );
+        
+        if (empty($subscriptions)) {
+            error_log('VOF Debug: No yearly subscriptions found for monthly processing');
+            return;
+        }
+        
+        foreach ($subscriptions as $subscription) {
+            // Calculate time until expiry
+            $expiry_date        = strtotime($subscription['expiry_date']);
+            $current_time       = current_time('timestamp');
+            $current_time_mysql = date('Y-m-d H:i:s', $current_time);
+            
+            // Check if it's time for monthly fulfillment (within one month window)
+            $one_month_before_expiry = strtotime('-1 month', $expiry_date);
+            
+            if ($current_time < $expiry_date && $current_time >= $one_month_before_expiry) {
+                // Process monthly fulfillment
+                $is_interim_fulfilled = $this->vof_process_customer_subscription_updated([
+                    'sub_id'      => $subscription['stripe_sub_id'],
+                    'status'      => $subscription['stripe_sub_status'],
+                    'expiry_date' => $subscription['stripe_sub_expiry_date'],
+                ]);
+                
+                if (!$is_interim_fulfilled) {
+                    error_log('VOF Warning: Monthly benefits processing failed for subscription: '. print_r($subscription, true));
+                    continue; // Skip to next subscription
+                }
+
+                // Update last interim fulfillment date on new cutom table
+                $this->temp_user_meta->vof_update_custom_meta($subscription['uuid'], 'last_interim_fulfillment', $current_time_mysql);
+
+                error_log('VOF Debug: Processed monthly benefits for yearly subscription: ' . $subscription['subscription_id']);
+                error_log( 'VOF Debug: Date comparisons - ' . 
+                'Current: ' . date('Y-m-d H:i:s', $current_time ) . 
+                ', Expiry: ' . date('Y-m-d H:i:s', $expiry_date ) . 
+                ', One Month Before: ' . date( 'Y-m-d H:i:s', $one_month_before_expiry ) );
+            }
+        }
+    }
+
+
+    private function vof_process_customer_subscription_updated($cron_job_param_array) {
+        try {
+            error_log('VOF Debug: Starting subscription update with params: ' . print_r($cron_job_param_array, true));
+            
+            $subscriptionIn = (new \RtclPro\Models\Subscriptions())->findOneBySubId($cron_job_param_array['sub_id']);
+            
+            if (!$subscriptionIn) {
+                error_log('VOF Error: Could not find subscription via sub_id: ' . $cron_job_param_array['sub_id']);
+                return false;
+            }
+            
+            $result = $subscriptionIn->updateStatus($cron_job_param_array['status']);
+            
+            if (is_wp_error($result)) {
+                error_log('VOF Error: Failed to update subscription status: ' . $result->get_error_message());
+                return false;
+            }
+            
+            error_log('VOF Debug: Successfully updated subscription status to: ' . $cron_job_param_array['status']);
+            return true;
+        } catch (\Exception $e) {
+            error_log('VOF Error: Exception in subscription update: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    // Utility Function; interim fulfillment
+private function vof_process_customer_subscription_updated_OLD($cron_job_param_array) {
+    try {
+        error_log('VOF Debug: Starting interim fulfillment with params: ' . print_r($cron_job_param_array, true));
+        
+        $subscriptionIn = (new \RtclPro\Models\Subscriptions())->findOneBySubId($cron_job_param_array['sub_id']);
+        
+        if (!$subscriptionIn) {
+            error_log('VOF Error: Could not find subscription via sub_id: ' . $cron_job_param_array['sub_id']);
+            return false;
+        }
+        
+        error_log('VOF Debug: Found RTCL subscription: ' . print_r($subscriptionIn, true));
+        
+        $result = $subscriptionIn->updateStatus($cron_job_param_array['status']);
+        
+        if ($result === false) {
+            error_log('VOF Error: Failed to update subscription status');
+            return false;
+        }
+        
+        error_log('VOF Debug: Successfully updated subscription status');
+        return true;
+    } catch (\Exception $e) {
+        error_log('VOF Error: Exception in vof_process_customer_subscription_updated: ' . $e->getMessage());
+        error_log('VOF Error: ' . $e->getTraceAsString());
+        return false;
+    }
+}
+
+
+    private function vof_process_customer_subscription_updated_OLDER($cron_job_param_array) {
+        $subscriptionIn = (new \RtclPro\Models\Subscriptions())->findOneBySubId($cron_job_param_array['sub_id']);
+        if (!$subscriptionIn) {
+            \RtclPro\Gateways\Stripe\lib\StripeLogger::log('Could not find subscription via charge ID: ' . $cron_job_param_array['sub_id']);
+            error_log('Could not find subscription via charge ID: ' . print_r($cron_job_param_array['sub_id'], true));
+            return;
+        }
+        $subscriptionIn->updateStatus( $cron_job_param_array['sub_id'] );
+        error_log( 'Subscription Updated from rtcl: ' . print_r( $subscriptionIn, true ) );
+    }
+
+
+    // ##################################################################
+    // #################### MANUAL FULFILLMENT AREA #####################
+    // ##################################################################
+
+    // Path: wp-content/plugins/vendor-onboarding-flow/includes/fulfillment/class-vof-fulfillment-handler.php
+
+/**
+ * Manual fulfillment function that can be triggered to complete membership fulfillment
+ * for any registered user when the normal webhook flow fails
+ * 
+ * @param int $user_id The user ID to fulfill membership for
+ * @param array $subscription_data Subscription data including plan details
+ * @return bool|WP_Error Success or failure
+ */
+public function vof_manual_fulfill_membership($user_id, $subscription_data) {
+    try {
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+        
+        error_log('VOF Debug: Starting manual membership fulfillment for user ID: ' . $user_id);
+        
+        // Validate user exists
+        if (!get_user_by('ID', $user_id)) {
+            throw new \Exception('Invalid user ID: ' . $user_id);
+        }
+        
+        // Validate subscription data has required fields
+        if (empty($subscription_data['product_id']) || empty($subscription_data['subscription_id'])) {
+            throw new \Exception('Missing required subscription data');
+        }
+        
+        // Find matching RTCL membership tier if not provided
+        if (empty($subscription_data['rtcl_pricing_tier_id'])) {
+            $rtcl_membership_tier_id = $this->subscription_handler->vof_find_matching_rtcl_membership_tier_with_retry($subscription_data);
+            $subscription_data['rtcl_pricing_tier_id'] = $rtcl_membership_tier_id;
+        }
+        
+        // Create subscription in RTCL's system if it doesn't exist
+        $existing_subscription = (new \RtclPro\Models\Subscriptions())->findOneBySubId($subscription_data['subscription_id']);
+        
+        if (!$existing_subscription) {
+            // Prepare required data for subscription creation
+            $sub_data = [
+                'user_id'      => $user_id,
+                'name'         => $subscription_data['product_name'] ?? 'Manually Restored Subscription',
+                'sub_id'       => $subscription_data['subscription_id'],
+                'occurrence'   => 1,
+                'gateway_id'   => 'stripe',
+                'status'       => $subscription_data['status'] ?? 'active',
+                'product_id'   => $subscription_data['rtcl_pricing_tier_id'],
+                'quantity'     => 1,
+                'price'        => (float) (($subscription_data['amount'] ?? 0) / 100),
+                'expiry_at'    => isset($subscription_data['current_period_end']) 
+                                ? date('Y-m-d H:i:s', $subscription_data['current_period_end']) 
+                                : date('Y-m-d H:i:s', strtotime('+1 month')),
+                'created_at'   => current_time('mysql'),
+                'updated_at'   => current_time('mysql')
+            ];
+            
+            // Create subscription
+            $subscriptions = new \RtclPro\Models\Subscriptions();
+            $new_sub = $subscriptions->create($sub_data);
+            
+            if (is_wp_error($new_sub)) {
+                throw new \Exception('Failed to create subscription: ' . $new_sub->get_error_message());
+            }
+            
+            error_log('VOF Debug: Created new subscription: ' . print_r($new_sub, true));
+            
+            // Process membership hook fulfillment
+            $this->vof_trigger_rtcl_membership_fulfillment($user_id, $subscription_data['rtcl_pricing_tier_id']);
+        } else {
+            // Update existing subscription to active if needed
+            if ($existing_subscription->getStatus() !== 'active') {
+                $existing_subscription->updateStatus('active');
+            }
+            
+            // Process membership hook fulfillment
+            $this->vof_trigger_rtcl_membership_fulfillment($user_id, $existing_subscription->getProductId());
+        }
+        
+        $wpdb->query('COMMIT');
+        return true;
+        
+    } catch (\Exception $e) {
+        $wpdb->query('ROLLBACK');
+        error_log('VOF Error: Manual fulfillment failed - ' . $e->getMessage());
+        return new \WP_Error('manual_fulfillment_failed', $e->getMessage());
+    }
+}
+
+/**
+ * Trigger RTCL membership fulfillment directly
+ * 
+ * @param int $user_id The user ID
+ * @param int $pricing_id The RTCL pricing ID
+ * @return bool Success or failure
+ */
+private function vof_trigger_rtcl_membership_fulfillment($user_id, $pricing_id) {
+    // Create a fake payment order to trigger membership benefits
+    $order_args = [
+        'post_title'  => esc_html__('Manual Membership Restoration', 'vendor-onboarding-flow') . ' ' . current_time("l jS F Y h:i:s A"),
+        'post_status' => 'rtcl-created',
+        'post_parent' => '0',
+        'ping_status' => 'closed',
+        'post_author' => 1,
+        'post_type'   => rtcl()->post_type_payment,
+        'meta_input'  => [
+            'customer_id'           => $user_id,
+            '_order_key'            => uniqid('rtcl_order_'),
+            '_pricing_id'           => $pricing_id,
+            'amount'                => 0, // Zero amount since this is a manual fulfillment
+            '_payment_method'       => 'stripe',
+            '_payment_method_title' => 'Stripe (Manual Restoration)',
+            '_order_currency'       => \Rtcl\Helpers\Functions::get_order_currency(),
+            'payment_type'          => 'membership',
+            '_applied'              => 1
+        ]
+    ];
+    
+    // Insert payment post
+    $order_id = wp_insert_post($order_args);
+    
+    if (!$order_id || is_wp_error($order_id)) {
+        error_log('VOF Error: Failed to create manual restoration order');
+        return false;
+    }
+    
+    // Get RTCL order object
+    $order = rtcl()->factory->get_order($order_id);
+    
+    if (!$order) {
+        error_log('VOF Error: Failed to get order object');
+        return false;
+    }
+    
+    // Set transaction ID and complete payment
+    $transaction_id = 'manual-restoration-' . time();
+    update_post_meta($order_id, 'transaction_id', $transaction_id);
+    
+    // Mark as paid
+    $order->set_date_paid(\Rtcl\Helpers\Functions::datetime());
+    
+    // Complete the payment to trigger membership fulfillment
+    $result = $order->payment_complete($transaction_id);
+    
+    error_log('VOF Debug: Manual membership fulfillment result: ' . ($result ? 'Success' : 'Failed'));
+    
+    return $result;
+}
  
-    // ##################################################################
-    // ######################### DELETE SOON ############################
-    // ##################################################################
-    /**
-     * Validates data before fulfillment
-     */
-    // public function vof_validate_data_REMOVE($stripe_data, $temp_user) {
-        //     if (empty($temp_user['true_user_id'])) {
-        //         throw new \Exception('Invalid user ID');
-        //     }
-
-        //     if (empty($temp_user['post_id'])) {
-        //         throw new \Exception('Invalid listing ID');
-        //     }
-
-        //     if (!isset($stripe_data['status']) || $stripe_data['status'] !== 'active') {
-        //         throw new \Exception('Invalid subscription status');
-        //     }
-    // }
-
-    /**
-     * Cleanup temporary data after successful fulfillment
-     */
-    // public function vof_cleanup_temp_data($stripe_data, $temp_user) {
-     //     // Mark temp user as completed
-     //     $this->temp_user_meta->vof_update_post_status(
-     //         $temp_user['uuid'], 
-     //         'completed'
-     //     );
-
-     //     // Schedule cleanup of expired temp data
-     //     wp_schedule_single_event(
-     //         time() + DAY_IN_SECONDS, 
-     //         'vof_cleanup_expired_temp_data'
-     //     );
-    // }
 }

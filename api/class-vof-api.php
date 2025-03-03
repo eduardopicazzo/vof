@@ -171,7 +171,8 @@ class VOF_API {
                     'monthly_tiers' => [ 
                         [ // tier biz (monthly)
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'biz Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 44, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -190,7 +191,8 @@ class VOF_API {
                         ],
                         [ // tier noise (monthly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 444, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -209,7 +211,8 @@ class VOF_API {
                         ],
                         [ // tier noise+ (monthly)
                             // 'name' => 'noise+',
-                            'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise+ Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 4444, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -230,7 +233,8 @@ class VOF_API {
                     'yearly_tiers' => [ 
                         [ // tier biz (yearly)
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'biz Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 440, // * 10 2 months free retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -249,7 +253,8 @@ class VOF_API {
                         ],
                         [ // tier noise (yearly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 4440, // * 10 2 months free  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -268,7 +273,8 @@ class VOF_API {
                         ],
                         [ // tier noise+ (yearly)
                             // 'name' => 'noise+',
-                            'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise+ Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise+ Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 44400,  // * 10 2 months free // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -294,7 +300,8 @@ class VOF_API {
                     'monthly_tiers' => [ 
                         [ // tier biz (monthly) 
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'biz Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 44, // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -313,7 +320,8 @@ class VOF_API {
                         ],
                         [ // tier noise (monthly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler',  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise Test Subscription Handler',  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise Multiprice Test',  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 444,  // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -332,7 +340,8 @@ class VOF_API {
                         ],
                         [ // tier noise+ (monthly)
                             // 'name' => 'noise+',
-                            'name' => 'noise+ Test Subscription Handler',
+                            // 'name' => 'noise+ Test Subscription Handler',
+                            'name' => 'noise+ Multiprice Test',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 4444, // hardcode for now since has not called stripe yet (later retrieve from DB)   // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -353,7 +362,8 @@ class VOF_API {
                     'yearly_tiers' => [ 
                         [ // tier biz (yearly)
                             // 'name' => 'biz',
-                            'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'biz Test Subscription Handler', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'biz Multiprice Test', // retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Ideal para emprendedores, agencias y freelancers que buscan construir su presencia local con fuerza. biz te permite publicar en la mayoría de categorías a excepción de autos e inmuebles.',
                             'price' => 440, // x10 2 months free; Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -372,7 +382,8 @@ class VOF_API {
                         ],
                         [ // tier noise (yearly)
                             // 'name' => 'noise',
-                            'name' => 'noise Test Subscription Handler', // Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            // 'name' => 'noise Test Subscription Handler', // Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
+                            'name' => 'noise Multiprice Test', // Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'description' => 'Perfecto para agentes inmobiliarios, vendedores de autos y profesionales que buscan máxima visibilidad local y conectar con su comunidad con toda flexibilidad.',
                             'price' => 4440, // * 10 2 months free; Retrieved pre-emptively from admin dashboard (in the future) via stripe api call
                             'features' => [
@@ -391,7 +402,8 @@ class VOF_API {
                         ],
                         [ // tier noise+ (yearly)
                             // 'name' => 'noise+',
-                            'name' => 'noise+ Test Subscription Handler',
+                            // 'name' => 'noise+ Test Subscription Handler',
+                            'name' => 'noise+ Multiprice Test',
                             'description' => 'Con Landing Page incluida, noise+ te da máxima flexibilidad para conectar con tus mejores clientes y llevarles tu propuesta al siguiente nivel.',
                             'price' => 44400,  // * 10 2 months free
                             'features' => [
@@ -527,11 +539,12 @@ class VOF_API {
         // Get proper price ID and configuration based on tier
         switch($tier_selected['name']) {
             // case 'biz':
-            case 'biz Test Subscription Handler':
+            // case 'biz Test Subscription Handler':
+            case 'biz Multiprice Test':
                 return [
                     'line_items' => [
                         // 'price' => $this->vof_get_price_id('biz'),
-                        'price' => $this->vof_get_price_id('biz Test Subscription Handler', $interval),
+                        'price' => $this->vof_get_price_id('biz Multiprice Test', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -547,11 +560,12 @@ class VOF_API {
                 ];
             
             // case 'noise':
-            case 'noise Test Subscription Handler':
+            // case 'noise Test Subscription Handler':
+            case 'noise Multiprice Test':
                 return [
                     'line_items' => [
                         // 'price' => $this->vof_get_price_id('noise'),
-                        'price' => $this->vof_get_price_id('noise Test Subscription Handler', $interval),
+                        'price' => $this->vof_get_price_id('noise Multiprice Test', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -567,10 +581,11 @@ class VOF_API {
                 ];
             
             // case 'noise_plus': // changed from noise+ to normalized name noise_plus
-            case 'noise_plus Test Subscription Handler': // changed from noise+ to normalized name noise_plus
+            // case 'noise_plus Test Subscription Handler': // changed from noise+ to normalized name noise_plus
+            case 'noise_plus Multiprice Test': // changed from noise+ to normalized name noise_plus
                 return [
                     'line_items' => [
-                        'price' => $this->vof_get_price_id('noise_plus Test Subscription Handler', $interval),
+                        'price' => $this->vof_get_price_id('noise_plus Multiprice Test', $interval),
                         'quantity' => 1,
                         'adjustable_quantity' => [
                             'enabled' => false
@@ -599,15 +614,21 @@ class VOF_API {
         $price_ids = [
             'test' => [ // this is $env
                 'monthly' => [
-                    'biz Test Subscription Handler'        => 'price_1QushhF1Da8bBQoXx6owQdne',
-                    'noise Test Subscription Handler'      => 'price_1QusjwF1Da8bBQoXRXJTb8ie',
-                    'noise_plus Test Subscription Handler' => 'price_1QuslaF1Da8bBQoXmDNcAzuM'
+                    // 'biz Test Subscription Handler'        => 'price_1QushhF1Da8bBQoXx6owQdne',
+                    // 'noise Test Subscription Handler'      => 'price_1QusjwF1Da8bBQoXRXJTb8ie',
+                    // 'noise_plus Test Subscription Handler' => 'price_1QuslaF1Da8bBQoXmDNcAzuM'
+                    'biz Multiprice Test'        => 'price_1Qxbg5F1Da8bBQoXprg5jwDY',
+                    'noise Multiprice Test'      => 'price_1QxmWRF1Da8bBQoXt5W5DbIe',
+                    'noise_plus Multiprice Test' => 'price_1QxmsRF1Da8bBQoXncWbeoxf'
 
                 ],
                 'yearly' => [
-                    'biz Test Subscription Handler'        => 'price_1QxSS0F1Da8bBQoXOvRkOMoP',
-                    'noise Test Subscription Handler'      => 'price_xxxxxxxxxx',
-                    'noise_plus Test Subscription Handler' => 'price_xxxxxxxxxx'
+                    // 'biz Test Subscription Handler'        => 'price_1QxSS0F1Da8bBQoXOvRkOMoP',
+                    // 'noise Test Subscription Handler'      => 'price_xxxxxxxxxx',
+                    // 'noise_plus Test Subscription Handler' => 'price_xxxxxxxxxx'
+                    'biz Multiprice Test'        => 'price_1QxboiF1Da8bBQoX0tNfCRDt',
+                    'noise Multiprice Test'      => 'price_1Qxmn5F1Da8bBQoX99zHdEYu',
+                    'noise_plus Multiprice Test' => 'price_1QxmsRF1Da8bBQoXFYS9rqmL'
                 ],
             ],
             'live' => [

@@ -18,6 +18,7 @@ class VOF_Temp_User_Meta {
         $this->table_name = $wpdb->prefix . 'vof_temp_user_meta';
         if (!self::$table_created) {
             $this->vof_maybe_create_table();
+            $this->vof_maybe_create_custom_meta_table();
             self::$table_created = true;
         }
     }
@@ -50,6 +51,8 @@ class VOF_Temp_User_Meta {
             `stripe_customer_id` varchar(255) DEFAULT NULL,
             `stripe_sub_id` varchar(255) DEFAULT NULL,
             `stripe_sub_status` varchar(50) DEFAULT NULL,
+            `stripe_sub_start_date` datetime DEFAULT NULL,
+            `stripe_sub_expiry_date` datetime DEFAULT NULL,
             `stripe_prod_name` varchar(255) DEFAULT NULL,
             `stripe_prod_lookup_key` varchar(255) DEFAULT NULL,
             `stripe_period_interval` varchar(50) DEFAULT NULL,
@@ -80,6 +83,158 @@ class VOF_Temp_User_Meta {
         
         // $wpdb->query($trigger_sql);
     }
+
+    /**
+     * Create custom meta table for flexible data storage
+     */
+    private function vof_maybe_create_custom_meta_table() {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $custom_meta_table = $wpdb->prefix . 'vof_custom_meta';
+
+        $sql = "CREATE TABLE IF NOT EXISTS `{$custom_meta_table}` (
+            `meta_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            `uuid` varchar(36) NOT NULL,
+            `meta_key` varchar(255) NOT NULL,
+            `meta_value` longtext,
+            `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`meta_id`),
+            KEY `uuid` (`uuid`),
+            KEY `meta_key` (`meta_key`(191))
+        ) $charset_collate;";
+
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+
+    // START GETTERS / SETTERS: for custom_meta table
+
+/**
+ * Add custom meta for a user
+ * 
+ * @param string $uuid The user UUID
+ * @param string $key The meta key
+ * @param mixed $value The meta value
+ * @return bool Success or failure
+ */
+public function vof_add_custom_meta($uuid, $key, $value) {
+    global $wpdb;
+    $custom_meta_table = $wpdb->prefix . 'vof_custom_meta';
+    
+    // Serialize arrays and objects
+    if (is_array($value) || is_object($value)) {
+        $value = maybe_serialize($value);
+    }
+    
+    $result = $wpdb->insert(
+        $custom_meta_table,
+        [
+            'uuid' => $uuid,
+            'meta_key' => $key,
+            'meta_value' => $value
+        ],
+        ['%s', '%s', '%s']
+    );
+    
+    return $result !== false;
+}
+
+/**
+ * Get custom meta for a user
+ * 
+ * @param string $uuid The user UUID
+ * @param string $key The meta key
+ * @param bool $single Whether to return a single value
+ * @return mixed The meta value
+ */
+public function vof_get_custom_meta($uuid, $key, $single = true) {
+    global $wpdb;
+    $custom_meta_table = $wpdb->prefix . 'vof_custom_meta';
+    
+    if ($single) {
+        $query = $wpdb->prepare(
+            "SELECT meta_value FROM {$custom_meta_table} WHERE uuid = %s AND meta_key = %s LIMIT 1",
+            $uuid,
+            $key
+        );
+        
+        $result = $wpdb->get_var($query);
+        return maybe_unserialize($result);
+    } else {
+        $query = $wpdb->prepare(
+            "SELECT meta_value FROM {$custom_meta_table} WHERE uuid = %s AND meta_key = %s",
+            $uuid,
+            $key
+        );
+        
+        $results = $wpdb->get_col($query);
+        return array_map('maybe_unserialize', $results);
+    }
+}
+
+/**
+ * Update custom meta for a user
+ * 
+ * @param string $uuid The user UUID
+ * @param string $key The meta key
+ * @param mixed $value The meta value
+ * @return bool Success or failure
+ */
+public function vof_update_custom_meta($uuid, $key, $value) {
+    global $wpdb;
+    $custom_meta_table = $wpdb->prefix . 'vof_custom_meta';
+    
+    // Check if meta key exists
+    $exists = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$custom_meta_table} WHERE uuid = %s AND meta_key = %s",
+            $uuid,
+            $key
+        )
+    );
+    
+    // Serialize arrays and objects
+    if (is_array($value) || is_object($value)) {
+        $value = maybe_serialize($value);
+    }
+    
+    if ($exists) {
+        $result = $wpdb->update(
+            $custom_meta_table,
+            ['meta_value' => $value],
+            ['uuid' => $uuid, 'meta_key' => $key],
+            ['%s'],
+            ['%s', '%s']
+        );
+    } else {
+        $result = $this->vof_add_custom_meta($uuid, $key, $value);
+    }
+    
+    return $result !== false;
+}
+
+/**
+ * Delete custom meta for a user
+ * 
+ * @param string $uuid The user UUID
+ * @param string $key The meta key
+ * @return bool Success or failure
+ */
+public function vof_delete_custom_meta($uuid, $key) {
+    global $wpdb;
+    $custom_meta_table = $wpdb->prefix . 'vof_custom_meta';
+    
+    $result = $wpdb->delete(
+        $custom_meta_table,
+        ['uuid' => $uuid, 'meta_key' => $key],
+        ['%s', '%s']
+    );
+    
+    return $result !== false;
+}
+
+// END SETTERS: for custom_meta table
 
     // GETTERS
     public function vof_get_temp_user_by_uuid($uuid) {
@@ -324,6 +479,8 @@ class VOF_Temp_User_Meta {
             `stripe_customer_id` varchar(255) DEFAULT NULL,
             `stripe_sub_id` varchar(255) DEFAULT NULL,
             `stripe_sub_status` varchar(50) DEFAULT NULL,
+            `stripe_sub_start_date` datetime DEFAULT NULL,
+            `stripe_sub_expiry_date` datetime DEFAULT NULL,            
             `stripe_prod_name` varchar(255) DEFAULT NULL,
             `stripe_prod_lookup_key` varchar(255) DEFAULT NULL,
             `stripe_period_interval` varchar(50) DEFAULT NULL,
@@ -427,6 +584,8 @@ class VOF_Temp_User_Meta {
                 '%s',   // stripe_prod_lookup_key
                 '%s',   // stripe_period_interval
                 '%d',   // price_purchased_at
+                '%s',   // stripe_sub_start_date
+                '%s',   // stripe_sub_expiry_date
             ),
             array('%s') // uuid format
         );

@@ -255,6 +255,7 @@ class VOF_Webhook_Handler {
                     'customer'                 => $expanded_subscription->customer ?? null,
                     'status'                   => $expanded_subscription->status ?? null,
                     'current_period_end'       => $expanded_subscription->current_period_end ?? null,
+                    'current_period_start'     => $expanded_subscription->current_period_start ?? null,
 
                     // newly added
                     'subscription_id'          => $expanded_subscription->items->data[0]->subscription ?? null,
@@ -267,8 +268,8 @@ class VOF_Webhook_Handler {
                     'customer_email'           => $expanded_subscription->latest_invoice->customer_email ?? null,
                     'customer_name'            => $expanded_subscription->latest_invoice->customer_name ?? null,
                     'customer_phone'           => $expanded_subscription->latest_invoice->customer_phone ?? null,
-                    'period_end'               => $expanded_subscription->latest_invoice->period_end ?? null,
-                    'period_start'             => $expanded_subscription->latest_invoice->period_start ?? null,
+                    // 'period_end'               => $expanded_subscription->latest_invoice->period_end ?? null,
+                    // 'period_start'             => $expanded_subscription->latest_invoice->period_start ?? null,
 
                     // newly very newly added
                     'rtcl_transaction_id'      => $expanded_subscription->latest_invoice->charge->id ?? null,                        // ch_xxxx
@@ -333,8 +334,60 @@ class VOF_Webhook_Handler {
         }
     }
 
-    private function vof_handle_subscription_updated($subscription) { // TODO: probably update expiration date every time on renewal for "monthly"
-        try {
+    private function vof_handle_subscription_updated($subscription) {
+        try { // TO-DO: 
+              // NEED TO DIFFERENTIATE BETWEEN LONG-TERM INTERVALS VS MONTHLY INTERVALS... 
+              // IF SHORTER, JUST RETURN SUCCESS RESPONSE 200 
+              // OTHER-WISE DO INTERIM LOGIC STUFF AND RETURN SUCCESS RESPONSE 200
+              // always update subscripton status in vof temp meta
+            // Get subscription ID
+            $subscription_id = $subscription->id;
+            
+            // Find corresponding VOF subscription
+            $temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
+            $vof_sub = $temp_user_meta->vof_get_subscription_by_stripe_id($subscription_id);
+            
+            if (!$vof_sub) {
+                return new WP_Error('subscription_not_found', 'Subscription not found');
+            }
+
+            // Check if this is a renewal or other status change
+            $is_renewal = false;
+            if (isset($subscription->current_period_end) && 
+                strtotime($vof_sub['stripe_sub_expiry_date']) < $subscription->current_period_end) {
+                $is_renewal = true;
+            }
+
+            // Update subscription data
+            $update_data = [
+                'stripe_sub_status'    => $subscription->status,
+                'stripe_sub_expiry_date' => date('Y-m-d H:i:s', $subscription->current_period_end)
+            ];
+
+            $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+
+            // If renewed and interim fulfillment is enabled, reset the interim fulfillment schedule
+            if ($is_renewal && 
+                $vof_sub['stripe_period_interval'] !== 'month' && 
+                $fulfillment_handler->vof_is_interim_fulfillment_enabled()) {
+                
+                // Set next interim fulfillment date to 30 days from now
+                $next_fulfillment = date('Y-m-d H:i:s', strtotime('+30 days'));
+                $temp_user_meta->vof_update_custom_meta(
+                    $vof_sub['uuid'], 
+                    'next_interim_fulfillment', 
+                    $next_fulfillment
+                );
+
+                // Update last fulfillment date to now
+                $temp_user_meta->vof_update_custom_meta(
+                    $vof_sub['uuid'], 
+                    'last_interim_fulfillment', 
+                    current_time('mysql')
+                );
+            }
+
             do_action('vof_subscription_updated', 
                 $subscription->id,
                 $subscription
@@ -353,6 +406,63 @@ class VOF_Webhook_Handler {
     }
 
     private function vof_handle_subscription_deleted($subscription) {
+        try {
+            // Get subscription ID
+            $subscription_id = $subscription->id;
+
+            // Find corresponding VOF subscription
+            $temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+            $vof_sub = $temp_user_meta->vof_get_subscription_by_stripe_id($subscription_id);
+
+            if ($vof_sub) {
+                // Update subscription status
+                $update_data = [
+                    'stripe_sub_status' => 'cancelled',
+                ];
+
+                $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+
+                // Clear interim fulfillment schedule
+                $temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'next_interim_fulfillment');
+            }
+
+            do_action('vof_subscription_cancelled', 
+                $subscription->id,
+                $subscription
+            );
+
+            http_response_code(200);
+            return array('success' => true);
+
+        } catch (\Exception $e) {
+            http_response_code(400);
+            return new WP_Error('subscription_deletion_error', 
+                $e->getMessage(),
+                array('status' => 400)
+            ); 
+        }
+    }
+
+    private function vof_handle_subscription_updated_OLD($subscription) { // TODO: probably update expiration date every time on renewal for "monthly"
+        try {
+            do_action('vof_subscription_updated', 
+                $subscription->id,
+                $subscription
+            );
+
+            http_response_code(200);
+            return array('success' => true);
+
+        } catch (\Exception $e) {
+            http_response_code(400);
+            return new WP_Error('subscription_update_error', 
+                $e->getMessage(),
+                array('status' => 400)
+            );
+        }
+    }
+
+    private function vof_handle_subscription_deleted_OLD($subscription) {
         try {
             do_action('vof_subscription_cancelled', 
                 $subscription->id,
