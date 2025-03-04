@@ -21,40 +21,6 @@ class VOF_Helper_Functions {
 		// add_filter('rtcl_ajax_listing_form_validate', [$this, 'vof_validate_ajax_email'], 10, 1);
     }
 
-	// MANUAL FULFILLMENT UTILITY FUNCTION
-	/**
-	 * Manually fulfill membership for a user
-	 * 
-	 * @param int $user_id The user ID to fulfill membership for
-	 * @param string $subscription_id The Stripe subscription ID
-	 * @param string $product_name The product name (optional)
-	 * @param int $pricing_id The RTCL pricing tier ID (optional)
-	 * @return bool|WP_Error Success or failure
-	 */
-	public static function vof_manually_fulfill_subscription($user_id, $subscription_id, $product_name = null, $pricing_id = null) {
-	    // Basic validation
-	    if (!$user_id || !$subscription_id) {
-	        return new \WP_Error('invalid_parameters', 'User ID and subscription ID are required');
-	    }
-	
-	    // Build subscription data
-	    $subscription_data = [
-	        'subscription_id' => $subscription_id,
-	        'product_name'    => $product_name ?: 'Manually Restored Subscription',
-	        'status'          => 'active',
-	        'current_period_end' => strtotime('+1 month')
-	    ];
-	
-	    // Add pricing tier ID if provided
-	    if ($pricing_id) {
-	        $subscription_data['rtcl_pricing_tier_id'] = $pricing_id;
-	    }
-	
-	    // Get fulfillment handler and call manual fulfillment
-	    $fulfillment_handler = \VOF\Includes\Fulfillment\VOF_Fulfillment_Handler::getInstance();
-	    return $fulfillment_handler->vof_manual_fulfill_membership($user_id, $subscription_data);
-	}
-
 	public static function vof_register_temp_post_status() {
 		register_post_status('vof_temp', [
 			'label' => _x('Temporary Listing','post status', 'vof'),
