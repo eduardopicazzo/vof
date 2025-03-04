@@ -916,8 +916,7 @@ public function vof_manual_fulfill_membership($user_id, $subscription_data) {
         error_log('VOF Debug: Subscription data: ' . print_r($subscription_data, true));
         
         // Validate user exists
-        $user = get_user_by('ID', $user_id);
-        if (!$user) {
+        if (!get_user_by('ID', $user_id)) {
             throw new \Exception('Invalid user ID: ' . $user_id);
         }
         
@@ -933,8 +932,6 @@ public function vof_manual_fulfill_membership($user_id, $subscription_data) {
             'amount' => 0,
             'status' => 'active',
             'current_period_end' => strtotime('+1 month'),
-            'interval' => 'month',
-            'lookup_key' => sanitize_title($subscription_data['product_name'] ?? 'manual-restore')
         ]);
         
         // Get or create RTCL pricing tier ID
@@ -951,11 +948,8 @@ public function vof_manual_fulfill_membership($user_id, $subscription_data) {
         
         error_log('VOF Debug: Using RTCL pricing tier ID: ' . $subscription_data['rtcl_pricing_tier_id']);
         
-        // Step 1: Create or update RTCL Subscription record first
-        $this->vof_create_or_update_rtcl_subscription($user_id, $subscription_data);
-        
-        // Step 2: Create payment and trigger membership creation/update
-        $this->vof_trigger_rtcl_membership_fulfillment($user_id, $subscription_data);
+        // Create subscription in RTCL's system if it doesn't exist
+        $this->vof_trigger_rtcl_membership_fulfillment($user_id, $subscription_data['rtcl_pricing_tier_id']);
         
         $wpdb->query('COMMIT');
         error_log('VOF Debug: Manual fulfillment completed successfully');
@@ -964,115 +958,7 @@ public function vof_manual_fulfill_membership($user_id, $subscription_data) {
     } catch (\Exception $e) {
         $wpdb->query('ROLLBACK');
         error_log('VOF Error: Manual fulfillment failed - ' . $e->getMessage());
-        error_log('VOF Error: ' . $e->getTraceAsString());
         return new \WP_Error('manual_fulfillment_failed', $e->getMessage());
-    }
-}
-
-/**
- * Create or update RTCL Subscription record
- * 
- * @param int $user_id
- * @param array $subscription_data
- * @return bool|object The created or updated subscription
- */
-private function vof_create_or_update_rtcl_subscription($user_id, $subscription_data) {
-    error_log('VOF Debug: Creating or updating RTCL subscription for user ID: ' . $user_id);
-    
-    // Find existing subscription by subscription ID
-    $subscriptions = new \RtclPro\Models\Subscriptions();
-    $subscription = $subscriptions->findOneBySubId($subscription_data['subscription_id']);
-    
-    // Set subscription details
-    $status = isset($subscription_data['status']) ? $subscription_data['status'] : 'active';
-    $amount = isset($subscription_data['amount']) ? $subscription_data['amount'] : 0;
-    $expiry_at = $subscription_data['current_period_end'] 
-        ? date('Y-m-d H:i:s', $subscription_data['current_period_end']) 
-        : date('Y-m-d H:i:s', strtotime('+1 month'));
-    
-    // Set credit card data if available
-    $cc_data = null;
-    if (!empty($subscription_data['payment_method']['cc'])) {
-        $cc_data = [
-            'cc' => $subscription_data['payment_method']['cc']
-        ];
-    }
-    
-    // If not found, create a new subscription
-    if (!$subscription) {
-        error_log('VOF Debug: No existing subscription found, creating new one');
-        
-        // Store current user context
-        $current_user = wp_get_current_user();            
-        
-        // Switch to target user context - Required for RTCL subscription creation
-        wp_set_current_user($user_id);
-        
-        // Create subscription data
-        $sub_data = [
-            'user_id'      => $user_id,
-            'name'         => $subscription_data['product_name'],
-            'sub_id'       => $subscription_data['subscription_id'],
-            'occurrence'   => 1,
-            'gateway_id'   => 'stripe',
-            'status'       => $status,
-            'product_id'   => $subscription_data['rtcl_pricing_tier_id'],
-            'quantity'     => 1,
-            'price'        => $amount,
-            'expiry_at'    => $expiry_at,
-            'created_at'   => current_time('mysql'),
-            'updated_at'   => current_time('mysql')
-        ];
-        
-        error_log('VOF Debug: Creating subscription with data: ' . print_r($sub_data, true));
-        
-        // Create the subscription
-        $subscription = $subscriptions->create($sub_data);
-        
-        // Restore original user context
-        wp_set_current_user($current_user->ID);
-        
-        if (is_wp_error($subscription)) {
-            error_log('VOF Error: Failed to create subscription - ' . $subscription->get_error_message());
-            throw new \Exception('Failed to create subscription: ' . $subscription->get_error_message());
-        }
-        
-        // Add credit card metadata if available
-        if ($cc_data && $subscription) {
-            $subscription->update_meta('cc', $cc_data['cc']);
-        }
-        
-        error_log('VOF Debug: Successfully created subscription with ID: ' . $subscription->getId());
-        return $subscription;
-    } else {
-        error_log('VOF Debug: Updating existing subscription: ' . print_r($subscription, true));
-        
-        // Update the subscription status
-        $result = $subscription->updateStatus($status);
-        if (is_wp_error($result)) {
-            error_log('VOF Error: Failed to update subscription status - ' . $result->get_error_message());
-        }
-        
-        // Update expiry date
-        $subscription_data = [
-            'expiry_date' => $expiry_at
-        ];
-        
-        // Update the subscription through RTCL's API
-        if (method_exists($subscription, 'update')) {
-            $result = $subscription->update($subscription_data);
-            if (is_wp_error($result)) {
-                error_log('VOF Error: Failed to update subscription expiry - ' . $result->get_error_message());
-            }
-        }
-        
-        // Add credit card metadata if available
-        if ($cc_data) {
-            $subscription->update_meta('cc', $cc_data['cc']);
-        }
-        
-        error_log('VOF Debug: Successfully updated subscription with ID: ' . $subscription->getId());
-        return $subscription;
     }
 }
 
@@ -1098,39 +984,33 @@ private function vof_find_default_pricing_tier() {
 }
 
 /**
- * Trigger RTCL membership fulfillment directly by creating a payment
- * that will trigger StatusChange hooks to apply membership benefits
+ * Trigger RTCL membership fulfillment directly
  * 
  * @param int $user_id The user ID
- * @param array $subscription_data Subscription and pricing data
+ * @param int $pricing_id The RTCL pricing ID
  * @return bool Success or failure
  */
-private function vof_trigger_rtcl_membership_fulfillment($user_id, $subscription_data) {
-    $pricing_id = $subscription_data['rtcl_pricing_tier_id'];
-    $amount = $subscription_data['amount'] ?: 0;
-    $subscription_id = $subscription_data['subscription_id'];
-    
+private function vof_trigger_rtcl_membership_fulfillment($user_id, $pricing_id) {
     error_log('VOF Debug: Creating manual fulfillment order for user ID: ' . $user_id . ', pricing ID: ' . $pricing_id);
     
-    // Create a payment order to trigger membership benefits
+    // Create a fake payment order to trigger membership benefits
     $order_args = [
-        'post_title'  => esc_html__('Manual Membership Fulfillment', 'vendor-onboarding-flow') . ' ' . current_time("l jS F Y h:i:s A"),
-        'post_status' => 'rtcl-created', // Important: Start as created, then complete it programmatically
+        'post_title'  => esc_html__('Manual Membership Restoration', 'vendor-onboarding-flow') . ' ' . current_time("l jS F Y h:i:s A"),
+        'post_status' => 'rtcl-created',
         'post_parent' => '0',
         'ping_status' => 'closed',
-        'post_author' => $user_id,
+        'post_author' => 1,
         'post_type'   => rtcl()->post_type_payment,
         'meta_input'  => [
-            'customer_id'             => $user_id,
-            '_order_key'              => apply_filters('rtcl_generate_order_key', uniqid('rtcl_order_')),
-            '_pricing_id'             => $pricing_id,
-            'amount'                  => $amount,
-            '_payment_method'         => 'stripe',
-            '_payment_method_title'   => 'Stripe',
-            '_order_currency'         => \Rtcl\Helpers\Functions::get_order_currency(),
-            'payment_type'            => 'membership',
-            '_stripe_subscription_id' => $subscription_id,
-            '_rtcl_membership_promotions' => get_post_meta($pricing_id, '_rtcl_membership_promotions', true)
+            'customer_id'           => $user_id,
+            '_order_key'            => uniqid('rtcl_order_'),
+            '_pricing_id'           => $pricing_id,
+            'amount'                => 0, // Zero amount since this is a manual fulfillment
+            '_payment_method'       => 'stripe',
+            '_payment_method_title' => 'Stripe (Manual Restoration)',
+            '_order_currency'       => \Rtcl\Helpers\Functions::get_order_currency(),
+            'payment_type'          => 'membership',
+            '_applied'              => 1
         ]
     ];
     
@@ -1138,9 +1018,8 @@ private function vof_trigger_rtcl_membership_fulfillment($user_id, $subscription
     $order_id = wp_insert_post($order_args);
     
     if (!$order_id || is_wp_error($order_id)) {
-        error_log('VOF Error: Failed to create manual fulfillment order: ' . 
-            (is_wp_error($order_id) ? $order_id->get_error_message() : 'Unknown error'));
-        throw new \Exception('Failed to create manual fulfillment order');
+        error_log('VOF Error: Failed to create manual restoration order');
+        throw new \Exception('Failed to create manual restoration order');
     }
     
     // Get RTCL order object
@@ -1151,69 +1030,23 @@ private function vof_trigger_rtcl_membership_fulfillment($user_id, $subscription
         throw new \Exception('Failed to get order object');
     }
     
-    // Set transaction ID
-    $transaction_id = 'manual-fulfill-' . $subscription_id . '-' . time();
-    $order->set_transaction_id($transaction_id);
+    // Set transaction ID and complete payment
+    $transaction_id = 'manual-restoration-' . time();
+    update_post_meta($order_id, 'transaction_id', $transaction_id);
     
     // Mark as paid
     $order->set_date_paid(\Rtcl\Helpers\Functions::datetime());
     
-    // Complete the payment which will trigger StatusChange hooks for membership fulfillment
+    // Complete the payment to trigger membership fulfillment
     $result = $order->payment_complete($transaction_id);
     
-    error_log('VOF Debug: Manual membership payment completion result: ' . ($result ? 'Success' : 'Failed'));
+    error_log('VOF Debug: Manual membership fulfillment result: ' . ($result ? 'Success' : 'Failed'));
     
     if (!$result) {
-        error_log('VOF Error: Payment completion failed');
         throw new \Exception('Failed to complete payment process');
     }
     
-    // Verify the order status changed to completed
-    $updated_order = rtcl()->factory->get_order($order_id);
-    error_log('VOF Debug: Order status after payment completion: ' . $updated_order->get_status());
-    
-    if (!$updated_order->has_status('rtcl-completed')) {
-        error_log('VOF Warning: Order did not complete successfully, current status: ' . $updated_order->get_status());
-    }
-    
-    // Additional action that directly applies membership if hooks didn't work
-    $this->vof_direct_apply_membership($user_id, $order);
-    
-    return true;
-}
-
-/**
- * Directly apply membership as a fallback if hooks don't trigger
- * 
- * @param int $user_id
- * @param \Rtcl\Models\Payment $payment
- * @return bool
- */
-private function vof_direct_apply_membership($user_id, $payment) {
-    try {
-        error_log('VOF Debug: Attempting direct membership application');
-        
-        // Check if the membership already exists and is applied
-        $membership = rtclStore()->factory->get_membership($user_id);
-        
-        if ($membership && !$membership->is_expired() && $payment->is_applied()) {
-            error_log('VOF Debug: Membership already exists and payment is applied');
-            return true;
-        }
-        
-        // Directly apply using RtclStore's method
-        if (class_exists('\RtclStore\Helpers\Functions')) {
-            \RtclStore\Helpers\Functions::apply_membership($payment);
-            error_log('VOF Debug: Direct membership application completed');
-            return true;
-        }
-        
-        error_log('VOF Error: Could not find RtclStore Functions class');
-        return false;
-    } catch (\Exception $e) {
-        error_log('VOF Error: Direct membership application failed - ' . $e->getMessage());
-        return false;
-    }
+    return $result;
 }
 
 

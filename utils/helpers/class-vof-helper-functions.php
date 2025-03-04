@@ -22,10 +22,6 @@ class VOF_Helper_Functions {
     }
 
 	// MANUAL FULFILLMENT UTILITY FUNCTION
-	// Path: wp-content/plugins/vendor-onboarding-flow/utils/helpers/class-vof-helper-functions.php
-
-	// Path: wp-content/plugins/vendor-onboarding-flow/utils/helpers/class-vof-helper-functions.php
-
 	/**
 	 * Manually fulfill membership for a user
 	 * 
@@ -44,8 +40,8 @@ class VOF_Helper_Functions {
 	    // Build subscription data
 	    $subscription_data = [
 	        'subscription_id' => $subscription_id,
-	        'product_name' => $product_name ?: 'Manually Restored Subscription',
-	        'status' => 'active',
+	        'product_name'    => $product_name ?: 'Manually Restored Subscription',
+	        'status'          => 'active',
 	        'current_period_end' => strtotime('+1 month')
 	    ];
 	
