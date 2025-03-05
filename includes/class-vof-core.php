@@ -12,6 +12,7 @@ use VOF\Includes\Fulfillment\VOF_Subscription_Handler;
 use VOF\Includes\Fulfillment\VOF_Fulfillment_Handler;
 use VOF\Utils\MailingESPs\VOF_MailerLite;
 use VOF\Utils\MailingESPs\VOF_MailerLite_Settings;
+use VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings;
 use RtclStore\Helpers\Functions as StoreFunctions;
 
 class VOF_Core {
@@ -29,6 +30,7 @@ class VOF_Core {
     private $subscription_handler;
     private $mailerlite;
     private $mailerlite_settings;
+    private $pricing_modal_settings;
 
     public static function instance() {
         if (null === self::$instance) {
@@ -174,6 +176,9 @@ class VOF_Core {
             if (class_exists('\VOF\Utils\MailingESPs\VOF_MailerLite_Settings')) {
                 $this->mailerlite_settings = new \VOF\Utils\MailingESPs\VOF_MailerLite_Settings();
             }
+            if (class_exists('\VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings')) {
+                $this->pricing_modal_settings = new \VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings();
+            }            
         }
     }
 

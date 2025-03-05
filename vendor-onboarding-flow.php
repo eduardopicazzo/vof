@@ -32,6 +32,7 @@ require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-helper-functions.php';
 require_once VOF_PLUGIN_DIR . 'utils/helpers/class-vof-temp-user-meta.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-config.php';
 require_once VOF_PLUGIN_DIR . 'utils/vof-stripe/class-vof-stripe-settings.php';
+require_once VOF_PLUGIN_DIR . 'utils/vof-pricing-modal/class-vof-pricing-modal-settings.php';
 
 // Load MailerLite integration if the directory exists
 if (file_exists(VOF_PLUGIN_DIR . 'utils/vof-mailing-esps')) {
