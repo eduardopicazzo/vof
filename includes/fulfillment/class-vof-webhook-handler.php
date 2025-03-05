@@ -100,50 +100,131 @@ class VOF_Webhook_Handler {
         }
     }
 
+    /**
+     * Process webhook event from Stripe
+     * 
+     * @param object $event The Stripe event
+     * @return array|WP_Error Success or error response
+     */
     private function vof_process_webhook_event($event) {
+        error_log('VOF Debug: Processing webhook event of type: ' . $event->type);
         
         switch ($event->type) {
             case 'checkout.session.completed':
                 $session = $event->data->object;
                 // $result = $this->vof_handle_checkout_completed($session);
                 $result = $this->vof_handle_checkout_completed_STUB();
-                
                 error_log('VOF Debug: Checkout completed');
-                
                 return $result;
     
             case 'customer.subscription.created':
                 $subscription = $event->data->object;                
                 $result = $this->vof_handle_subscription_created($subscription);
-                
                 error_log('VOF Debug: Subscription created');
+                
+                // Trigger action for interim fulfillment setup
+                do_action('vof_subscription_created', $subscription->id, $subscription);
                 
                 return $result;
             
-            // case 'checkout.session.expired':      // TODO (maybe)
-                    // SEND PERIODIC EMAIL TO CUSTOMER
-                // return true; // Return true to indicate success
-                // break;
-            // case 'customer.subscription.updated': // CURRENTLY NOT IN USE
+            case 'customer.subscription.updated': 
                 // Occurs whenever a subscription changes 
-                // (e.g., switching from one plan to another, or changing the status from trial to active).
-                // return $this->vof_handle_subscription_updated($event->data->object);
+                // (e.g., switching from one plan to another, renewal, or changing the status)
+                $subscription = $event->data->object;
+                $result = $this->vof_handle_subscription_updated($subscription);
+                error_log('VOF Debug: Subscription updated');
+                return $result;
 
-            // case 'customer.subscription.deleted': // CURRENTLY NOT IN USE
-                // return $this->vof_handle_subscription_deleted($event->data->object);
+            case 'customer.subscription.deleted': 
+                // Occurs when a subscription is cancelled or expires
+                $subscription = $event->data->object;
+                $result = $this->vof_handle_subscription_deleted($subscription);
+                error_log('VOF Debug: Subscription deleted');
+                return $result;
 
-            // case 'invoice.payment_succeeded':     // CURRENTLY NOT IN USE
-                // return $this->vof_handle_invoice_payment_succeeded($event->data->object);
+            case 'invoice.payment_succeeded':
+                // Occurs when an invoice payment succeeds
+                $invoice = $event->data->object;
+                
+                // Only handle subscription-related invoices
+                if (!empty($invoice->subscription)) {
+                    error_log('VOF Debug: Invoice payment succeeded for subscription: ' . $invoice->subscription);
+                    
+                    // Get the subscription to process the update
+                    try {
+                        $stripe_config = \VOF\VOF_Core::instance()->vof_get_stripe_config();
+                        $stripe = $stripe_config->vof_get_stripe();
+                        
+                        // Retrieve the subscription to pass to the update handler
+                        $subscription = $stripe->subscriptions->retrieve($invoice->subscription);
+                        
+                        error_log('VOF Debug: Retrieved subscription for invoice payment success: ' . $invoice->subscription);
+                        
+                        // Handle the subscription update which will trigger benefits refresh
+                        $result = $this->vof_handle_subscription_updated($subscription);
+                        return $result;
+                    } catch (\Exception $e) {
+                        error_log('VOF Error: Failed to retrieve subscription for invoice: ' . $e->getMessage());
+                        // Return success anyway to avoid retries
+                        http_response_code(200);
+                        return array('success' => true);
+                    }
+                }
+                
+                // For non-subscription invoices, just return success
+                http_response_code(200);
+                return array('success' => true);
 
-            // case 'invoice.payment_failed':        // CURRENTLY NOT IN USE
-                // return $this->vof_handle_invoice_payment_failed($event->data->object);
+            case 'invoice.payment_failed':
+                // Occurs when an invoice payment fails
+                $invoice = $event->data->object;
+                
+                // Only handle subscription-related invoices
+                if (!empty($invoice->subscription)) {
+                    error_log('VOF Debug: Invoice payment failed for subscription: ' . $invoice->subscription);
+                    
+                    // Mark subscription as past_due in our database
+                    try {
+                        $temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
+                        $vof_subs = $this->vof_get_subscription_by_stripe_id($invoice->subscription);
+                        
+                        if (!empty($vof_subs)) {
+                            foreach ($vof_subs as $vof_sub) {
+                                // Update status to past_due
+                                $update_data = [
+                                    'stripe_sub_status' => 'past_due'
+                                ];
+                                
+                                $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+                                error_log('VOF Debug: Updated subscription status to past_due');
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        error_log('VOF Error: Failed to update subscription status: ' . $e->getMessage());
+                    }
+                }
+                
+                // Return success
+                http_response_code(200);
+                return array('success' => true);
+                
+            case 'checkout.session.expired':
+                // When a checkout session expires
+                error_log('VOF Debug: Checkout session expired');
+                // We could potentially send a reminder email here
+                
+                http_response_code(200);
+                return array('success' => true);
 
             default:
-                http_response_code(400);
-                return new WP_Error(
-                    'unhandled_event',
-                    'Unhandled webhook event type: ' . $event->type,
-                    ['status' => 400]
+                error_log('VOF Debug: Unhandled webhook event type: ' . $event->type);
+                
+                // For unknown events, we should still return a 200 status
+                // to acknowledge receipt and avoid Stripe retrying
+                http_response_code(200);
+                return array(
+                    'success' => true,
+                    'message' => 'Event acknowledged but not processed: ' . $event->type
                 );
         }
     }
@@ -334,69 +415,131 @@ class VOF_Webhook_Handler {
         }
     }
 
+    /**
+     * Handle subscription update webhook from Stripe
+     * 
+     * @param object $subscription The subscription object from Stripe
+     * @return array|WP_Error Success or error response
+     */
     private function vof_handle_subscription_updated($subscription) {
-        try { // TO-DO: 
-              // NEED TO DIFFERENTIATE BETWEEN LONG-TERM INTERVALS VS MONTHLY INTERVALS... 
-              // IF SHORTER, JUST RETURN SUCCESS RESPONSE 200 
-              // OTHER-WISE DO INTERIM LOGIC STUFF AND RETURN SUCCESS RESPONSE 200
-              // always update subscripton status in vof temp meta
+        try {
+            error_log('VOF Debug: Handling subscription update webhook for ID: ' . $subscription->id);
+            
             // Get subscription ID
             $subscription_id = $subscription->id;
             
             // Find corresponding VOF subscription
             $temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
             $fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
-            $vof_sub = $temp_user_meta->vof_get_subscription_by_stripe_id($subscription_id);
             
-            if (!$vof_sub) {
-                return new WP_Error('subscription_not_found', 'Subscription not found');
+            // Get method does not exist - we need to implement this or find the subscription another way
+            // Using our own custom implementation to get subscription by stripe_sub_id
+            $vof_subs = $this->vof_get_subscription_by_stripe_id($subscription_id);
+            
+            if (empty($vof_subs)) {
+                error_log('VOF Warning: No VOF subscription found with Stripe ID: ' . $subscription_id);
+                // Just return success since this might be a subscription created outside our system
+                http_response_code(200);
+                return array('success' => true);
             }
-
-            // Check if this is a renewal or other status change
-            $is_renewal = false;
-            if (isset($subscription->current_period_end) && 
-                strtotime($vof_sub['stripe_sub_expiry_date']) < $subscription->current_period_end) {
-                $is_renewal = true;
-            }
-
-            // Update subscription data
-            $update_data = [
-                'stripe_sub_status'    => $subscription->status,
-                'stripe_sub_expiry_date' => date('Y-m-d H:i:s', $subscription->current_period_end)
-            ];
-
-            $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
-
-            // If renewed and interim fulfillment is enabled, reset the interim fulfillment schedule
-            if ($is_renewal && 
-                $vof_sub['stripe_period_interval'] !== 'month' && 
-                $fulfillment_handler->vof_is_interim_fulfillment_enabled()) {
+            
+            // Process each matching subscription (in most cases, there should be only one)
+            foreach ($vof_subs as $vof_sub) {
+                error_log('VOF Debug: Processing subscription update for UUID: ' . $vof_sub['uuid']);
                 
-                // Set next interim fulfillment date to 30 days from now
-                $next_fulfillment = date('Y-m-d H:i:s', strtotime('+30 days'));
-                $temp_user_meta->vof_update_custom_meta(
-                    $vof_sub['uuid'], 
-                    'next_interim_fulfillment', 
-                    $next_fulfillment
-                );
+                // Check if this is a renewal or other status change
+                $is_renewal = false;
+                if (isset($subscription->current_period_end) && 
+                    isset($vof_sub['stripe_sub_expiry_date']) && 
+                    strtotime($vof_sub['stripe_sub_expiry_date']) < $subscription->current_period_end) {
+                    $is_renewal = true;
+                    error_log('VOF Debug: This is a renewal - old expiry: ' . $vof_sub['stripe_sub_expiry_date'] . 
+                             ', new expiry: ' . date('Y-m-d H:i:s', $subscription->current_period_end));
+                }
 
-                // Update last fulfillment date to now
-                $temp_user_meta->vof_update_custom_meta(
-                    $vof_sub['uuid'], 
-                    'last_interim_fulfillment', 
-                    current_time('mysql')
-                );
+                // Update subscription data in our database
+                $update_data = [
+                    'stripe_sub_status'     => $subscription->status,
+                    'stripe_sub_expiry_date' => date('Y-m-d H:i:s', $subscription->current_period_end)
+                ];
+
+                $update_result = $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+                if (!$update_result) {
+                    error_log('VOF Warning: Failed to update subscription data in VOF database');
+                }
+
+                // Check if this is a yearly or other long-term subscription
+                $is_long_term = isset($vof_sub['stripe_period_interval']) && 
+                               $vof_sub['stripe_period_interval'] !== 'month';
+                
+                error_log('VOF Debug: Subscription interval: ' . 
+                         (isset($vof_sub['stripe_period_interval']) ? $vof_sub['stripe_period_interval'] : 'unknown') . 
+                         ', Is long-term: ' . ($is_long_term ? 'yes' : 'no'));
+                
+                // If this is a renewal of a long-term subscription and interim fulfillment is enabled
+                if ($is_renewal && $is_long_term && $fulfillment_handler->vof_is_interim_fulfillment_enabled()) {
+                    error_log('VOF Debug: Handling renewal of long-term subscription with interim fulfillment');
+                    
+                    // Reset the interim fulfillment schedule
+                    
+                    // Get interval from fulfillment handler
+                    $fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
+                    $interval = $fulfillment_handler->vof_get_fulfillment_interval();
+                    $next_fulfillment = date('Y-m-d H:i:s', strtotime(current_time('mysql')) + $interval);
+                    
+                    error_log('VOF Debug: Using ' . 
+                             ($fulfillment_handler->vof_is_test_interval_enabled() ? '2-minute test interval' : '30-day production interval') . 
+                             ' for next fulfillment');
+                    
+                    $meta_result = $temp_user_meta->vof_update_custom_meta(
+                        $vof_sub['uuid'], 
+                        'next_interim_fulfillment', 
+                        $next_fulfillment
+                    );
+                    
+                    if (!$meta_result) {
+                        error_log('VOF Warning: Failed to update next_interim_fulfillment');
+                    } else {
+                        error_log('VOF Debug: Set next interim fulfillment to: ' . $next_fulfillment);
+                    }
+
+                    // Update last fulfillment date to now
+                    $last_result = $temp_user_meta->vof_update_custom_meta(
+                        $vof_sub['uuid'], 
+                        'last_interim_fulfillment', 
+                        current_time('mysql')
+                    );
+                    
+                    if (!$last_result) {
+                        error_log('VOF Warning: Failed to update last_interim_fulfillment');
+                    }
+                }
+                
+                // ELSE IF IT'S JUST A REGULAR MOTTHLY SUBSCRIPTION RTCL SHOULD HANDLE IT... THIS SHOULD NOT APPLY HERE...
+                // Manually trigger RTCL subscription update to refresh benefits immediately
+                if ($subscription->status === 'active') {
+                    // For subscription updates, only pass the status and subscription ID
+                    // to avoid modifying the real expiry date unintentionally during interim fulfillment
+                    $params = [
+                        'sub_id'  => $subscription_id,
+                        'status'  => 'active'
+                        // Intentionally NOT passing expiry_date to avoid changing the real end date
+                    ];
+                    
+                    $process_result = $fulfillment_handler->vof_process_customer_subscription_updated($params);
+                    error_log('VOF Debug: Immediate subscription update result: ' . ($process_result ? 'success' : 'failed'));
+                }
             }
 
-            do_action('vof_subscription_updated', 
-                $subscription->id,
-                $subscription
-            );
+            do_action('vof_subscription_updated', $subscription_id, $subscription);
 
             http_response_code(200);
             return array('success' => true);
 
         } catch (\Exception $e) {
+            error_log('VOF Error: Subscription update failed - ' . $e->getMessage());
+            error_log('VOF Error: ' . $e->getTraceAsString());
+            
             http_response_code(400);
             return new WP_Error('subscription_update_error', 
                 $e->getMessage(),
@@ -404,37 +547,109 @@ class VOF_Webhook_Handler {
             );
         }
     }
+    
+    /**
+     * Get subscription by Stripe subscription ID
+     * 
+     * @param string $subscription_id The Stripe subscription ID
+     * @return array Array of matching subscriptions
+     */
+    private function vof_get_subscription_by_stripe_id($subscription_id) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'vof_temp_user_meta';
+        
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE stripe_sub_id = %s",
+            $subscription_id
+        );
+        
+        error_log('VOF Debug: Running subscription query: ' . $query);
+        
+        $results = $wpdb->get_results($query, ARRAY_A);
+        
+        if ($wpdb->last_error) {
+            error_log('VOF Error: Database error when looking up subscription: ' . $wpdb->last_error);
+            return [];
+        }
+        
+        if (empty($results)) {
+            error_log('VOF Debug: No subscriptions found with ID: ' . $subscription_id);
+            return [];
+        }
+        
+        error_log('VOF Debug: Found ' . count($results) . ' subscriptions with ID: ' . $subscription_id);
+        return $results;
+    }
 
+    /**
+     * Handle subscription deletion webhook from Stripe
+     * 
+     * @param object $subscription The subscription object from Stripe
+     * @return array|WP_Error Success or error response
+     */
     private function vof_handle_subscription_deleted($subscription) {
         try {
+            error_log('VOF Debug: Handling subscription deletion webhook for ID: ' . $subscription->id);
+            
             // Get subscription ID
             $subscription_id = $subscription->id;
 
-            // Find corresponding VOF subscription
+            // Find corresponding VOF subscription(s)
             $temp_user_meta = \VOF\Utils\Helpers\VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
-            $vof_sub = $temp_user_meta->vof_get_subscription_by_stripe_id($subscription_id);
+            $vof_subs = $this->vof_get_subscription_by_stripe_id($subscription_id);
 
-            if ($vof_sub) {
+            if (empty($vof_subs)) {
+                error_log('VOF Warning: No VOF subscription found with Stripe ID: ' . $subscription_id);
+                // Just return success since this might be a subscription created outside our system
+                http_response_code(200);
+                return array('success' => true);
+            }
+            
+            // Process each matching subscription
+            foreach ($vof_subs as $vof_sub) {
+                error_log('VOF Debug: Processing subscription deletion for UUID: ' . $vof_sub['uuid']);
+                
                 // Update subscription status
                 $update_data = [
                     'stripe_sub_status' => 'cancelled',
                 ];
 
-                $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+                $update_result = $temp_user_meta->vof_update_post_status($vof_sub['uuid'], $update_data);
+                if (!$update_result) {
+                    error_log('VOF Warning: Failed to update subscription status to cancelled');
+                } else {
+                    error_log('VOF Debug: Updated subscription status to cancelled');
+                }
 
-                // Clear interim fulfillment schedule
-                $temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'next_interim_fulfillment');
+                // Clear interim fulfillment schedule by removing both meta entries
+                $meta_result1 = $temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'next_interim_fulfillment');
+                $meta_result2 = $temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'last_interim_fulfillment');
+                
+                error_log('VOF Debug: Cleared interim fulfillment meta - next: ' . 
+                         ($meta_result1 ? 'success' : 'failed') . ', last: ' . 
+                         ($meta_result2 ? 'success' : 'failed'));
+                
+                // Update the RTCL subscription to cancelled
+                $fulfillment_handler = VOF_Fulfillment_Handler::getInstance();
+                $params = [
+                    'sub_id'  => $subscription_id,
+                    'status'  => 'cancelled'
+                    // Intentionally NOT passing expiry_date to avoid changing the real end date
+                ];
+                
+                $process_result = $fulfillment_handler->vof_process_customer_subscription_updated($params);
+                error_log('VOF Debug: RTCL subscription cancellation result: ' . ($process_result ? 'success' : 'failed'));
             }
 
-            do_action('vof_subscription_cancelled', 
-                $subscription->id,
-                $subscription
-            );
+            do_action('vof_subscription_cancelled', $subscription_id, $subscription);
 
             http_response_code(200);
             return array('success' => true);
 
         } catch (\Exception $e) {
+            error_log('VOF Error: Subscription deletion failed - ' . $e->getMessage());
+            error_log('VOF Error: ' . $e->getTraceAsString());
+            
             http_response_code(400);
             return new WP_Error('subscription_deletion_error', 
                 $e->getMessage(),

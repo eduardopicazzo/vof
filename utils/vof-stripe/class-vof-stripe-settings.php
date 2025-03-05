@@ -30,8 +30,9 @@ class VOF_Stripe_Settings {
         register_setting('vof_stripe_settings', 'vof_stripe_live_secret_key');
         register_setting('vof_stripe_settings', 'vof_stripe_live_webhook_secret');
 
-        // Add interim fulfillment setting
+        // Interim fulfillment settings
         register_setting('vof_stripe_settings', 'vof_enable_interim_fulfillment');
+        register_setting('vof_stripe_settings', 'vof_use_test_interval_2min');
     }
 
     public function vof_render_stripe_settings_page() {
@@ -124,8 +125,34 @@ class VOF_Stripe_Settings {
                         <p class="description">TLDR; Prevent one-off product fulfillment on subscriptons with longer-than-monthly billing periods </p>
                         <p class="description">When enabled, subscriptions with longer-than "per month" billing period intervals (bi-monthly, yearly, etc) will keep being fulfilled monthly regardless of the longer interval periods.</p>
                     </td>
+                    </tr>
+                    <tr class="interim-fulfillment-options" style="<?php echo get_option('vof_enable_interim_fulfillment', true) ? '' : 'display: none;'; ?>">
+                    <th scope="row">Testing Mode</th>
+                    <td>
+                        <label for="vof_use_test_interval_2min">
+                            <input type="checkbox" name="vof_use_test_interval_2min" 
+                                   id="vof_use_test_interval_2min"
+                                   value="1" <?php checked(1, get_option('vof_use_test_interval_2min', false), true); ?> />
+                            Use 2-minute interval for testing (instead of 30 days)
+                        </label>
+                        <p class="description"><strong>Important:</strong> Only enable this for testing! This will trigger interim fulfillment every 2 minutes instead of the normal 30-day interval.</p>
+                        <p class="description">This can generate a lot of database activity and log entries, so disable it when not needed for testing.</p>
+                    </td>
                     </tr>                    
                 </table>
+                
+                <script type="text/javascript">
+                jQuery(document).ready(function($) {
+                    // Show/hide test interval option based on interim fulfillment setting
+                    $('#vof_enable_interim_fulfillment').change(function() {
+                        if ($(this).is(':checked')) {
+                            $('.interim-fulfillment-options').show();
+                        } else {
+                            $('.interim-fulfillment-options').hide();
+                        }
+                    });
+                });
+                </script>
 
                 <?php submit_button('Save Settings'); ?>
             </form>

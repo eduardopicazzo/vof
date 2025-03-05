@@ -26,142 +26,21 @@ class VOF_Fulfillment_Handler {
     private function __construct() {
         $this->temp_user_meta       = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance();
         $this->subscription_handler = VOF_Subscription_Handler::getInstance();
-        
-        // Always hook into webhook events for proper subscription handling
-        add_action('vof_subscription_created', [$this, 'vof_handle_subscription_created'], 10, 2);
-        add_action('vof_subscription_updated', [$this, 'vof_handle_subscription_updated'], 10, 2);
-        add_action('vof_subscription_cancelled', [$this, 'vof_handle_subscription_cancelled'], 10, 2);
-        
-        // Only set up mesh-timer fulfillment hooks if interim fulfillment is enabled
+        // Hook the fulfillment handler to process the scheduled event
         if ($this->vof_is_interim_fulfillment_enabled()) {
-            error_log('VOF Debug: Interim fulfillment is enabled, setting up mesh-timer hooks');
+            // add_action('vof_monthly_subscription_fulfillment', [$this, 'vof_process_monthly_benefits']);
             
-            // Set up mesh-timer hooks for regular checks
+            // Set up mesh-timer hooks
             add_action('admin_init', [$this, 'vof_check_pending_fulfillments']);
             add_action('wp', [$this, 'vof_check_pending_fulfillments']);
             add_action('rest_api_init', [$this, 'vof_check_pending_fulfillments']);
-            
-            // We could add more hooks that fire regularly in WordPress, such as:
-            add_action('wp_ajax_nopriv_heartbeat', [$this, 'vof_check_pending_fulfillments'], 999);
-            add_action('wp_ajax_heartbeat', [$this, 'vof_check_pending_fulfillments'], 999);
-            
-            // Add a transient lock to prevent excessive checks
+        
+            // Add a 5-minute transient lock to prevent excessive checks
             add_action('vof_fulfillment_check_completed', [$this, 'vof_set_check_lock'], 10, 0);
         } else {
-            error_log('VOF Debug: Interim fulfillment is disabled');
-            
-            // Clean up anything that might be lingering
-            delete_transient('vof_fulfillment_check_lock');
+            // Remove any scheduled events if disabled
+            wp_clear_scheduled_hook('vof_monthly_subscription_fulfillment');
         }
-    }
-    
-    /**
-     * Handle subscription creation from webhook events
-     */
-    public function vof_handle_subscription_created($subscription_id, $data) {
-        error_log('VOF Debug: Handling subscription created event for ' . $subscription_id);
-        
-        // For new subscriptions with longer intervals, set up the initial interim fulfillment timer
-        $interval = isset($data->items->data[0]->plan->interval) ? $data->items->data[0]->plan->interval : 'month';
-        
-        if ($interval !== 'month' && $this->vof_is_interim_fulfillment_enabled()) {
-            error_log('VOF Debug: Non-monthly subscription detected (' . $interval . '), setting up interim fulfillment');
-            
-            // Find the subscription in our database
-            $vof_subs = $this->vof_get_subscriptions_by_stripe_id($subscription_id);
-            
-            error_log('VOF Debug: Found ' . count($vof_subs) . ' subscription records for interim setup');
-            
-            // Sets interim fulfillment timer by adding init fulfillment date and next fulfillment date
-            if (!empty($vof_subs)) {
-                foreach ($vof_subs as $vof_sub) {
-                    error_log('VOF Debug: Setting up interim fulfillment for UUID: ' . $vof_sub['uuid']);
-                    
-                    // Set up initial interim fulfillment timer
-                    // Get interval from settings
-                    $interval = $this->vof_get_fulfillment_interval();
-                    $next_fulfillment = date('Y-m-d H:i:s', strtotime(current_time('mysql')) + $interval);
-                    
-                    error_log('VOF Debug: Using ' . 
-                             ($this->vof_is_test_interval_enabled() ? '2-minute test interval' : '30-day production interval') . 
-                             ' for subscription creation');
-                    
-                    $result1 = $this->temp_user_meta->vof_update_custom_meta(
-                        $vof_sub['uuid'],
-                        'next_interim_fulfillment',
-                        $next_fulfillment
-                    );
-                    
-                    $result2 = $this->temp_user_meta->vof_update_custom_meta(
-                        $vof_sub['uuid'],
-                        'last_interim_fulfillment',
-                        current_time('mysql')
-                    );
-                    
-                    error_log('VOF Debug: Set up initial interim fulfillment timer for ' . $vof_sub['uuid'] . 
-                             ' to ' . $next_fulfillment . ' (next success: ' . ($result1 ? 'yes' : 'no') . 
-                             ', last success: ' . ($result2 ? 'yes' : 'no') . ')');
-                }
-            } else {
-                error_log('VOF Warning: No subscription records found for interim fulfillment setup');
-            }
-        } else {
-            if ($interval === 'month') {
-                error_log('VOF Debug: Monthly subscription detected, no interim fulfillment needed');
-            } else if (!$this->vof_is_interim_fulfillment_enabled()) {
-                error_log('VOF Debug: Interim fulfillment is disabled, skipping setup');
-            }
-        }
-    }
-    
-    /**
-     * Handle subscription update from webhook events
-     */
-    public function vof_handle_subscription_updated($subscription_id, $data) {
-        error_log('VOF Debug: Handling subscription updated event for ' . $subscription_id);
-        // Additional processing can be added here if needed
-    }
-    
-    /**
-     * Handle subscription cancellation from webhook events
-     */
-    public function vof_handle_subscription_cancelled($subscription_id, $data) {
-        error_log('VOF Debug: Handling subscription cancelled event for ' . $subscription_id);
-        
-        // Find the subscription in our database
-        $vof_subs = $this->vof_get_subscriptions_by_stripe_id($subscription_id);
-        
-        if (!empty($vof_subs)) {
-            foreach ($vof_subs as $vof_sub) {
-                // Clean up interim fulfillment timers
-                $this->temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'next_interim_fulfillment');
-                $this->temp_user_meta->vof_delete_custom_meta($vof_sub['uuid'], 'last_interim_fulfillment');
-                
-                error_log('VOF Debug: Cleaned up interim fulfillment timers for ' . $vof_sub['uuid']);
-            }
-        }
-    }
-    
-    /**
-     * Helper to get subscriptions by Stripe ID
-     */
-    private function vof_get_subscriptions_by_stripe_id($subscription_id) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'vof_temp_user_meta';
-        
-        $query = $wpdb->prepare(
-            "SELECT * FROM {$table_name} WHERE stripe_sub_id = %s",
-            $subscription_id
-        );
-        
-        $results = $wpdb->get_results($query, ARRAY_A);
-        
-        if (empty($results)) {
-            error_log('VOF Debug: No subscriptions found with ID: ' . $subscription_id);
-            return [];
-        }
-        
-        return $results;
     }
 
     /**
@@ -455,65 +334,35 @@ class VOF_Fulfillment_Handler {
      */
     public function vof_update_vof_flow($stripe_data, $is_vof_fulfilled) {
         if (!$is_vof_fulfilled) {
-            error_log('VOF Warning: Not updating flow since fulfillment was not successful');
             return false;
         }
 
-        error_log('VOF Debug: Updating VOF flow for UUID: ' . $stripe_data['uuid']);
-        
-        // Ensure required UUIDs are present
-        if (empty($stripe_data['uuid'])) {
-            error_log('VOF Error: Missing UUID in stripe_data');
-            return false;
-        }
-
-        // Get the start time
         $vof_flow_started_at = $this->temp_user_meta->vof_get_flow_started_at_by_uuid($stripe_data['uuid']);
-        if (!$vof_flow_started_at) {
-            error_log('VOF Warning: Could not find flow start time for UUID: ' . $stripe_data['uuid']);
-            $vof_flow_started_at = strtotime(current_time('mysql')) - 3600; // Default to 1 hour ago
-        }
 
-        // Process the values with proper null handling
-        $price_purchased_at    = isset($stripe_data['amount']) ? ($stripe_data['amount'] / 100) : null;
-        $vof_flow_completed_at = current_time('mysql');
-        $vof_flow_time_elapsed = $vof_flow_started_at ? (strtotime($vof_flow_completed_at) - strtotime($vof_flow_started_at)) : null; // Seconds. should display on hours or days...
-        
-        // Format dates safely
-        $vof_sub_start_date = isset($stripe_data['current_period_start']) ? 
-                            date('Y-m-d H:i:s', $stripe_data['current_period_start']) : 
-                            date('Y-m-d H:i:s', strtotime('now'));
-        
-        $vof_sub_expiry_date = isset($stripe_data['current_period_end']) ? 
-                             date('Y-m-d H:i:s', $stripe_data['current_period_end']) : 
-                             date('Y-m-d H:i:s', strtotime('+30 days'));
+        $price_purchased_at    = $stripe_data['amount'] / 100 ?? null;
+        $vof_flow_completed_at = current_time('mysql') ?? null;
+        $vof_flow_time_elapsed = $vof_flow_completed_at - $vof_flow_started_at ?? null;
+        $vof_sub_start_date    = date('Y-m-d H:i:s', $stripe_data['current_period_start']) ?? null; 
+        $vof_sub_expiry_date   = date('Y-m-d H:i:s', $stripe_data['current_period_end']) ?? null;
 
-        // Check if this is a longer-than-monthly subscription and interim fulfillment is enabled (maybe wrap into a standalone function)
+        // Check if this is a longer-than-monthly subscription and interim fulfillment is enabled
         $is_long_term_subscription = false;
         $next_fulfillment_date = null;
         $current_timestamp = strtotime(current_time('mysql'));
-        
-        error_log('VOF Debug: Checking if interim fulfillment is needed - enabled: ' . 
-                 ($this->vof_is_interim_fulfillment_enabled() ? 'yes' : 'no') . 
-                 ', interval: ' . (isset($stripe_data['interval']) ? $stripe_data['interval'] : 'unknown'));
         
         if ($this->vof_is_interim_fulfillment_enabled() && 
             isset($stripe_data['interval']) && 
             $stripe_data['interval'] !== 'month') {
             
             $is_long_term_subscription = true;
-            
-            // Get interval from settings
-            $interval = $this->vof_get_fulfillment_interval();
-            $next_fulfillment_date = date('Y-m-d H:i:s', $current_timestamp + $interval);
-            
-            error_log('VOF Debug: This is a long-term subscription, setting next fulfillment to: ' . $next_fulfillment_date . 
-                     ' using ' . ($this->vof_is_test_interval_enabled() ? '2-minute test interval' : '30-day production interval'));
+            // [PRODUCTION] Set next fulfillment date to 30 days from now
+            // $next_fulfillment_date = date('Y-m-d H:i:s', strtotime('+30 days'));
+            // [TEST ONLY] Set next fulfillment date to 2 minutes from now
+            $next_fulfillment_date = date('Y-m-d H:i:s', $current_timestamp + (2 * MINUTE_IN_SECONDS));
         }
 
-        // Prepare update data with safe values
         $vof_updated_data = [
-            'vof_flow_status'        => 'completed',
+            'vof_flow_status'        => 'completed' ?? null,
             'vof_flow_completed_at'  => $vof_flow_completed_at,
             'vof_flow_time_elapsed'  => $vof_flow_time_elapsed,
             'stripe_user_name'       => $stripe_data['customer_name'] ?? null,
@@ -528,43 +377,23 @@ class VOF_Fulfillment_Handler {
             'stripe_sub_expiry_date' => $vof_sub_expiry_date
         ];
 
-        // Update the VOF temp user data
-        $update_result = self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
-        if (!$update_result) {
-            error_log('VOF Warning: Failed to update VOF temp user data');
-        } else {
-            error_log('VOF Debug: Successfully updated VOF temp user data');
-        }
+        // Update the VOF temp user data first
+        self::vof_update_vof_temp_user_data($stripe_data['uuid'], $vof_updated_data);
 
-        // Make sure the custom meta table exists
-        $this->temp_user_meta->vof_maybe_create_custom_meta_table();
-
-        // Store next (interim) fulfillment date for long-term subscriptions if interim fulfillment is enabled
+        // Store next fulfillment date for long-term subscriptions if interim fulfillment is enabled
         if ($is_long_term_subscription && $next_fulfillment_date) {
-            $next_result = $this->temp_user_meta->vof_update_custom_meta(
+            $this->temp_user_meta->vof_update_custom_meta(
                 $stripe_data['uuid'], 
                 'next_interim_fulfillment', 
                 $next_fulfillment_date
             );
-            
-            if (!$next_result) {
-                error_log('VOF Warning: Failed to set next_interim_fulfillment');
-            } else {
-                error_log('VOF Debug: Successfully set next_interim_fulfillment to: ' . $next_fulfillment_date);
-            }
 
             // Also store last fulfillment date as current time (initial fulfillment)
-            $last_result = $this->temp_user_meta->vof_update_custom_meta(
+            $this->temp_user_meta->vof_update_custom_meta(
                 $stripe_data['uuid'], 
                 'last_interim_fulfillment', 
                 current_time('mysql')
             );
-            
-            if (!$last_result) {
-                error_log('VOF Warning: Failed to set last_interim_fulfillment');
-            } else {
-                error_log('VOF Debug: Successfully set last_interim_fulfillment to: ' . current_time('mysql'));
-            }
         }
 
         // Now attempt the MailerLite integration with a try/catch that won't disrupt the main flow
@@ -693,46 +522,46 @@ class VOF_Fulfillment_Handler {
     }
 
     /**
-     * Handles subscription status changes REMOVE THIS FUNCTION
+     * Handles subscription status changes
      */
-    // public function vof_handle_subscription_status_change($subscription_id, $new_status, $stripe_data) {
-    //     try {
-    //         $user_id = $this->vof_get_user_by_subscription($subscription_id);
-    //         if (!$user_id) {
-    //             throw new \Exception('No user found for subscription');
-    //         }
+    public function vof_handle_subscription_status_change($subscription_id, $new_status, $stripe_data) {
+        try {
+            $user_id = $this->vof_get_user_by_subscription($subscription_id);
+            if (!$user_id) {
+                throw new \Exception('No user found for subscription');
+            }
 
-    //         $membership = new VOF_Membership($user_id, $stripe_data);
+            $membership = new VOF_Membership($user_id, $stripe_data);
             
-    //         // Create temporary payment for status update
-    //         $payment = new VOF_Payment($stripe_data, [
-    //             'true_user_id' => $user_id
-    //         ]);
+            // Create temporary payment for status update
+            $payment = new VOF_Payment($stripe_data, [
+                'true_user_id' => $user_id
+            ]);
 
-    //         // Update membership using VOF-specific method
-    //         $membership->vof_update_stripe_membership($payment);
+            // Update membership using VOF-specific method
+            $membership->vof_update_stripe_membership($payment);
 
-    //         do_action('vof_subscription_status_updated', $subscription_id, $new_status);
+            do_action('vof_subscription_status_updated', $subscription_id, $new_status);
 
-    //     } catch (\Exception $e) {
-    //         error_log('VOF Status Change Error: ' . $e->getMessage());
-    //     }
-    // }
+        } catch (\Exception $e) {
+            error_log('VOF Status Change Error: ' . $e->getMessage());
+        }
+    }
 
     /**
      * Gets user ID by subscription ID
      */
-    // private function vof_get_user_by_subscription($subscription_id) {
-    //     global $wpdb;
+    private function vof_get_user_by_subscription($subscription_id) {
+        global $wpdb;
         
-    //     return $wpdb->get_var($wpdb->prepare(
-    //         "SELECT user_id 
-    //         FROM {$wpdb->usermeta} 
-    //         WHERE meta_key = '_vof_stripe_subscription_id' 
-    //         AND meta_value = %s",
-    //         $subscription_id
-    //     ));
-    // }
+        return $wpdb->get_var($wpdb->prepare(
+            "SELECT user_id 
+            FROM {$wpdb->usermeta} 
+            WHERE meta_key = '_vof_stripe_subscription_id' 
+            AND meta_value = %s",
+            $subscription_id
+        ));
+    }
 
     // ##################################################################
     // ################## CRON FULFILLMENT SECTION ######################
@@ -745,94 +574,40 @@ class VOF_Fulfillment_Handler {
     public function vof_is_interim_fulfillment_enabled() {
         return get_option('vof_enable_interim_fulfillment', true); // Default to enabled
     }
-    
-    /**
-     * Check if test interval (2 minutes) is enabled
-     * @return bool Whether test interval is enabled
-     */
-    public function vof_is_test_interval_enabled() {
-        return get_option('vof_use_test_interval_2min', false);
-    }
-    
-    /**
-     * Get the next fulfillment interval in seconds
-     * @return int Interval in seconds (either 30 days or 2 minutes)
-     */
-    public function vof_get_fulfillment_interval() {
-        if ($this->vof_is_test_interval_enabled()) {
-            error_log('VOF Debug: Using 2-minute test interval for interim fulfillment');
-            return 2 * MINUTE_IN_SECONDS; // 2 minutes for testing
-        } else {
-            // Default to 30 days but maybe add here the 30 day offset before actual expiry date... To allow for real fulfillment to take-over
-            error_log('VOF Debug: Using 30-day production interval for interim fulfillment');
-            return 30 * DAY_IN_SECONDS; // 30 days for production
-        }
-    }
 
     /**
      * Set a short-term lock to prevent excessive fulfillment checks
      */
     public function vof_set_check_lock() {
-        // Use a different lock duration based on test mode
-        if ($this->vof_is_test_interval_enabled()) {
-            // Test mode: Use a 30-second lock to allow faster testing
-            $lock_duration = 30; // 30 seconds
-            error_log('VOF Debug: Setting 30-second test lock');
-        } else {
-            // Production mode: Use a 5-minute lock
-            $lock_duration = 5 * MINUTE_IN_SECONDS; // 5 minutes
-            error_log('VOF Debug: Setting 5-minute production lock');
-        }
-        
-        set_transient('vof_fulfillment_check_lock', true, $lock_duration);
+        // [PRODUCTION] Set check lock idle to 5 minutes
+        // set_transient('vof_fulfillment_check_lock', true, 5 * MINUTE_IN_SECONDS);
+
+        // [TEST ONLY] Set check lock idle to 30 seconds for testing purposes
+        set_transient('vof_fulfillment_check_lock', true, 30);
     }
 
     /**
      * Check for pending fulfillments
-     * 
-     * This function checks for and processes any subscriptions that are due
-     * for interim fulfillment.
      */
     public function vof_check_pending_fulfillments() {
-        // Capture which hook fired this check for debugging
-        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $caller = isset($trace[1]['function']) ? $trace[1]['function'] : 'unknown';
-        error_log('VOF Debug: Fulfillment check triggered by ' . $caller . ' at ' . current_time('mysql'));
-        
         // Skip if a lock is in place
         if (get_transient('vof_fulfillment_check_lock')) {
             error_log('VOF Debug: Fulfillment check skipped due to lock');
             return;
         }
 
+        error_log('VOF Debug: Starting fulfillment check at ' . current_time('mysql'));
+
         // Skip if interim fulfillment is disabled
         if (!$this->vof_is_interim_fulfillment_enabled()) {
             error_log('VOF Debug: Interim fulfillment is disabled');
             return;
         }
-        
-        // Set a lock before processing to prevent race conditions
-        if ($this->vof_is_test_interval_enabled()) {
-            $lock_duration = 30; // 30 seconds for test mode
-        } else {
-            $lock_duration = 5 * MINUTE_IN_SECONDS; // 5 minutes for production
-        }
-        set_transient('vof_fulfillment_check_lock', true, $lock_duration);
-        
-        // For debugging, count how many eligible subscriptions exist
-        global $wpdb;
-        $count = $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}vof_temp_user_meta 
-            WHERE stripe_sub_status = 'active' 
-            AND stripe_period_interval IS NOT NULL 
-            AND stripe_period_interval != 'month'"
-        );
-        error_log('VOF Debug: Found ' . $count . ' active non-monthly subscriptions');
 
-        // Process batch of pending fulfillments
+        // Process batch of pending fulfillments TODO: Rename to proces_pendind_interim_fulfillments
         $this->vof_process_pending_fulfillments();
 
-        // Set a new lock to prevent excessive checks
+        // Set a lock to prevent excessive checks
         do_action('vof_fulfillment_check_completed');
     }
 
@@ -843,96 +618,60 @@ class VOF_Fulfillment_Handler {
         global $wpdb;
 
         try {
-            // Ensure the custom meta table exists
-            if (!$this->temp_user_meta->vof_maybe_create_custom_meta_table()) {
-                error_log('VOF Error: Failed to create or access custom meta table');
-                return;
-            }
-
             // Get current time
             $current_time = current_time('mysql');
-            error_log('VOF Debug: Starting process_pending_fulfillments at ' . $current_time);
 
             // Get all custom meta entries with next_interim_fulfillment dates in the past
             $meta_table = $wpdb->prefix . 'vof_custom_meta';
-            
-            // Log query before execution for debugging
-            $query = $wpdb->prepare(
-                "SELECT m.uuid, m.meta_value AS next_fulfillment_date
-                FROM {$meta_table} m
-                WHERE m.meta_key = %s 
-                AND m.meta_value <= %s
-                LIMIT 10", // Process in batches to avoid timeouts
-                'next_interim_fulfillment',
-                $current_time
+            $pending_fulfillments = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT m.uuid, m.meta_value AS next_fulfillment_date
+                    FROM {$meta_table} m
+                    WHERE m.meta_key = %s 
+                    AND m.meta_value <= %s
+                    LIMIT 10", // Process in batches to avoid timeouts
+                    'next_interim_fulfillment',
+                    $current_time
+                ),
+                ARRAY_A
             );
-            error_log('VOF Debug: Running query: ' . $query);
-            
-            $pending_fulfillments = $wpdb->get_results($query, ARRAY_A);
-            
-            // Log any SQL errors
-            if ($wpdb->last_error) {
-                error_log('VOF Error: SQL error in pending fulfillments query: ' . $wpdb->last_error);
-                return;
-            }
-
-            error_log('VOF Debug: Found ' . ($pending_fulfillments ? count($pending_fulfillments) : 0) . ' pending fulfillments');
 
             if (empty($pending_fulfillments)) {
                 return;
             }
 
             foreach ($pending_fulfillments as $fulfillment) {
-                error_log('VOF Debug: Processing fulfillment for UUID: ' . $fulfillment['uuid']);
-                
                 // Get subscription data
                 $subscription = $this->temp_user_meta->vof_get_temp_user_by_uuid($fulfillment['uuid']);
 
-                if (!$subscription) {
-                    error_log('VOF Debug: No subscription found for UUID: ' . $fulfillment['uuid']);
+                if (!$subscription || empty($subscription['stripe_sub_id'])) {
                     // Clean up orphaned meta if subscription doesn't exist
-                    $this->temp_user_meta->vof_delete_custom_meta($fulfillment['uuid'], 'next_interim_fulfillment');
-                    continue;
-                }
-                
-                if (empty($subscription['stripe_sub_id'])) {
-                    error_log('VOF Debug: No stripe_sub_id found for UUID: ' . $fulfillment['uuid']);
                     $this->temp_user_meta->vof_delete_custom_meta($fulfillment['uuid'], 'next_interim_fulfillment');
                     continue;
                 }
 
                 // Skip if subscription is not active
                 if ($subscription['stripe_sub_status'] !== 'active') {
-                    error_log('VOF Debug: Skipping inactive subscription with status: ' . $subscription['stripe_sub_status']);
                     continue;
                 }
 
                 // Process the interim fulfillment
-                $result = $this->vof_process_interim_fulfillment($subscription);
-                error_log('VOF Debug: Interim fulfillment result: ' . ($result ? 'success' : 'failed'));
+                $this->vof_process_interim_fulfillment($subscription);
             }
 
             error_log('VOF Debug: Processed ' . count($pending_fulfillments) . ' pending fulfillments');
 
         } catch (\Exception $e) {
             error_log('VOF Error: Failed to process pending fulfillments - ' . $e->getMessage());
-            error_log('VOF Error: Stack trace - ' . $e->getTraceAsString());
         }
-    }
+    }    
 
     /**
      * Process interim fulfillment for a subscription
-     * 
-     * This is the core function that performs the actual interim fulfillment.
-     * It triggers a status update (without changing expiry date) to re-apply benefits.
-     * 
-     * @param array $subscription The subscription data from temp_user_meta
-     * @return bool Success or failure
      */
     private function vof_process_interim_fulfillment($subscription) {
         try {
-            error_log('VOF Debug: Processing interim fulfillment for subscription ID: ' . 
-                     (isset($subscription['stripe_sub_id']) ? $subscription['stripe_sub_id'] : 'unknown'));
+            error_log('VOF Debug: Processing interim fulfillment for subscription: ' . print_r($subscription, true));
 
             // Validate subscription data
             if (empty($subscription['stripe_sub_id'])) {
@@ -945,84 +684,37 @@ class VOF_Fulfillment_Handler {
                 return false;
             }
 
-            if (empty($subscription['uuid'])) {
-                error_log('VOF Error: Missing uuid in subscription data');
-                return false;
-            }
-
             $current_timestamp = strtotime(current_time('mysql'));
-            
-            // Double-check if the subscription is still active
-            if ($subscription['stripe_sub_status'] !== 'active') {
-                error_log('VOF Warning: Cannot fulfill inactive subscription with status: ' . $subscription['stripe_sub_status']);
-                return false;
-            }
 
-            // Log when this subscription was last fulfilled
-            $last_fulfillment = $this->temp_user_meta->vof_get_custom_meta($subscription['uuid'], 'last_interim_fulfillment');
-            if ($last_fulfillment) {
-                error_log('VOF Debug: Last fulfillment was at: ' . $last_fulfillment);
-            } else {
-                error_log('VOF Debug: This appears to be the first interim fulfillment');
-            }
-
-            // Process subscription refresh - IMPORTANT: We only pass sub_id and status,
-            // but NOT expiry_date, to avoid modifying the actual subscription end date
-            error_log('VOF Debug: Calling process_customer_subscription_updated with sub_id: ' . $subscription['stripe_sub_id']);
-            
+            // Process subscription benefits
             $result = $this->vof_process_customer_subscription_updated([
-                'sub_id'  => $subscription['stripe_sub_id'],
-                'status'  => $subscription['stripe_sub_status']
-                // Intentionally NOT passing expiry_date to avoid changing the real end date
+                'sub_id'      => $subscription['stripe_sub_id'],
+                'status'      => $subscription['stripe_sub_status'],
+                'expiry_date' => isset($subscription['stripe_sub_expiry_date']) ? $subscription['stripe_sub_expiry_date'] : null,
             ]);
 
             if (!$result) {
                 error_log('VOF Warning: Interim fulfillment failed for subscription: ' . $subscription['stripe_sub_id']);
-                
-                // Even if the fulfillment fails, update the next attempt time to avoid continuous retries
-                // Set it to retry in 1 hour
-                $retry_at = date('Y-m-d H:i:s', $current_timestamp + (1 * HOUR_IN_SECONDS));
-                $this->temp_user_meta->vof_update_custom_meta(
-                    $subscription['uuid'], 
-                    'next_interim_fulfillment', 
-                    $retry_at
-                );
-                
-                error_log('VOF Debug: Will retry fulfillment at: ' . $retry_at);
                 return false;
             }
 
             // Update last fulfillment date
-            error_log('VOF Debug: Updating last_interim_fulfillment to: ' . current_time('mysql'));
-            $update_result = $this->temp_user_meta->vof_update_custom_meta(
+            $this->temp_user_meta->vof_update_custom_meta(
                 $subscription['uuid'], 
                 'last_interim_fulfillment', 
                 current_time('mysql')
             );
-            
-            if (!$update_result) {
-                error_log('VOF Warning: Failed to update last_interim_fulfillment');
-            }
 
-            // Get the interval from settings and set next fulfillment date
-            $interval = $this->vof_get_fulfillment_interval();
-            $next_fulfillment = date('Y-m-d H:i:s', $current_timestamp + $interval);
-            
-            error_log('VOF Debug: Using ' . 
-                     ($this->vof_is_test_interval_enabled() ? '2-minute test interval' : '30-day production interval') . 
-                     ' for next fulfillment');
+            // [PRODUCTION] Set next fulfillment date to 30 days from now
+            // $next_fulfillment = date('Y-m-d H:i:s', strtotime('+30 days'));
+            // [TEST ONLY] Set next fulfillment date to 2 minutes from now
+            $next_fulfillment = date('Y-m-d H:i:s', $current_timestamp + (2 * MINUTE_IN_SECONDS));
 
-            error_log('VOF Debug: Setting next_interim_fulfillment to: ' . $next_fulfillment);
-            $next_result = $this->temp_user_meta->vof_update_custom_meta(
+            $this->temp_user_meta->vof_update_custom_meta(
                 $subscription['uuid'], 
                 'next_interim_fulfillment', 
                 $next_fulfillment
             );
-            
-            if (!$next_result) {
-                error_log('VOF Warning: Failed to update next_interim_fulfillment');
-                return false;
-            }
 
             error_log('VOF Debug: Successfully processed interim fulfillment. Next fulfillment set for: ' . $next_fulfillment);
             return true;
@@ -1037,119 +729,81 @@ class VOF_Fulfillment_Handler {
     /**
      * Process monthly benefits for yearly subscribers
      */
-    // public function vof_process_monthly_benefits() { // MAYBE NOT NEEDED ANYMORE
-    //     global $wpdb;
+    public function vof_process_monthly_benefits() { // MAYBE NOT NEEDED ANYMORE
+        global $wpdb;
         
-    //     // Get all active yearly (or custom) subscriptions intervals
-    //     $subscriptions = $wpdb->get_results(
-    //         "SELECT * FROM {$wpdb->prefix}vof_temp_user_meta 
-    //         WHERE stripe_sub_status = 'active' 
-    //         AND stripe_sub_id IS NOT NULL
-    //         AND stripe_period_interval IS NOT NULL 
-    //         AND stripe_period_interval != 'month'",
-    //         ARRAY_A
-    //     );
+        // Get all active yearly (or custom) subscriptions intervals
+        $subscriptions = $wpdb->get_results(
+            "SELECT * FROM {$wpdb->prefix}vof_temp_user_meta 
+            WHERE stripe_sub_status = 'active' 
+            AND stripe_sub_id IS NOT NULL
+            AND stripe_period_interval IS NOT NULL 
+            AND stripe_period_interval != 'month'",
+            ARRAY_A
+        );
         
-    //     if (empty($subscriptions)) {
-    //         error_log('VOF Debug: No yearly subscriptions found for monthly processing');
-    //         return;
-    //     }
+        if (empty($subscriptions)) {
+            error_log('VOF Debug: No yearly subscriptions found for monthly processing');
+            return;
+        }
         
-    //     foreach ($subscriptions as $subscription) {
-    //         // Calculate time until expiry
-    //         $expiry_date        = strtotime($subscription['expiry_date']);
-    //         $current_time       = current_time('timestamp');
-    //         $current_time_mysql = date('Y-m-d H:i:s', $current_time);
+        foreach ($subscriptions as $subscription) {
+            // Calculate time until expiry
+            $expiry_date        = strtotime($subscription['expiry_date']);
+            $current_time       = current_time('timestamp');
+            $current_time_mysql = date('Y-m-d H:i:s', $current_time);
             
-    //         // Check if it's time for monthly fulfillment (within one month window)
-    //         $one_month_before_expiry = strtotime('-1 month', $expiry_date);
+            // Check if it's time for monthly fulfillment (within one month window)
+            $one_month_before_expiry = strtotime('-1 month', $expiry_date);
             
-    //         if ($current_time < $expiry_date && $current_time >= $one_month_before_expiry) {
-    //             // Process monthly fulfillment
-    //             $is_interim_fulfilled = $this->vof_process_customer_subscription_updated([
-    //                 'sub_id'      => $subscription['stripe_sub_id'],
-    //                 'status'      => $subscription['stripe_sub_status'],
-    //                 'expiry_date' => $subscription['stripe_sub_expiry_date'],
-    //             ]);
+            if ($current_time < $expiry_date && $current_time >= $one_month_before_expiry) {
+                // Process monthly fulfillment
+                $is_interim_fulfilled = $this->vof_process_customer_subscription_updated([
+                    'sub_id'      => $subscription['stripe_sub_id'],
+                    'status'      => $subscription['stripe_sub_status'],
+                    'expiry_date' => $subscription['stripe_sub_expiry_date'],
+                ]);
                 
-    //             if (!$is_interim_fulfilled) {
-    //                 error_log('VOF Warning: Monthly benefits processing failed for subscription: '. print_r($subscription, true));
-    //                 continue; // Skip to next subscription
-    //             }
+                if (!$is_interim_fulfilled) {
+                    error_log('VOF Warning: Monthly benefits processing failed for subscription: '. print_r($subscription, true));
+                    continue; // Skip to next subscription
+                }
 
-    //             // Update last interim fulfillment date on new cutom table
-    //             $this->temp_user_meta->vof_update_custom_meta($subscription['uuid'], 'last_interim_fulfillment', $current_time_mysql);
+                // Update last interim fulfillment date on new cutom table
+                $this->temp_user_meta->vof_update_custom_meta($subscription['uuid'], 'last_interim_fulfillment', $current_time_mysql);
 
-    //             error_log('VOF Debug: Processed monthly benefits for yearly subscription: ' . $subscription['subscription_id']);
-    //             error_log( 'VOF Debug: Date comparisons - ' . 
-    //             'Current: ' . date('Y-m-d H:i:s', $current_time ) . 
-    //             ', Expiry: ' . date('Y-m-d H:i:s', $expiry_date ) . 
-    //             ', One Month Before: ' . date( 'Y-m-d H:i:s', $one_month_before_expiry ) );
-    //         }
-    //     }
-    // }
+                error_log('VOF Debug: Processed monthly benefits for yearly subscription: ' . $subscription['subscription_id']);
+                error_log( 'VOF Debug: Date comparisons - ' . 
+                'Current: ' . date('Y-m-d H:i:s', $current_time ) . 
+                ', Expiry: ' . date('Y-m-d H:i:s', $expiry_date ) . 
+                ', One Month Before: ' . date( 'Y-m-d H:i:s', $one_month_before_expiry ) );
+            }
+        }
+    }
 
 
-    /**
-     * Process customer subscription update for RTCL
-     * 
-     * This method refreshes the subscription in RTCL by updating its status,
-     * which triggers the membership benefits to be re-applied.
-     * 
-     * For interim fulfillment, we specifically DO NOT update the real expiry date,
-     * as we only want to trigger the benefits refresh, not extend the subscription.
-     * 
-     * @param array $params Parameters with sub_id, status, and expiry_date
-     * @return bool Success or failure
-     */
-    private function vof_process_customer_subscription_updated($params) {
+    private function vof_process_customer_subscription_updated($cron_job_param_array) {
         try {
-            error_log('VOF Debug: Starting subscription update with params: ' . print_r($params, true));
+            error_log('VOF Debug: Starting subscription update with params: ' . print_r($cron_job_param_array, true));
             
-            // Make sure the RtclPro Subscriptions class exists
-            if (!class_exists('\RtclPro\Models\Subscriptions')) {
-                error_log('VOF Error: RtclPro\Models\Subscriptions class not found');
+            $subscriptionIn = (new \RtclPro\Models\Subscriptions())->findOneBySubId($cron_job_param_array['sub_id']);
+            
+            if (!$subscriptionIn) {
+                error_log('VOF Error: Could not find subscription via sub_id: ' . $cron_job_param_array['sub_id']);
                 return false;
             }
             
-            // Find the subscription by ID
-            $subscriptions = new \RtclPro\Models\Subscriptions();
-            $subscription = $subscriptions->findOneBySubId($params['sub_id']);
-            
-            if (!$subscription) {
-                error_log('VOF Error: Could not find RTCL subscription via sub_id: ' . $params['sub_id']);
-                return false;
-            }
-            
-            error_log('VOF Debug: Found RTCL subscription: ' . print_r($subscription, true));
-            
-            // Get current status
-            $current_status = $subscription->getStatus();
-            error_log('VOF Debug: Current subscription status: ' . $current_status);
-            
-            // Re-apply the status (even if it's the same) to trigger benefits refresh
-            // This is the key part that applies the benefits for interim fulfillment
-            $result = $subscription->updateStatus($params['status']);
+            $result = $subscriptionIn->updateStatus($cron_job_param_array['status']);
             
             if (is_wp_error($result)) {
                 error_log('VOF Error: Failed to update subscription status: ' . $result->get_error_message());
                 return false;
             }
             
-            error_log('VOF Debug: Successfully updated subscription status to: ' . $params['status']);
-            
-            // Directly trigger benefits refresh action
-            error_log('VOF Debug: Triggering benefits refresh');
-            $user_id = $subscription->getUserId();
-            if ($user_id) {
-                do_action('rtcl_membership_updated_benefits', $user_id);
-                error_log('VOF Debug: Triggered rtcl_membership_updated_benefits for user: ' . $user_id);
-            }
-            
+            error_log('VOF Debug: Successfully updated subscription status to: ' . $cron_job_param_array['status']);
             return true;
         } catch (\Exception $e) {
             error_log('VOF Error: Exception in subscription update: ' . $e->getMessage());
-            error_log('VOF Error: ' . $e->getTraceAsString());
             return false;
         }
     }

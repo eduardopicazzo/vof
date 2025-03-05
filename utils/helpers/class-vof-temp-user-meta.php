@@ -87,7 +87,11 @@ class VOF_Temp_User_Meta {
     /**
      * Create custom meta table for flexible data storage
      */
-    private function vof_maybe_create_custom_meta_table() {
+    /**
+     * Create or update the custom meta table for storing flexible data
+     * This method is public so it can be called from outside if needed
+     */
+    public function vof_maybe_create_custom_meta_table() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
 
@@ -105,7 +109,18 @@ class VOF_Temp_User_Meta {
         ) $charset_collate;";
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        
+        // Use dbDelta to create or update the table
+        $result = dbDelta($sql);
+        
+        // Log the result
+        error_log('VOF Debug: Custom meta table create/update result: ' . print_r($result, true));
+        
+        // Check if the table was created successfully
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$custom_meta_table}'");
+        error_log('VOF Debug: Custom meta table exists: ' . ($table_exists ? 'yes' : 'no'));
+        
+        return $table_exists ? true : false;
     }
 
     // START GETTERS / SETTERS: for custom_meta table
