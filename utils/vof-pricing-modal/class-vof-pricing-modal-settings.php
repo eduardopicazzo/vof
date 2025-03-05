@@ -141,8 +141,10 @@ class VOF_Pricing_Modal_Settings {
                                     'features' => [],
                                     'isRecommended' => false,
                                     'isGrayOut' => false,
-                                    'stripe_price_id' => '',
-                                    'stripe_lookup_key' => ''
+                                    'stripe_price_id_test' => '',
+                                    'stripe_price_id_live' => '',
+                                    'stripe_lookup_key_test' => '',
+                                    'stripe_lookup_key_live' => ''
                                 ];
 
                                 $display = $i < $options['numberOfTiersMonthly'] ? 'block' : 'none';
@@ -212,33 +214,65 @@ class VOF_Pricing_Modal_Settings {
 
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id"><?php echo esc_html__('Stripe Price ID', 'vof'); ?></label>
+                                                <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id_test"><?php echo esc_html__('TEST Stripe Price ID', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="text" 
-                                                       id="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id" 
-                                                       name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_price_id]" 
-                                                       value="<?php echo esc_attr(isset($tier['stripe_price_id']) ? $tier['stripe_price_id'] : ''); ?>" 
+                                                       id="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id_test" 
+                                                       name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_price_id_test]" 
+                                                       value="<?php echo esc_attr(isset($tier['stripe_price_id_test']) ? $tier['stripe_price_id_test'] : ''); ?>" 
                                                        class="regular-text" 
                                                        placeholder="price_xxxxxxxxxxxxxxxx" />
-                                                <p class="description"><?php echo esc_html__('The Stripe Price ID for this tier (e.g. price_1AbCdEfGhIjKlM).', 'vof'); ?></p>
+                                                <p class="description"><?php echo esc_html__('The TEST environment Stripe Price ID for this tier.', 'vof'); ?></p>
                                             </td>
                                         </tr>
-
+                                                                                            
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key"><?php echo esc_html__('Stripe Lookup Key', 'vof'); ?></label>
+                                                <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id_live"><?php echo esc_html__('LIVE Stripe Price ID', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="text" 
-                                                       id="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key" 
-                                                       name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_lookup_key]" 
-                                                       value="<?php echo esc_attr(isset($tier['stripe_lookup_key']) ? $tier['stripe_lookup_key'] : ''); ?>" 
+                                                       id="vof_monthly_tier_<?php echo $i; ?>_stripe_price_id_live" 
+                                                       name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_price_id_live]" 
+                                                       value="<?php echo esc_attr(isset($tier['stripe_price_id_live']) ? $tier['stripe_price_id_live'] : ''); ?>" 
                                                        class="regular-text" 
-                                                       placeholder="my_tier_lookup_key" />
-                                                <p class="description"><?php echo esc_html__('The lookup key for this tier in Stripe.', 'vof'); ?></p>
+                                                       placeholder="price_xxxxxxxxxxxxxxxx" />
+                                                <p class="description"><?php echo esc_html__('The LIVE environment Stripe Price ID for this tier.', 'vof'); ?></p>
                                             </td>
                                         </tr>
+                                                                                        
+                                    <!-- Replace the single Stripe Lookup Key with separate TEST and LIVE fields -->
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key_test"><?php echo esc_html__('TEST Stripe Lookup Key', 'vof'); ?></label>
+                                        </th>
+                                        <td>
+                                            <input type="text" 
+                                                   id="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key_test" 
+                                                   name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_lookup_key_test]" 
+                                                   value="<?php echo esc_attr(isset($tier['stripe_lookup_key_test']) ? $tier['stripe_lookup_key_test'] : ''); ?>" 
+                                                   class="regular-text" 
+                                                   placeholder="my_tier_lookup_key" />
+                                            <p class="description"><?php echo esc_html__('The TEST environment lookup key for this tier in Stripe.', 'vof'); ?></p>
+                                        </td>
+                                    </tr>
+                                                                                        
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key_live"><?php echo esc_html__('LIVE Stripe Lookup Key', 'vof'); ?></label>
+                                        </th>
+                                        <td>
+                                            <input type="text" 
+                                                   id="vof_monthly_tier_<?php echo $i; ?>_stripe_lookup_key_live" 
+                                                   name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][stripe_lookup_key_live]" 
+                                                   value="<?php echo esc_attr(isset($tier['stripe_lookup_key_live']) ? $tier['stripe_lookup_key_live'] : ''); ?>" 
+                                                   class="regular-text" 
+                                                   placeholder="my_tier_lookup_key" />
+                                            <p class="description"><?php echo esc_html__('The LIVE environment lookup key for this tier in Stripe.', 'vof'); ?></p>
+                                        </td>
+                                    </tr>                                        
+
 
                                         <tr>
                                             <th scope="row">
@@ -304,8 +338,10 @@ class VOF_Pricing_Modal_Settings {
                                     'features' => [],
                                     'isRecommended' => false,
                                     'isGrayOut' => false,
-                                    'stripe_price_id' => '',
-                                    'stripe_lookup_key' => ''
+                                    'stripe_price_id_test' => '',
+                                    'stripe_price_id_live' => '',
+                                    'stripe_lookup_key_test' => '',
+                                    'stripe_lookup_key_live' => ''
                                 ];
 
                                 $display = $i < $options['numberOfTiersYearly'] ? 'block' : 'none';
@@ -375,31 +411,61 @@ class VOF_Pricing_Modal_Settings {
 
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id"><?php echo esc_html__('Stripe Price ID', 'vof'); ?></label>
+                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id_test"><?php echo esc_html__('TEST Stripe Price ID', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="text" 
-                                                       id="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id" 
-                                                       name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_price_id]" 
-                                                       value="<?php echo esc_attr(isset($tier['stripe_price_id']) ? $tier['stripe_price_id'] : ''); ?>" 
-                                                       class="regular-text" 
-                                                       placeholder="price_xxxxxxxxxxxxxxxx" />
-                                                <p class="description"><?php echo esc_html__('The Stripe Price ID for this yearly tier.', 'vof'); ?></p>
+                                                        id="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id_test" 
+                                                        name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_price_id_test]" 
+                                                        value="<?php echo esc_attr(isset($tier['stripe_price_id_test']) ? $tier['stripe_price_id_test'] : ''); ?>" 
+                                                        class="regular-text" 
+                                                        placeholder="price_xxxxxxxxxxxxxxxx" />
+                                                <p class="description"><?php echo esc_html__('The TEST environment Stripe Price ID for this yearly tier.', 'vof'); ?></p>
                                             </td>
                                         </tr>
 
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key"><?php echo esc_html__('Stripe Lookup Key', 'vof'); ?></label>
+                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id_live"><?php echo esc_html__('LIVE Stripe Price ID', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="text" 
-                                                       id="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key" 
-                                                       name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_lookup_key]" 
-                                                       value="<?php echo esc_attr(isset($tier['stripe_lookup_key']) ? $tier['stripe_lookup_key'] : ''); ?>" 
-                                                       class="regular-text" 
-                                                       placeholder="my_yearly_tier_lookup_key" />
-                                                <p class="description"><?php echo esc_html__('The lookup key for this yearly tier in Stripe.', 'vof'); ?></p>
+                                                        id="vof_yearly_tier_<?php echo $i; ?>_stripe_price_id_live" 
+                                                        name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_price_id_live]" 
+                                                        value="<?php echo esc_attr(isset($tier['stripe_price_id_live']) ? $tier['stripe_price_id_live'] : ''); ?>" 
+                                                        class="regular-text" 
+                                                        placeholder="price_xxxxxxxxxxxxxxxx" />
+                                                <p class="description"><?php echo esc_html__('The LIVE environment Stripe Price ID for this yearly tier.', 'vof'); ?></p>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <th scope="row">
+                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key_test"><?php echo esc_html__('TEST Stripe Lookup Key', 'vof'); ?></label>
+                                            </th>
+                                            <td>
+                                                <input type="text" 
+                                                        id="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key_test" 
+                                                        name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_lookup_key_test]" 
+                                                        value="<?php echo esc_attr(isset($tier['stripe_lookup_key_test']) ? $tier['stripe_lookup_key_test'] : ''); ?>" 
+                                                        class="regular-text" 
+                                                        placeholder="my_yearly_tier_lookup_key" />
+                                                <p class="description"><?php echo esc_html__('The TEST environment lookup key for this yearly tier in Stripe.', 'vof'); ?></p>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <th scope="row">
+                                                <label for="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key_live"><?php echo esc_html__('LIVE Stripe Lookup Key', 'vof'); ?></label>
+                                            </th>
+                                            <td>
+                                                <input type="text" 
+                                                        id="vof_yearly_tier_<?php echo $i; ?>_stripe_lookup_key_live" 
+                                                        name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][stripe_lookup_key_live]" 
+                                                        value="<?php echo esc_attr(isset($tier['stripe_lookup_key_live']) ? $tier['stripe_lookup_key_live'] : ''); ?>" 
+                                                        class="regular-text" 
+                                                        placeholder="my_yearly_tier_lookup_key" />
+                                                <p class="description"><?php echo esc_html__('The LIVE environment lookup key for this yearly tier in Stripe.', 'vof'); ?></p>
                                             </td>
                                         </tr>
 
@@ -675,8 +741,11 @@ class VOF_Pricing_Modal_Settings {
                 $sanitized_tier['isGrayOut'] = isset($tier['isGrayOut']) ? (bool) $tier['isGrayOut'] : false;
 
                 // Add new Stripe-related fields
-                $sanitized_tier['stripe_price_id'] = sanitize_text_field($tier['stripe_price_id'] ?? '');
-                $sanitized_tier['stripe_lookup_key'] = sanitize_text_field($tier['stripe_lookup_key'] ?? '');
+                $sanitized_tier['stripe_price_id_test'] = sanitize_text_field($tier['stripe_price_id_test'] ?? '');
+                $sanitized_tier['stripe_price_id_live'] = sanitize_text_field($tier['stripe_price_id_live'] ?? '');
+                $sanitized_tier['stripe_lookup_key_test'] = sanitize_text_field($tier['stripe_lookup_key_test'] ?? '');
+                $sanitized_tier['stripe_lookup_key_live'] = sanitize_text_field($tier['stripe_lookup_key_live'] ?? '');
+
 
                 // Sanitize features
                 $sanitized_tier['features'] = [];
@@ -708,8 +777,10 @@ class VOF_Pricing_Modal_Settings {
                 $sanitized_tier['isGrayOut'] = isset($tier['isGrayOut']) ? (bool) $tier['isGrayOut'] : false;
 
                 // Add new Stripe-related fields
-                $sanitized_tier['stripe_price_id'] = sanitize_text_field($tier['stripe_price_id'] ?? '');
-                $sanitized_tier['stripe_lookup_key'] = sanitize_text_field($tier['stripe_lookup_key'] ?? '');
+                $sanitized_tier['stripe_price_id_test'] = sanitize_text_field($tier['stripe_price_id_test'] ?? '');
+                $sanitized_tier['stripe_price_id_live'] = sanitize_text_field($tier['stripe_price_id_live'] ?? '');
+                $sanitized_tier['stripe_lookup_key_test'] = sanitize_text_field($tier['stripe_lookup_key_test'] ?? '');
+                $sanitized_tier['stripe_lookup_key_live'] = sanitize_text_field($tier['stripe_lookup_key_live'] ?? '');
 
                 // Sanitize features
                 $sanitized_tier['features'] = [];
@@ -753,8 +824,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => true,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ],
                 [
                     'name' => 'noise',
@@ -770,8 +843,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ],
                 [
                     'name' => 'noise+',
@@ -787,8 +862,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ]
             ],
             'tiersYearly' => [
@@ -807,8 +884,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => true,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ],
                 [
                     'name' => 'noise',
@@ -825,8 +904,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ],
                 [
                     'name' => 'noise+',
@@ -843,8 +924,10 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
-                    'stripe_price_id' => '',
-                    'stripe_lookup_key' => ''
+                    'stripe_price_id_test' => '',
+                    'stripe_price_id_live' => '',
+                    'stripe_lookup_key_test' => '',
+                    'stripe_lookup_key_live' => ''
                 ]
             ]
         ];
