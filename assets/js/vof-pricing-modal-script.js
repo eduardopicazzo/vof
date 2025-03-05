@@ -2,7 +2,7 @@
 console.log('VOF Debug: Pricing Modal script loaded');
 
 const VOF_MODAL_CONFIG = {
-    enableFallback: false
+    enableFallback: true // Enable fallback if admin settings aren't available
 };
 
 // Global state with fallback data updated to include both monthly and yearly pricing options
@@ -107,12 +107,23 @@ const defaultState = {
     ]
 };
 
+// Check if admin dashboard settings are available
+let adminSettings = {};
+if (typeof vofPricingModalConfig !== 'undefined') {
+    console.log('VOF Debug: Admin settings loaded:', vofPricingModalConfig);
+    adminSettings = vofPricingModalConfig;
+}
+
 // Update modalState structure to support both pricing schemes
+// Use admin settings if available, otherwise use defaults
 let modalState = {
-    isMultiPricingOn: defaultState.isMultiPricingOn,
-    isApiData: defaultState.isApiData,
-    monthlyTiers: [...defaultState.monthlyTiers],
-    yearlyTiers: [...defaultState.yearlyTiers],
+    isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
+        adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
+    isApiData: false,
+    monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+        adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+    yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+        adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
     selectedInterval: "month", // Default to monthly pricing scheme
 }
 
@@ -362,25 +373,44 @@ function updateModalState(response) {
 
     try {
         if (response && response.pricing_data) {
-            // Extract pricing data from API response
+            // Extract pricing data from API response (which might come from the API or the admin settings)
             const { is_multi_pricing_on, monthly_tiers, yearly_tiers } = response.pricing_data;
             
+            // Use admin settings if available, otherwise use API data with fallback to defaults
+            // This ensures admin panel settings take precedence
+            const adminMultiPricing = adminSettings.is_multi_pricing_on !== undefined ? 
+                adminSettings.is_multi_pricing_on : 
+                (is_multi_pricing_on !== undefined ? is_multi_pricing_on : defaultState.isMultiPricingOn);
+                
+            const adminMonthlyTiers = adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+                adminSettings.monthly_tiers : 
+                (monthly_tiers || defaultState.monthlyTiers);
+                
+            const adminYearlyTiers = adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+                adminSettings.yearly_tiers : 
+                (yearly_tiers || defaultState.yearlyTiers);
+            
             modalState = {
-                isMultiPricingOn: is_multi_pricing_on,
+                isMultiPricingOn: adminMultiPricing,
                 isApiData: true,
-                monthlyTiers: monthly_tiers || defaultState.monthlyTiers,
-                yearlyTiers: yearly_tiers || defaultState.yearlyTiers,
+                monthlyTiers: adminMonthlyTiers,
+                yearlyTiers: adminYearlyTiers,
                 selectedInterval: "month",            // default to monthly pricing scheme
                 customer_meta: response.customer_meta // Make sure this exists
             };
-            console.log('VOF Debug: Updated modal state:', modalState);
+            console.log('VOF Debug: Updated modal state with admin settings:', modalState);
         } else {
-            console.warn('VOF Debug: Invalid API response format, using fallback data');
+            console.warn('VOF Debug: Invalid API response format, using admin settings or fallback data');
+            
+            // Use admin settings if available, otherwise fallback to defaults
             modalState = { 
-                isMultiPricingOn: defaultState.isMultiPricingOn,
+                isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
+                    adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
                 isApiData: defaultState.isApiData,
-                monthlyTiers: [...defaultState.monthlyTiers],
-                yearlyTiers: [...defaultState.yearlyTiers],
+                monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+                    adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+                yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+                    adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
                 selectedInterval: "month", // default to monthly pricing scheme
             };
         }
@@ -389,11 +419,16 @@ function updateModalState(response) {
         renderTiers();
     } catch (error) {
         console.error('VOF Debug: Error updating modal state:', error);
+        
+        // Use admin settings if available, otherwise fallback to defaults
         modalState = { 
-            isMultiPricingOn: defaultState.isMultiPricingOn,
+            isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
+                adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
             isApiData: defaultState.isApiData,
-            monthlyTiers: [...defaultState.monthlyTiers],
-            yearlyTiers: [...defaultState.yearlyTiers],
+            monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+                adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+            yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+                adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
             selectedInterval: "month", // default to monthly pricing scheme
         };
         renderTabs();
@@ -418,16 +453,31 @@ function openModal(apiData = null) {
         return;
     }
 
-    // Update state based on API data or use fallback
-    if (apiData) { // TODO: ENSURE DATA IS COMPLETE AND CORRECT STRUCTURE 
+    // Update state based on API data or use admin settings with fallback
+    if (apiData) { 
+        // If API data is provided, update the modal state
+        // The updateModalState function now prioritizes admin settings
         updateModalState(apiData);
-    } else if (VOF_MODAL_CONFIG.enableFallback) {
-        console.log('VOF Debug: Using fallback data');
-        modalState = { ...defaultState };
+    } else if (typeof vofPricingModalConfig !== 'undefined' || VOF_MODAL_CONFIG.enableFallback) {
+        console.log('VOF Debug: Using admin settings or fallback data');
+        
+        // Use admin settings if available, otherwise use fallback data
+        modalState = { 
+            isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
+                adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
+            isApiData: false,
+            monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+                adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+            yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+                adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
+            selectedInterval: "month" // Default to monthly pricing scheme
+        };
+        
+        console.log('VOF Debug: Using settings:', modalState);
         renderTabs();
         renderTiers();
     } else {
-        console.error('VOF Debug: No API data provided and fallback disabled');
+        console.error('VOF Debug: No API data provided, no admin settings available, and fallback disabled');
         return; // Don't open modal if no data and fallback disabled
     }
     

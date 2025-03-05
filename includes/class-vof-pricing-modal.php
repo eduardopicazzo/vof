@@ -20,8 +20,87 @@ class VOF_Pricing_Modal {
         return strpos($_SERVER['REQUEST_URI'], '/post-an-ad/') !== false;
     }
         
+    /**
+     * Get pricing modal configuration from admin settings
+     * 
+     * @return array Configuration for the pricing modal
+     */
+    public function vof_get_pricing_modal_config() {
+        // Get settings from database
+        $config = get_option('vof_pricing_modal_config', []);
+        
+        // If no config exists, use defaults from settings class
+        if (empty($config) && class_exists('\VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings')) {
+            $settings = new \VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings();
+            $config = $settings->vof_get_default_pricing_config();
+        }
+        
+        return $config;
+    }
+    
+    /**
+     * Format pricing modal data for JavaScript
+     * 
+     * @param array $config Raw configuration from database
+     * @return array Formatted data ready for JavaScript
+     */
+    public function vof_format_pricing_data_for_js($config) {
+        $formatted_data = [
+            'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
+            'monthly_tiers' => [],
+            'yearly_tiers' => []
+        ];
+        
+        // Format monthly tiers
+        if (!empty($config['tiersMonthly'])) {
+            foreach ($config['tiersMonthly'] as $tier) {
+                // Skip empty tiers
+                if (empty($tier['name'])) {
+                    continue;
+                }
+                
+                $formatted_data['monthly_tiers'][] = [
+                    'name' => $tier['name'],
+                    'description' => $tier['description'],
+                    'price' => floatval($tier['price']),
+                    'features' => array_filter($tier['features']), // Remove empty features
+                    'isRecommended' => !empty($tier['isRecommended']),
+                    'isGrayOut' => !empty($tier['isGrayOut'])
+                ];
+            }
+        }
+        
+        // Format yearly tiers if multi-pricing is enabled
+        if (!empty($config['isMultiPricingOn']) && !empty($config['tiersYearly'])) {
+            foreach ($config['tiersYearly'] as $tier) {
+                // Skip empty tiers
+                if (empty($tier['name'])) {
+                    continue;
+                }
+                
+                $formatted_data['yearly_tiers'][] = [
+                    'name' => $tier['name'],
+                    'description' => $tier['description'],
+                    'price' => floatval($tier['price']),
+                    'features' => array_filter($tier['features']), // Remove empty features
+                    'isRecommended' => !empty($tier['isRecommended']),
+                    'isGrayOut' => !empty($tier['isGrayOut']),
+                    'interval' => 'year'
+                ];
+            }
+        }
+        
+        return $formatted_data;
+    }
+
     public function vof_render_modal() {
-        // ob_start();
+        // Get configuration from admin settings
+        $config = $this->vof_get_pricing_modal_config();
+        $js_data = $this->vof_format_pricing_data_for_js($config);
+        
+        // Add settings to page as JavaScript data
+        wp_localize_script('vof-pricing-modal-script', 'vofPricingModalConfig', $js_data);
+        
         ?>
         <div id="vofPricingModal" class="vof-pm-wrapper">
             <!-- html here -->
@@ -54,6 +133,5 @@ class VOF_Pricing_Modal {
             </div>
         </div>
         <?php
-        // return ob_get_clean();
     }
 }
