@@ -121,9 +121,21 @@ let modalState = {
         adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
     isApiData: false,
     monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
-        adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+        adminSettings.monthly_tiers.map(tier => ({ 
+            ...tier, 
+            stripePriceIdTest: tier.stripePriceIdTest || '',
+            stripePriceIdLive: tier.stripePriceIdLive || '',
+            stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+            stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+        })) : [...defaultState.monthlyTiers],
     yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
-        adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
+        adminSettings.yearly_tiers.map(tier => ({
+            ...tier,
+            stripePriceIdTest: tier.stripePriceIdTest || '',
+            stripePriceIdLive: tier.stripePriceIdLive || '',
+            stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+            stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+        })): [...defaultState.yearlyTiers],
     selectedInterval: "month", // Default to monthly pricing scheme
 }
 
@@ -184,11 +196,7 @@ function createTierElement(tier, index) {
                     price: subscribeBtn.getAttribute('data-tier-price'),
                     interval: subscribeBtn.getAttribute('data-tier-interval')
                 });
-                handleTierSelection(
-                    subscribeBtn.getAttribute('data-tier-name'),
-                    parseFloat(subscribeBtn.getAttribute('data-tier-price')),
-                    subscribeBtn.getAttribute('data-tier-interval')
-                );
+                handleTierSelection(tier); // pass all the tier data, instead of just some elements of the tier
             });
         }
         tierElement.classList.add('vof-pm-fade-in');
@@ -198,15 +206,46 @@ function createTierElement(tier, index) {
 }
 
 // Update handleTierSelection to include interval
-function handleTierSelection(tierName, tierPrice, tierInterval) {
-    console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice, 'Interval:', tierInterval);
-    console.log('VOF Debug: Modal state:', modalState);
-    console.log('VOF Debug: handleTierSelection called with:', {
-        tierName,
-        tierPrice,
-        tierInterval,
-        modalState: modalState
-    });
+// function handleTierSelection_OLD(tierName, tierPrice, tierInterval) {
+//     console.log('VOF Debug: Tier selected:', tierName, 'Price:', tierPrice, 'Interval:', tierInterval);
+//     console.log('VOF Debug: Modal state:', modalState);
+//     console.log('VOF Debug: handleTierSelection called with:', {
+//         tierName,
+//         tierPrice,
+//         tierInterval,
+//         modalState: modalState
+//     });
+
+//     // Validate we have customer data
+//     if (!modalState.customer_meta?.uuid) { // array from the post listing api response
+//         console.error('VOF Debug: No UUID found for customer');
+//         return;
+//     }
+
+//     // Validate checkout handler exists
+//     if (!window.handleCheckoutStart) {
+//         console.error('VOF Debug: handleCheckoutStart not found');
+//         return;
+//     }
+
+//     // Get VOF handler instance (from orchestrator)
+//     if (window.handleCheckoutStart) {
+//         window.handleCheckoutStart({
+//             uuid: modalState.customer_meta.uuid,
+//             tier_selected: {
+//                 name: tierName.replace('+', '_plus'),
+//                 price: tierPrice,
+//                 interval: tierInterval || 'month',
+//                 // stripe_lookup_key: 'stripe_lookup_key', // pass later when admin dashboard ready
+//                 // stripe_price_id: 'stripe_price_id'      // pass later when admin dashboard ready
+//             }
+//         });
+//     } else {
+//         console.error('VOF Debug: Checkout handler not found');
+//     }
+// }
+function handleTierSelection(tier) {
+    console.log('VOF Debug: Tier selected:', tier);
 
     // Validate we have customer data
     if (!modalState.customer_meta?.uuid) { // array from the post listing api response
@@ -225,11 +264,14 @@ function handleTierSelection(tierName, tierPrice, tierInterval) {
         window.handleCheckoutStart({
             uuid: modalState.customer_meta.uuid,
             tier_selected: {
-                name: tierName.replace('+', '_plus'),
-                price: tierPrice,
-                interval: tierInterval || 'month',
-                // stripe_lookup_key: 'stripe_lookup_key', // pass later when admin dashboard ready
-                // stripe_price_id: 'stripe_price_id'      // pass later when admin dashboard ready
+                // name: tier.name.replace('+', '_plus'),
+                name: tier.name,
+                price: tier.price,
+                interval: tier.interval || 'month',
+                stripePriceIdTest: tier.stripePriceIdTest || '',
+                stripePriceIdLive:  tier.stripePriceIdLive || '',
+                stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
             }
         });
     } else {
@@ -373,32 +415,90 @@ function updateModalState(response) {
 
     try {
         if (response && response.pricing_data) {
-            // Extract pricing data from API response (which might come from the API or the admin settings)
-            const { is_multi_pricing_on, monthly_tiers, yearly_tiers } = response.pricing_data;
+            // Extract pricing data from API response (which comes from the API)
+            const { is_multi_pricing_on, tier_limits } = response.pricing_data;
             
-            // Use admin settings if available, otherwise use API data with fallback to defaults
-            // This ensures admin panel settings take precedence
-            const adminMultiPricing = adminSettings.is_multi_pricing_on !== undefined ? 
-                adminSettings.is_multi_pricing_on : 
-                (is_multi_pricing_on !== undefined ? is_multi_pricing_on : defaultState.isMultiPricingOn);
+            // Check if we have tier_limits from the API which includes category-based restrictions
+            if (tier_limits && Array.isArray(tier_limits)) {
+                console.log('VOF Debug: Found tier limits from API with category restrictions:', tier_limits);
                 
-            const adminMonthlyTiers = adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
-                adminSettings.monthly_tiers : 
-                (monthly_tiers || defaultState.monthlyTiers);
+                // Process the tier limits to separate monthly and yearly tiers
+                const monthlyTiers = [];
+                const yearlyTiers = [];
                 
-            const adminYearlyTiers = adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
-                adminSettings.yearly_tiers : 
-                (yearly_tiers || defaultState.yearlyTiers);
-            
-            modalState = {
-                isMultiPricingOn: adminMultiPricing,
-                isApiData: true,
-                monthlyTiers: adminMonthlyTiers,
-                yearlyTiers: adminYearlyTiers,
-                selectedInterval: "month",            // default to monthly pricing scheme
-                customer_meta: response.customer_meta // Make sure this exists
-            };
-            console.log('VOF Debug: Updated modal state with admin settings:', modalState);
+                tier_limits.forEach(tier => {
+                    // Clone the tier to avoid reference issues
+                    const tierCopy = {...tier};
+                    
+                    // Check interval and add to appropriate array
+                    if (tierCopy.interval === 'year') {
+                        yearlyTiers.push(tierCopy);
+                    } else {
+                        monthlyTiers.push(tierCopy);
+                    }
+                });
+                
+                // Use the tier limits from the API which include category-based restrictions (isGrayOut)
+                modalState = {
+                    isMultiPricingOn: is_multi_pricing_on !== undefined ? is_multi_pricing_on : defaultState.isMultiPricingOn,
+                    isApiData: true,
+                    monthlyTiers: monthlyTiers.length > 0 ? monthlyTiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.monthlyTiers],
+                    yearlyTiers: yearlyTiers.length > 0 ? yearlyTiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.yearlyTiers],
+                    selectedInterval: "month",              // default to monthly pricing scheme
+                    customer_meta: response.customer_meta,  // Make sure this exists
+                    category_id: response.post_category_data // Store the category ID
+                };
+                console.log('VOF Debug: Updated modal state with category-based tier restrictions:', modalState);
+            } else {
+                // Fall back to admin settings or default data if no tier_limits available
+                console.warn('VOF Debug: No tier_limits found in API response, using admin settings with default isGrayOut values');
+                
+                // Use admin settings if available, otherwise use API data with fallback to defaults
+                const adminMultiPricing = adminSettings.is_multi_pricing_on !== undefined ? 
+                    adminSettings.is_multi_pricing_on : 
+                    (is_multi_pricing_on !== undefined ? is_multi_pricing_on : defaultState.isMultiPricingOn);
+                    
+                const adminMonthlyTiers = adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
+                    adminSettings.monthly_tiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.monthlyTiers];
+                    
+                const adminYearlyTiers = adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
+                    adminSettings.yearly_tiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.yearlyTiers];
+                
+                modalState = {
+                    isMultiPricingOn: adminMultiPricing,
+                    isApiData: true,
+                    monthlyTiers: adminMonthlyTiers,
+                    yearlyTiers: adminYearlyTiers,
+                    selectedInterval: "month",            // default to monthly pricing scheme
+                    customer_meta: response.customer_meta, // Make sure this exists
+                    category_id: response.post_category_data // Store the category ID
+                };
+                console.log('VOF Debug: Updated modal state with admin settings (no category restrictions):', modalState);
+            }
         } else {
             console.warn('VOF Debug: Invalid API response format, using admin settings or fallback data');
             
@@ -408,9 +508,21 @@ function updateModalState(response) {
                     adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
                 isApiData: defaultState.isApiData,
                 monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
-                    adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
+                    adminSettings.monthly_tiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.monthlyTiers],
                 yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
-                    adminSettings.yearly_tiers : [...defaultState.yearlyTiers],
+                    adminSettings.yearly_tiers.map(tier => ({
+                        ...tier,
+                        stripePriceIdTest: tier.stripePriceIdTest || '',
+                        stripePriceIdLive: tier.stripePriceIdLive || '',
+                        stripeLookupKeyTest: tier.stripeLookupKeyTest || '',
+                        stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
+                    })) : [...defaultState.yearlyTiers],
                 selectedInterval: "month", // default to monthly pricing scheme
             };
         }

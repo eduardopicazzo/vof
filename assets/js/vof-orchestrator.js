@@ -76,11 +76,15 @@
         console.log('VOF Debug: Starting checkout with data:', checkoutData);
 
         const formData = new FormData();
-        formData.append('action', 'vof_start_checkout'); // how come this works (no name like this anywhere)? if in form handler ? wp_ajax_nopriv_vof_start_checkout : wp_ajax_vof_start_checkout
+        formData.append('action', 'vof_start_checkout');
         formData.append('uuid', checkoutData.uuid);
         formData.append('tier_name', checkoutData.tier_selected.name);
         formData.append('tier_price', checkoutData.tier_selected.price);
         formData.append('tier_interval', checkoutData.tier_selected.interval);
+        formData.append('stripe_price_id_test', checkoutData.tier_selected.stripePriceIdTest);
+        formData.append('stripe_price_id_live', checkoutData.tier_selected.stripePriceIdLive);
+        formData.append('stripe_lookup_key_test', checkoutData.tier_selected.stripeLookupKeyTest);
+        formData.append('stripe_lookup_key_live', checkoutData.tier_selected.stripeLookupKeyLive);
         formData.append('security', vofSettings.security); // From wp_localize_script
 
         console.log('VOF Debug: Sending AJAX request with formData:', {
@@ -88,7 +92,11 @@
             uuid: formData.get('uuid'),
             tier_name: formData.get('tier_name'),
             tier_price: formData.get('tier_price'),
-            tier_interval: formData.get('tier_interval')
+            tier_interval: formData.get('tier_interval'),
+            stripe_price_id_test: formData.get('stripe_price_id_test'),
+            stripe_price_id_live: formData.get('stripe_price_id_live'),
+            stripe_lookup_key_test: formData.get('stripe_lookup_key_test'),
+            stripe_lookup_key_live: formData.get('stripe_lookup_key_live')
         });
     
         // Submit to WordPress AJAX endpoint

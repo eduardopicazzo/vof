@@ -134,7 +134,11 @@ class VOF_Assets {
                     'price' => floatval($tier['price']),
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
-                    'isGrayOut' => !empty($tier['isGrayOut'])
+                    'isGrayOut' => !empty($tier['isGrayOut']),
+                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
+                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
+                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
+                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])
                 );
             }
         }
@@ -153,7 +157,11 @@ class VOF_Assets {
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
-                    'interval' => 'year'
+                    'interval' => 'year',
+                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
+                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
+                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
+                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])                    
                 );
             }
         }
