@@ -117,6 +117,7 @@ class VOF_Assets {
         // Format configuration for JavaScript
         $js_data = array(
             'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
+            'iso_currency_code' => !empty($config['isoCurrencyCode']) ? strtoupper($config['isoCurrencyCode']) : 'USD',
             'monthly_tiers' => array(),
             'yearly_tiers' => array()
         );
@@ -135,10 +136,10 @@ class VOF_Assets {
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
-                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
-                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
-                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
-                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])
+                    'stripePriceIdTest' => isset($tier['stripePriceIdTest']) ? $tier['stripePriceIdTest'] : '',
+                    'stripePriceIdLive' => isset($tier['stripePriceIdLive']) ? $tier['stripePriceIdLive'] : '',
+                    'stripeLookupKeyTest' => isset($tier['stripeLookupKeyTest']) ? $tier['stripeLookupKeyTest'] : '',
+                    'stripeLookupKeyLive' => isset($tier['stripeLookupKeyLive']) ? $tier['stripeLookupKeyLive'] : ''
                 );
             }
         }
@@ -158,10 +159,10 @@ class VOF_Assets {
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
                     'interval' => 'year',
-                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
-                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
-                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
-                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])                    
+                    'stripePriceIdTest' => isset($tier['stripePriceIdTest']) ? $tier['stripePriceIdTest'] : '',
+                    'stripePriceIdLive' => isset($tier['stripePriceIdLive']) ? $tier['stripePriceIdLive'] : '',
+                    'stripeLookupKeyTest' => isset($tier['stripeLookupKeyTest']) ? $tier['stripeLookupKeyTest'] : '',
+                    'stripeLookupKeyLive' => isset($tier['stripeLookupKeyLive']) ? $tier['stripeLookupKeyLive'] : ''                    
                 );
             }
         }

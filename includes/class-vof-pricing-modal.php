@@ -47,6 +47,7 @@ class VOF_Pricing_Modal {
     public function vof_format_pricing_data_for_js($config) {
         $formatted_data = [
             'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
+            'iso_currency_code' => !empty($config['isoCurrencyCode']) ? strtoupper($config['isoCurrencyCode']) : 'USD',
             'monthly_tiers' => [],
             'yearly_tiers' => []
         ];

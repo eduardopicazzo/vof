@@ -96,6 +96,22 @@ class VOF_Pricing_Modal_Settings {
 
                         <tr>
                             <th scope="row">
+                                <label for="vof_currency_code"><?php echo esc_html__('Currency Code', 'vof'); ?></label>
+                            </th>
+                            <td>
+                                <input type="text" 
+                                       id="vof_currency_code" 
+                                       name="vof_pricing_modal_config[isoCurrencyCode]" 
+                                       value="<?php echo esc_attr(isset($options['isoCurrencyCode']) ? strtoupper($options['isoCurrencyCode']) : 'USD'); ?>" 
+                                       class="regular-text"
+                                       maxlength="3"
+                                       style="text-transform: uppercase;" />
+                                <p class="description"><?php echo esc_html__('Three-letter ISO currency code (e.g., USD, EUR, GBP). Default is USD.', 'vof'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row">
                                 <label for="vof_monthly_tiers"><?php echo esc_html__('Number of Monthly Tiers', 'vof'); ?></label>
                             </th>
                             <td>
@@ -857,6 +873,7 @@ class VOF_Pricing_Modal_Settings {
 
         // General settings
         $sanitized['isMultiPricingOn'] = isset($input['isMultiPricingOn']) ? (bool) $input['isMultiPricingOn'] : false;
+        $sanitized['isoCurrencyCode'] = isset($input['isoCurrencyCode']) ? strtoupper(substr(sanitize_text_field($input['isoCurrencyCode']), 0, 3)) : 'USD';
         $sanitized['numberOfTiersMonthly'] = isset($input['numberOfTiersMonthly']) ? intval($input['numberOfTiersMonthly']) : 3;
         $sanitized['numberOfTiersYearly'] = isset($input['numberOfTiersYearly']) ? intval($input['numberOfTiersYearly']) : 3;
 
@@ -940,6 +957,7 @@ class VOF_Pricing_Modal_Settings {
      */
     public function vof_get_default_pricing_config() {
         return [
+            'isoCurrencyCode' => 'USD',
             'isMultiPricingOn' => false,
             'numberOfTiersMonthly' => 3,
             'numberOfTiersYearly' => 3,

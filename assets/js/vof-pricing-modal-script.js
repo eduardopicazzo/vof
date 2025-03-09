@@ -111,6 +111,7 @@ const defaultState = {
 let adminSettings = {};
 if (typeof vofPricingModalConfig !== 'undefined') {
     console.log('VOF Debug: Admin settings loaded:', vofPricingModalConfig);
+    console.log('VOF Debug: Currency code from PHP:', vofPricingModalConfig.iso_currency_code);
     adminSettings = vofPricingModalConfig;
 }
 
@@ -120,6 +121,7 @@ let modalState = {
     isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
         adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
     isApiData: false,
+    isoCurrencyCode: adminSettings.iso_currency_code || 'USD', // Default to USD if not set
     monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
         adminSettings.monthly_tiers.map(tier => ({ 
             ...tier, 
@@ -154,10 +156,12 @@ function createTierElement(tier, index) {
     tierElement.className = `vof-pm-tier ${tier.isRecommended ? 'vof-pm-recommended' : ''} ${tier.isGrayOut ? 'vof-pm-gray-out' : ''}`;
     
     // Store the tier's data for the click handler
-    // const subscribeBtnId = `vof-pm-subscribe-${tier.name.toLowerCase().replace('+', '_plus')}`;
-    // TO-DO:add currency option on dashboard
     const subscribeBtnId = `vof-pm-subscribe-${sanitizeId(tier.name)}`;
     const intervalText = tier.interval === "year" ? "por año" : "por mes";
+    
+    // Get currency code from modalState or fallback to USD
+    const currencyCode = modalState.isoCurrencyCode || 'USD';
+    console.log('VOF Debug: Using currency code:', currencyCode);
     
     tierElement.innerHTML = `
         <div class="vof-pm-tier-header">
@@ -166,7 +170,7 @@ function createTierElement(tier, index) {
             <p class="vof-pm-tier-description">${tier.description}</p>
         </div>
         <div class="vof-pm-tier-price">
-            MXN ${tier.price} <span>${intervalText}</span>
+            ${currencyCode} $${tier.price} <span>${intervalText}</span>
         </div>
         <button 
             id="${subscribeBtnId}"
@@ -442,6 +446,7 @@ function updateModalState(response) {
                 modalState = {
                     isMultiPricingOn: is_multi_pricing_on !== undefined ? is_multi_pricing_on : defaultState.isMultiPricingOn,
                     isApiData: true,
+                    isoCurrencyCode: response.pricing_data.iso_currency_code || adminSettings.iso_currency_code || 'USD',
                     monthlyTiers: monthlyTiers.length > 0 ? monthlyTiers.map(tier => ({
                         ...tier,
                         stripePriceIdTest: tier.stripePriceIdTest || '',
@@ -491,6 +496,7 @@ function updateModalState(response) {
                 modalState = {
                     isMultiPricingOn: adminMultiPricing,
                     isApiData: true,
+                    isoCurrencyCode: response.pricing_data.iso_currency_code || adminSettings.iso_currency_code || 'USD',
                     monthlyTiers: adminMonthlyTiers,
                     yearlyTiers: adminYearlyTiers,
                     selectedInterval: "month",            // default to monthly pricing scheme
@@ -507,6 +513,7 @@ function updateModalState(response) {
                 isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
                     adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
                 isApiData: defaultState.isApiData,
+                isoCurrencyCode: adminSettings.iso_currency_code || 'USD',
                 monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
                     adminSettings.monthly_tiers.map(tier => ({
                         ...tier,
@@ -537,6 +544,7 @@ function updateModalState(response) {
             isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
                 adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
             isApiData: defaultState.isApiData,
+            isoCurrencyCode: adminSettings.iso_currency_code || 'USD',
             monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
                 adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
             yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
@@ -578,6 +586,7 @@ function openModal(apiData = null) {
             isMultiPricingOn: adminSettings.is_multi_pricing_on !== undefined ? 
                 adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
             isApiData: false,
+            isoCurrencyCode: adminSettings.iso_currency_code || 'USD',
             monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
                 adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
             yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
