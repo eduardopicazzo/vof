@@ -107,7 +107,69 @@ class VOF_Assets {
             true
         );
 
-        // Add localization for modal JavaScript
+        // Get pricing modal configuration from database or default
+        $config = get_option('vof_pricing_modal_config');
+        if (empty($config) && class_exists('\VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings')) {
+            $settings = new \VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings();
+            $config = $settings->vof_get_default_pricing_config();
+        }
+        
+        // Format configuration for JavaScript
+        $js_data = array(
+            'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
+            'monthly_tiers' => array(),
+            'yearly_tiers' => array()
+        );
+        
+        // Format monthly tiers
+        if (!empty($config['tiersMonthly'])) {
+            foreach ($config['tiersMonthly'] as $tier) {
+                if (empty($tier['name'])) {
+                    continue;
+                }
+                
+                $js_data['monthly_tiers'][] = array(
+                    'name' => $tier['name'],
+                    'description' => $tier['description'],
+                    'price' => floatval($tier['price']),
+                    'features' => array_filter($tier['features']), // Remove empty features
+                    'isRecommended' => !empty($tier['isRecommended']),
+                    'isGrayOut' => !empty($tier['isGrayOut']),
+                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
+                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
+                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
+                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])
+                );
+            }
+        }
+        
+        // Format yearly tiers if multi-pricing is enabled
+        if (!empty($config['isMultiPricingOn']) && !empty($config['tiersYearly'])) {
+            foreach ($config['tiersYearly'] as $tier) {
+                if (empty($tier['name'])) {
+                    continue;
+                }
+                
+                $js_data['yearly_tiers'][] = array(
+                    'name' => $tier['name'],
+                    'description' => $tier['description'],
+                    'price' => floatval($tier['price']),
+                    'features' => array_filter($tier['features']), // Remove empty features
+                    'isRecommended' => !empty($tier['isRecommended']),
+                    'isGrayOut' => !empty($tier['isGrayOut']),
+                    'interval' => 'year',
+                    'stripePriceIdTest' => !empty($tier['stripePriceIdTest']),
+                    'stripePriceIdLive' => !empty($tier['stripePriceIdTest']),
+                    'stripeLookupKeyTest' => !empty($tier['stripeLookupKeyTest']),
+                    'stripeLookupKeyLive' => !empty($tier['stripeLookupKeyLive'])                    
+                );
+            }
+        }
+
+        // Add pricing modal configuration to JavaScript
+        wp_localize_script('vof-pricing-modal-script', 'vofPricingModalConfig', $js_data);
+        
+        // Add general localization for modal JavaScript
         wp_localize_script('vof-pricing-modal-script', 'vofPricingModal', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('vof-pricing-modal'),
@@ -117,6 +179,6 @@ class VOF_Assets {
             )
         ));
 
-        error_log('VOF Debug: Modal assets enqueued');
+        error_log('VOF Debug: Modal assets enqueued with pricing config');
     }
 }

@@ -137,9 +137,39 @@ class VOF_API {
                 );
             }
             
-            // Get available pricing data based on category
-            $tier_slot = $stored_data['vof_tier'];
-            $pricing_data = $this->vof_get_checkout_options($tier_slot);
+            // Get the category ID from stored data
+            $posted_category = $stored_data['post_parent_cat'];
+            error_log("VOF Debug API: Post category for tier limits: " . print_r($posted_category, true));
+            
+            // Get pricing modal settings helper
+            $pricing_settings = new \VOF\Utils\PricingModal\VOF_Pricing_Modal_Settings();
+            
+            // Get base pricing data from admin settings
+            $pricing_config = get_option('vof_pricing_modal_config', $pricing_settings->vof_get_default_pricing_config());
+            
+            // Combine monthly and yearly tiers 
+            $all_tiers = [];
+            
+            // Add monthly tiers
+            if (isset($pricing_config['tiersMonthly'])) {
+                foreach ($pricing_config['tiersMonthly'] as $tier) {
+                    $tier['interval'] = 'month';
+                    $all_tiers[] = $tier;
+                }
+            }
+            
+            // Add yearly tiers if multi-pricing is enabled
+            if (isset($pricing_config['isMultiPricingOn']) && $pricing_config['isMultiPricingOn'] && isset($pricing_config['tiersYearly'])) {
+                foreach ($pricing_config['tiersYearly'] as $tier) {
+                    $tier['interval'] = 'year';
+                    $all_tiers[] = $tier;
+                }
+            }
+            
+            // Apply tier limitations based on category compatibility
+            $tier_limits_meta = $pricing_settings->vof_apply_tier_limits($all_tiers, $posted_category);
+            
+            error_log("VOF Debug API: Tier limits applied: " . print_r($tier_limits_meta, true));
             
             return rest_ensure_response([
                 'success' => true,
@@ -148,7 +178,11 @@ class VOF_API {
                     'email' => $stored_data['vof_email'],
                     'phone' => $stored_data['vof_phone'],
                 ],
-                'pricing_data' => $pricing_data
+                'post_category_data' => $posted_category,
+                'pricing_data' => [
+                    'is_multi_pricing_on' => isset($pricing_config['isMultiPricingOn']) ? $pricing_config['isMultiPricingOn'] : false,
+                    'tier_limits' => $tier_limits_meta
+                ]
             ]);
     
         } catch (\Exception $e) {
@@ -487,7 +521,8 @@ class VOF_API {
             }
 
             // Get proper checkout data for selected tier
-            $checkout_data = $this->vof_get_stripe_checkout_data($tier_selected);
+            $line_items = $this->vof_get_stripe_line_items($tier_selected);
+            error_log('VOF DEBUG API: Line Items (OUTER)'. print_r($line_items, true));
 
             // Add interval metadata
             $interval = isset($tier_selected['interval']) ? $tier_selected['interval']: 'month';
@@ -516,7 +551,7 @@ class VOF_API {
                     'wp_user_id' => $user_data['true_user_id'],
                     'interval'   => $interval
                 ],
-                'line_items' => [$checkout_data['line_items']],
+                'line_items' => [$line_items['line_items']],
                 'allow_promotion_codes' => true,
                 // 'payment_method_types' => ['card', 'apple_pay', 'google_pay'],
                 'payment_method_types' => ['card'],
@@ -531,7 +566,177 @@ class VOF_API {
         }
     }
 
-    public function vof_get_stripe_checkout_data($tier_selected) {
+    public function vof_get_stripe_line_items($tier_selected) {
+        error_log('VOF API Debug: Getting Stripe line items for tier - '. print_r($tier_selected, true));
+
+        $is_test_env = VOF_Core::instance()->vof_get_stripe_config()->vof_is_stripe_test_mode();
+        error_log('VOF API Debug: Getting Stripe stripe test environment for tier - '. print_r($is_test_env, true));
+        
+        if($is_test_env) {
+            $lookup_key = $tier_selected['sLookupKeyLive'];
+            error_log('VOF API Debug: Test lookup key - '. print_r($lookup_key, true));
+        } else {
+            $lookup_key = $tier_selected['sLookupKeyTest'];
+            error_log('VOF API Debug: Live lookup key - '. print_r($lookup_key, true));
+        }
+        
+        if (!$is_test_env) {
+            $price_id = $tier_selected['sPriceIdLive'];
+            error_log('VOF API Debug: Live Price Id - '. print_r($price_id, true));
+        }  else {
+            $price_id = $tier_selected['sPriceIdTest'];
+            error_log('VOF API Debug: Test Price Id - '. print_r($price_id, true));
+        }
+        
+        error_log('VOF API Debug: Final Price_id is: '. print_r($price_id, true));
+        if (!$price_id || empty($price_id)) {
+            $price_id = $this->vof_get_price_id_by_name_or_lookup_key($tier_selected['name'], $tier_selected['interval'], $is_test_env, $lookup_key);
+        }
+
+        $line_items = [
+            'line_items' => [
+                'price' => $price_id,
+                'quantity' => 1,
+                'adjustable_quantity' => [
+                    'enabled' => false
+                ]
+            ]
+        ];
+
+        error_log('VOF API Debug: Retrieving line items (inner) with: '. print_r($line_items, true));
+
+        return $line_items;
+    }
+
+    /**
+     * Get a Stripe price ID by product name, interval, and environment
+     * 
+     * @param string $pricing_tier_name The name of the pricing tier
+     * @param string $interval The billing interval ('month' or 'year')
+     * @param bool $is_test_env Whether to use test or live environment
+     * @param string $lookup_key Optional lookup key to find the price
+     * @return string The Stripe price ID
+     * @throws \Exception If the price cannot be found
+     */
+    public function vof_get_price_id_by_name_or_lookup_key($pricing_tier_name, $interval, $is_test_env, $lookup_key = '') {
+        $stripe = VOF_Core::instance()->vof_get_stripe_config()->vof_get_stripe();
+
+        try {
+            // If lookup key is provided, use it to find the price directly
+            if (!empty($lookup_key)) {
+                error_log("VOF Debug: Attempting to find price with lookup key: {$lookup_key}");
+
+                $prices = $stripe->prices->all([
+                    'lookup_keys' => [$lookup_key],
+                    'active' => true,
+                    'expand' => ['data.product']
+                ]);
+
+                if (!empty($prices->data)) {
+                    foreach ($prices->data as $price) {
+                        // Verify this price belongs to the expected product and has the correct interval
+                        if (isset($price->recurring) && 
+                            $price->recurring->interval === $interval && 
+                            $price->active) {
+                            
+                            // Check if this price matches our test/live environment
+                            // livemode = true means it's in the live environment, false means test
+                            $is_live_price = $price->livemode;
+                            // The correct comparison should be:
+                            // - If we're in test env ($is_test_env is true), we want test prices (!$is_live_price is true)
+                            // - If we're in live env ($is_test_env is false), we want live prices ($is_live_price is true)
+                            $price_matches_env = ($is_test_env) ? (!$is_live_price) : $is_live_price;
+                            
+                            if ($price_matches_env) {
+                                error_log("VOF Debug: Found price ID {$price->id} using lookup key {$lookup_key}");
+                                return $price->id;
+                            } else {
+                                error_log("VOF Debug: Found price ID {$price->id} but environment mismatch. Price is " . 
+                                    ($is_live_price ? "live" : "test") . ", but we need " . 
+                                    ($is_test_env ? "test" : "live"));
+                            }
+                        }
+                    }
+                }
+
+                error_log("VOF Debug: Could not find price with lookup key {$lookup_key} matching environment and interval");
+            }
+
+            // If we get here, either no lookup key was provided or it didn't find a match
+            // Fall back to searching by product name
+
+            // Step 1: Retrieve products by name
+            $products = $stripe->products->all([
+                'limit' => 100,
+                'active' => true
+            ]);
+        
+            $productId = null;
+        
+            foreach ($products->data as $product) {
+                if ($product->name === $pricing_tier_name) {
+                    $productId = $product->id;
+                    error_log("VOF Debug: Found product ID {$productId} for tier {$pricing_tier_name}");
+                    break;
+                }
+            }
+        
+            if ($productId) {
+                // Step 2: Retrieve prices for the matching product
+                $prices = $stripe->prices->all([
+                    'product' => $productId,
+                    'active' => true
+                ]);
+
+                $matching_prices = [];
+            
+                foreach ($prices->data as $price) {
+                    if (isset($price->recurring) && 
+                        $price->recurring->interval === $interval && 
+                        $price->active) {
+                        
+                        // Check if this price matches our test/live environment
+                        $is_live_price = $price->livemode;
+                        // The correct comparison should be:
+                        // - If we're in test env ($is_test_env is true), we want test prices (!$is_live_price is true)
+                        // - If we're in live env ($is_test_env is false), we want live prices ($is_live_price is true)
+                        $price_matches_env = ($is_test_env) ? (!$is_live_price) : $is_live_price;
+                        
+                        if ($price_matches_env) {
+                            $matching_prices[] = $price;
+                            error_log("VOF Debug: Found matching price ID {$price->id} for tier {$pricing_tier_name} with interval {$interval} in " . 
+                                ($is_test_env ? 'test' : 'live') . " environment");
+                        } else {
+                            error_log("VOF Debug: Found price ID {$price->id} but environment mismatch. Price is " . 
+                                ($is_live_price ? "live" : "test") . ", but we need " . 
+                                ($is_test_env ? "test" : "live"));
+                        }
+                    }
+                }
+
+                if (!empty($matching_prices)) {
+                    // Return the first matching price by default
+                    // This could be enhanced to pick the most appropriate price based on other criteria
+                    return $matching_prices[0]->id;
+                }
+
+                error_log("VOF Debug: No price found for product {$productId} with interval {$interval} in " . 
+                    ($is_test_env ? 'test' : 'live') . " environment");
+            } else {
+                error_log("VOF Debug: No product found with name {$pricing_tier_name}");
+            }
+
+            // If we get here, no matching price was found
+            throw new \Exception("No price found for tier {$pricing_tier_name} with interval {$interval} in " . 
+                ($is_test_env ? 'test' : 'live') . " environment");
+
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            error_log("VOF Error: Stripe API error - " . $e->getMessage());
+            throw new \Exception("Stripe API error: " . $e->getMessage());
+        }
+    }
+
+    public function vof_get_stripe_checkout_data_OLD($tier_selected) {
         // Normalize tier name by reaplacing + with _plus if needed
         $tier_name = str_replace('+', '_plus', $tier_selected['name']);
         $interval = isset($tier_selected['interval']) ? $tier_selected['interval']: 'month';
@@ -607,7 +812,7 @@ class VOF_API {
     }
 
     // Updated to handle different pricing scheme intervals
-    private function vof_get_price_id($tier, $interval='month') {
+    private function vof_get_price_id_OLD($tier, $interval='month') {
         $is_test = VOF_Core::instance()->vof_get_stripe_config()->vof_is_stripe_test_mode();
         
         // Price IDs for each environment and tier

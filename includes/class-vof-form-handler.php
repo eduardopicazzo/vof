@@ -404,6 +404,10 @@ class VOF_Form_Handler {
             $tier_name = isset($_POST['tier_name']) ? sanitize_text_field($_POST['tier_name']) : '';
             $tier_price = isset($_POST['tier_price']) ? floatval($_POST['tier_price']) : 0;
 			$tier_interval = isset($_POST['tier_interval']) ? sanitize_text_field($_POST['tier_interval']) : 'month';
+			$stripe_price_id_test = isset($_POST['stripe_price_id_test']) ? sanitize_text_field($_POST['stripe_price_id_test']) : '';
+			$stripe_price_id_live = isset($_POST['stripe_price_id_live']) ? sanitize_text_field($_POST['stripe_price_id_live']) : '';
+			$stripe_lookup_key_test = isset($_POST['stripe_lookup_key_test']) ? sanitize_text_field($_POST['stripe_lookup_key_test']) : '';
+			$stripe_lookup_key_live = isset($_POST['stripe_lookup_key_live']) ? sanitize_text_field($_POST['stripe_lookup_key_live']) : '';
 
             if (!$uuid || !$tier_name || !$tier_price) {
                 wp_send_json_error([
@@ -430,9 +434,13 @@ class VOF_Form_Handler {
             // Pass all necessary data for checkout session creation
             $request->set_param('uuid', $uuid);
             $request->set_param('tier_selected', [
-                'name'     => $tier_name,
-                'price'    => $tier_price,
-				'interval' => $tier_interval
+                'name'           => $tier_name,
+                'price'          => $tier_price,
+				'interval'       => $tier_interval,
+				'sPriceIdTest'   => $stripe_price_id_test,
+				'sPriceIdLive'   => $stripe_price_id_live,
+				'sLookupKeyTest' => $stripe_lookup_key_test,
+				'sLookupKeyLive' => $stripe_lookup_key_live
             ]);
 
             // Process the request through our API
