@@ -96,6 +96,21 @@ class VOF_Pricing_Modal_Settings {
 
                         <tr>
                             <th scope="row">
+                                <label for="vof_pricing_modal_title"><?php echo esc_html__('Pricing Modal Title', 'vof'); ?></label>
+                            </th>
+                            <td>
+                                <input type="text" 
+                                       id="vof_pricing_modal_title" 
+                                       name="vof_pricing_modal_config[pricingModalTitle]" 
+                                       value="<?php echo esc_attr(isset($options['pricingModalTitle']) ? $options['pricingModalTitle'] : ''); ?>" 
+                                       class="regular-text" 
+                                       placeholder="Select Your Plan" />
+                                <p class="description"><?php echo esc_html__('Defaults to "Select Your Plan"', 'vof'); ?></p>
+                            </td>
+                        </tr>                        
+
+                        <tr>
+                            <th scope="row">
                                 <label for="vof_currency_code"><?php echo esc_html__('Currency Code', 'vof'); ?></label>
                             </th>
                             <td>
@@ -123,6 +138,21 @@ class VOF_Pricing_Modal_Settings {
                             </td>
                         </tr>
 
+                        <tr>
+                            <th scope="row">
+                                <label for="vof_tab_label_monthly"><?php echo esc_html__('Tab Label Title', 'vof'); ?></label>
+                            </th>
+                            <td>
+                                <input type="text" 
+                                       id="vof_tab_label_monthly" 
+                                       name="vof_pricing_modal_config[tabLabelMonthly]" 
+                                       value="<?php echo esc_attr(isset($options['tabLabelMonthly'])) ? $options['tabLabelMonthly'] :''?>" 
+                                       class="regular-text" 
+                                       placeholder="Monthly Plans" />
+                                <p class="description"><?php echo esc_html__('Defaults to "Monthly Plans"', 'vof'); ?></p>
+                            </td>
+                        </tr> 
+
                         <tr class="vof-yearly-tiers-option" <?php echo !$options['isMultiPricingOn'] ? 'style="display:none;"' : ''; ?>>
                             <th scope="row">
                                 <label for="vof_yearly_tiers"><?php echo esc_html__('Number of Yearly Tiers', 'vof'); ?></label>
@@ -134,6 +164,21 @@ class VOF_Pricing_Modal_Settings {
                                     <option value="3" <?php selected(3, $options['numberOfTiersYearly']); ?>>3</option>
                                 </select>
                             </td>
+                            
+                            <tr class="vof-yearly-tiers-option" <?php echo !$options['isMultiPricingOn'] ? 'style="display:none;"' : ''; ?>>
+                                <th scope="row">
+                                    <label for="vof_tab_label_yearly"><?php echo esc_html__('Tab Label Title', 'vof'); ?></label>
+                                </th>
+                                <td>
+                                    <input type="text" 
+                                           id="vof_tab_label_yearly" 
+                                           name="vof_pricing_modal_config[tabLabelYearly]" 
+                                           value="<?php echo esc_attr(isset($options['tabLabelYearly']) ? $options['tabLabelYearly'] : ''); ?>" 
+                                           class="regular-text"
+                                           placeholder="Yearly Plans" />
+                                    <p class="description"><?php echo esc_html__('Defaults to "Yearly Plans"', 'vof'); ?></p>
+                                </td>
+                            </tr>
                         </tr>
                     </table>
                 </div>
@@ -157,6 +202,7 @@ class VOF_Pricing_Modal_Settings {
                                     'features' => [],
                                     'isRecommended' => false,
                                     'isGrayOut' => false,
+                                    'billingCycleLabel' => '',
                                     'stripePriceIdTest' => '',
                                     'stripePriceIdLive' => '',
                                     'stripeLookupKeyTest' => '',
@@ -325,15 +371,24 @@ class VOF_Pricing_Modal_Settings {
                                                 
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_monthly_tier_<?php echo $i; ?>_grayout"><?php echo esc_html__('Gray Out', 'vof'); ?></label>
+                                                <label for="vof_monthly_tier_<?php echo $i; ?>_billing_cycle_label"><?php echo esc_html__('Override Billing Cycle Label', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="checkbox" 
-                                                       id="vof_monthly_tier_<?php echo $i; ?>_grayout" 
-                                                       name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][isGrayOut]" 
-                                                       value="1" 
-                                                       <?php checked(true, isset($tier['isGrayOut']) ? $tier['isGrayOut'] : false); ?> />
-                                                <p class="description"><?php echo esc_html__('Gray out this tier to indicate unavailability.', 'vof'); ?></p>
+                                                       id="vof_monthly_tier_<?php echo $i; ?>_billing_cycle_label_toggle" 
+                                                       class="vof-billing-cycle-label-toggle"
+                                                       data-tier-index="<?php echo $i; ?>"
+                                                       data-tier-type="monthly"
+                                                       <?php checked(!empty($tier['billingCycleLabel'])); ?> />
+                                                <div class="vof-billing-cycle-label-field" id="vof_monthly_tier_<?php echo $i; ?>_billing_cycle_label_container" style="margin-top: 10px; <?php echo empty($tier['billingCycleLabel']) ? 'display: none;' : ''; ?>">
+                                                    <input type="text" 
+                                                           id="vof_monthly_tier_<?php echo $i; ?>_billing_cycle_label" 
+                                                           name="vof_pricing_modal_config[tiersMonthly][<?php echo $i; ?>][billingCycleLabel]" 
+                                                           value="<?php echo esc_attr(isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : ''); ?>" 
+                                                           class="regular-text"
+                                                           placeholder="<?php echo esc_attr__('Custom billing cycle label', 'vof'); ?>" />
+                                                </div>
+                                                <p class="description"><?php echo esc_html__('Override the default billing cycle label shown in the pricing modal. Defaults to "per month" if left empty.', 'vof'); ?></p>
                                             </td>
                                         </tr>
                                     </table>
@@ -354,6 +409,7 @@ class VOF_Pricing_Modal_Settings {
                                     'features' => [],
                                     'isRecommended' => false,
                                     'isGrayOut' => false,
+                                    'billingCycleLabel' => '',
                                     'stripePriceIdTest' => '',
                                     'stripePriceIdLive' => '',
                                     'stripeLookupKeyTest' => '',
@@ -520,15 +576,24 @@ class VOF_Pricing_Modal_Settings {
                                                 
                                         <tr>
                                             <th scope="row">
-                                                <label for="vof_yearly_tier_<?php echo $i; ?>_grayout"><?php echo esc_html__('Gray Out', 'vof'); ?></label>
+                                                <label for="vof_yearly_tier_<?php echo $i; ?>_billing_cycle_label"><?php echo esc_html__('Override Billing Cycle Label', 'vof'); ?></label>
                                             </th>
                                             <td>
                                                 <input type="checkbox" 
-                                                       id="vof_yearly_tier_<?php echo $i; ?>_grayout" 
-                                                       name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][isGrayOut]" 
-                                                       value="1" 
-                                                       <?php checked(true, isset($tier['isGrayOut']) ? $tier['isGrayOut'] : false); ?> />
-                                                <p class="description"><?php echo esc_html__('Gray out this tier to indicate unavailability.', 'vof'); ?></p>
+                                                       id="vof_yearly_tier_<?php echo $i; ?>_billing_cycle_label_toggle" 
+                                                       class="vof-billing-cycle-label-toggle"
+                                                       data-tier-index="<?php echo $i; ?>"
+                                                       data-tier-type="yearly"
+                                                       <?php checked(!empty($tier['billingCycleLabel'])); ?> />
+                                                <div class="vof-billing-cycle-label-field" id="vof_yearly_tier_<?php echo $i; ?>_billing_cycle_label_container" style="margin-top: 10px; <?php echo empty($tier['billingCycleLabel']) ? 'display: none;' : ''; ?>">
+                                                    <input type="text" 
+                                                           id="vof_yearly_tier_<?php echo $i; ?>_billing_cycle_label" 
+                                                           name="vof_pricing_modal_config[tiersYearly][<?php echo $i; ?>][billingCycleLabel]" 
+                                                           value="<?php echo esc_attr(isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : ''); ?>" 
+                                                           class="regular-text"
+                                                           placeholder="<?php echo esc_attr__('Custom billing cycle label', 'vof'); ?>" />
+                                                </div>
+                                                <p class="description"><?php echo esc_html__('Override the default billing cycle label shown in the pricing modal. Defaults to "per year" if left empty.', 'vof'); ?></p>
                                             </td>
                                         </tr>
                                     </table>
@@ -683,6 +748,22 @@ class VOF_Pricing_Modal_Settings {
                                 $('.vof-sync-stripe').text('Sync with Stripe').attr('disabled', false);
                             }
                         });
+                    }
+                });
+                
+                // Handle billing cycle label toggles
+                $('.vof-billing-cycle-label-toggle').on('change', function() {
+                    var $this = $(this);
+                    var tierIndex = $this.data('tier-index');
+                    var tierType = $this.data('tier-type');
+                    var containerId = '#vof_' + tierType + '_tier_' + tierIndex + '_billing_cycle_label_container';
+                    
+                    if ($this.is(':checked')) {
+                        $(containerId).slideDown(200);
+                    } else {
+                        $(containerId).slideUp(200);
+                        // Clear the value when unchecking
+                        $('#vof_' + tierType + '_tier_' + tierIndex + '_billing_cycle_label').val('');
                     }
                 });
             });
@@ -872,10 +953,14 @@ class VOF_Pricing_Modal_Settings {
         $sanitized = [];
 
         // General settings
-        $sanitized['isMultiPricingOn'] = isset($input['isMultiPricingOn']) ? (bool) $input['isMultiPricingOn'] : false;
-        $sanitized['isoCurrencyCode'] = isset($input['isoCurrencyCode']) ? strtoupper(substr(sanitize_text_field($input['isoCurrencyCode']), 0, 3)) : 'USD';
+        $sanitized['isMultiPricingOn']     = isset($input['isMultiPricingOn']) ? (bool) $input['isMultiPricingOn'] : false;
+        $sanitized['pricingModalTitle']    = isset($input['pricingModalTitle']) ? sanitize_text_field($input['pricingModalTitle']) : 'Select Your Plan';
+        $sanitized['tabLabelMonthly']      = isset($input['tabLabelMonthly']) ? sanitize_text_field($input['tabLabelMonthly']) : 'Monthly Plans';
+        $sanitized['tabLabelYearly']       = isset($input['tabLabelYearly']) ? sanitize_text_field($input['tabLabelYearly']) : 'Yearly Plans';
+        $sanitized['isoCurrencyCode']      = isset($input['isoCurrencyCode']) ? strtoupper(substr(sanitize_text_field($input['isoCurrencyCode']), 0, 3)) : 'USD';
         $sanitized['numberOfTiersMonthly'] = isset($input['numberOfTiersMonthly']) ? intval($input['numberOfTiersMonthly']) : 3;
-        $sanitized['numberOfTiersYearly'] = isset($input['numberOfTiersYearly']) ? intval($input['numberOfTiersYearly']) : 3;
+        $sanitized['numberOfTiersYearly']  = isset($input['numberOfTiersYearly']) ? intval($input['numberOfTiersYearly']) : 3;
+        
 
         // Sanitize monthly tiers
         $sanitized['tiersMonthly'] = [];
@@ -890,7 +975,7 @@ class VOF_Pricing_Modal_Settings {
                 $sanitized_tier['description'] = sanitize_textarea_field($tier['description']);
                 $sanitized_tier['price'] = floatval($tier['price']);
                 $sanitized_tier['isRecommended'] = isset($tier['isRecommended']) ? (bool) $tier['isRecommended'] : false;
-                $sanitized_tier['isGrayOut'] = isset($tier['isGrayOut']) ? (bool) $tier['isGrayOut'] : false;
+                $sanitized_tier['billingCycleLabel'] = isset($tier['billingCycleLabel']) ? sanitize_text_field($tier['billingCycleLabel']) : 'per month';
 
                 // Add new Stripe-related fields
                 $sanitized_tier['stripePriceIdTest'] = sanitize_text_field($tier['stripePriceIdTest'] ?? '');
@@ -925,7 +1010,7 @@ class VOF_Pricing_Modal_Settings {
                 $sanitized_tier['description'] = sanitize_textarea_field($tier['description']);
                 $sanitized_tier['price'] = floatval($tier['price']);
                 $sanitized_tier['isRecommended'] = isset($tier['isRecommended']) ? (bool) $tier['isRecommended'] : false;
-                $sanitized_tier['isGrayOut'] = isset($tier['isGrayOut']) ? (bool) $tier['isGrayOut'] : false;
+                $sanitized_tier['billingCycleLabel'] = isset($tier['billingCycleLabel']) ? sanitize_text_field($tier['billingCycleLabel']) : 'per year';
 
                 // Add new Stripe-related fields
                 $sanitized_tier['stripePriceIdTest'] = sanitize_text_field($tier['stripePriceIdTest'] ?? '');
@@ -957,6 +1042,9 @@ class VOF_Pricing_Modal_Settings {
      */
     public function vof_get_default_pricing_config() {
         return [
+            'tabLabelYearly' => 'Yearly Plans',
+            'tabLabelMonthly' => 'Monthly Plans',
+            'pricingModalTitle' => 'Select Your Plan',
             'isoCurrencyCode' => 'USD',
             'isMultiPricingOn' => false,
             'numberOfTiersMonthly' => 3,
@@ -976,6 +1064,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => true,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',
@@ -995,6 +1084,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',
@@ -1014,6 +1104,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',
@@ -1036,6 +1127,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => true,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',
@@ -1056,6 +1148,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',
@@ -1076,6 +1169,7 @@ class VOF_Pricing_Modal_Settings {
                     ],
                     'isRecommended' => false,
                     'isGrayOut' => false,
+                    'billingCycleLabel' => '',
                     'stripePriceIdTest' => '',
                     'stripePriceIdLive' => '',
                     'stripeLookupKeyTest' => '',

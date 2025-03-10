@@ -47,9 +47,12 @@ class VOF_Pricing_Modal {
     public function vof_format_pricing_data_for_js($config) {
         $formatted_data = [
             'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
-            'iso_currency_code' => !empty($config['isoCurrencyCode']) ? strtoupper($config['isoCurrencyCode']) : 'USD',
-            'monthly_tiers' => [],
-            'yearly_tiers' => []
+            'pricing_modal_title' => !empty($config['pricingModalTitle']) ? $config['pricingModalTitle'] : 'Select Your Plan',
+            'tab_label_monthly'   => !empty($config['tabLabelMonthly']) ? $config['tabLabelMonthly'] : 'Monthly Plans',
+            'tab_label_yearly'    => !empty($config['tabLabelYearly']) ? $config['tabLabelYearly'] : 'Yearly Plans',
+            'iso_currency_code'   => !empty($config['isoCurrencyCode']) ? strtoupper($config['isoCurrencyCode']) : 'USD',
+            'monthly_tiers'       => [],
+            'yearly_tiers'        => []
         ];
         
         // Format monthly tiers
@@ -66,7 +69,8 @@ class VOF_Pricing_Modal {
                     'price' => floatval($tier['price']),
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
-                    'isGrayOut' => !empty($tier['isGrayOut'])
+                    'isGrayOut' => !empty($tier['isGrayOut']),
+                    'billingCycleLabel' => isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : ''
                 ];
             }
         }
@@ -86,6 +90,7 @@ class VOF_Pricing_Modal {
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
+                    'billingCycleLabel' => isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : '',
                     'interval' => 'year'
                 ];
             }
@@ -108,12 +113,15 @@ class VOF_Pricing_Modal {
             <div id="vof-pm-pricingModal" class="vof-pm-modal">
                 <div class="vof-pm-modal-content">
                     <div class="vof-pm-modal-header">
-                        <h2 class="vof-pm-modal-title">Upgrade Plan</h2>
+                        <!-- <h2 class="vof-pm-modal-title">Upgrade Plan</h2> -->
+                        <h2 class="vof-pm-modal-title"><?php echo esc_html($js_data['pricing_modal_title']); ?></h2>
                         <button id="vof-pm-closeModalBtn" class="vof-pm-close-btn">×</button>
                     </div>
                     <div id="vof-pm-tabsContainer" class="vof-pm-tabs">
                         <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
                         <button class="vof-pm-tab-btn" data-tab="yearly">Anualmente</button>
+                        <!-- <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly"><//?php echo esc_html($js_data['tab_label_monthly']); ?></button> -->
+                        <!-- <button class="vof-pm-tab-btn" data-tab="yearly"><//?php echo esc_html($js_data['tab_label_yearly']); ?></button> -->
                     </div>
                     <div id="vof-pm-monthlyContent" class="vof-pm-tab-content vof-pm-active">
                         <div class="vof-pm-tier-container">

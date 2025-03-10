@@ -118,6 +118,9 @@ class VOF_Assets {
         $js_data = array(
             'is_multi_pricing_on' => !empty($config['isMultiPricingOn']),
             'iso_currency_code' => !empty($config['isoCurrencyCode']) ? strtoupper($config['isoCurrencyCode']) : 'USD',
+            'pricing_modal_title' => !empty($config['pricingModalTitle']) ? $config['pricingModalTitle'] : 'Select Your Plan',
+            'tab_label_monthly' => !empty($config['tabLabelMonthly']) ? $config['tabLabelMonthly'] : 'Monthly Plans',
+            'tab_label_yearly' => !empty($config['tabLabelYearly']) ? $config['tabLabelYearly'] : 'Yearly Plans',
             'monthly_tiers' => array(),
             'yearly_tiers' => array()
         );
@@ -136,6 +139,7 @@ class VOF_Assets {
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
+                    'billingCycleLabel' => isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : '',
                     'stripePriceIdTest' => isset($tier['stripePriceIdTest']) ? $tier['stripePriceIdTest'] : '',
                     'stripePriceIdLive' => isset($tier['stripePriceIdLive']) ? $tier['stripePriceIdLive'] : '',
                     'stripeLookupKeyTest' => isset($tier['stripeLookupKeyTest']) ? $tier['stripeLookupKeyTest'] : '',
@@ -158,6 +162,7 @@ class VOF_Assets {
                     'features' => array_filter($tier['features']), // Remove empty features
                     'isRecommended' => !empty($tier['isRecommended']),
                     'isGrayOut' => !empty($tier['isGrayOut']),
+                    'billingCycleLabel' => isset($tier['billingCycleLabel']) ? $tier['billingCycleLabel'] : '',
                     'interval' => 'year',
                     'stripePriceIdTest' => isset($tier['stripePriceIdTest']) ? $tier['stripePriceIdTest'] : '',
                     'stripePriceIdLive' => isset($tier['stripePriceIdLive']) ? $tier['stripePriceIdLive'] : '',

@@ -122,6 +122,9 @@ let modalState = {
         adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
     isApiData: false,
     isoCurrencyCode: adminSettings.iso_currency_code || 'USD', // Default to USD if not set
+    pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+    tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+    tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans',
     monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
         adminSettings.monthly_tiers.map(tier => ({ 
             ...tier, 
@@ -157,7 +160,12 @@ function createTierElement(tier, index) {
     
     // Store the tier's data for the click handler
     const subscribeBtnId = `vof-pm-subscribe-${sanitizeId(tier.name)}`;
-    const intervalText = tier.interval === "year" ? "por año" : "por mes";
+    
+    // Use the custom billing cycle label if provided, otherwise use default interval text
+    let intervalText = tier.interval === "year" ? "por año" : "por mes";
+    if (tier.billingCycleLabel && tier.billingCycleLabel.trim() !== '') {
+        intervalText = tier.billingCycleLabel;
+    }
     
     // Get currency code from modalState or fallback to USD
     const currencyCode = modalState.isoCurrencyCode || 'USD';
@@ -289,9 +297,11 @@ function renderTabs() {
 
     if (modalState.isMultiPricingOn) {
         tabsContainer.classList.remove('vof-pm-single-tab');
+        const monthlyLabel = modalState.tab_label_monthly || 'Monthly Plans';
+        const yearlyLabel = modalState.tab_label_yearly || 'Yearly Plans';
         tabsContainer.innerHTML = `
-            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
-            <button class="vof-pm-tab-btn" data-tab="yearly">Anualmente</button>
+            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">${monthlyLabel}</button>
+            <button class="vof-pm-tab-btn" data-tab="yearly">${yearlyLabel}</button>
         `;
 
         // Ensure yearly content has the proper structure
@@ -305,8 +315,9 @@ function renderTabs() {
         }
     } else {
         tabsContainer.classList.add('vof-pm-single-tab');
+        const monthlyLabel = modalState.tab_label_monthly || 'Monthly Plans';
         tabsContainer.innerHTML = `
-            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">Mensualmente</button>
+            <button class="vof-pm-tab-btn vof-pm-active" data-tab="monthly">${monthlyLabel}</button>
         `;
     }
 
@@ -463,7 +474,10 @@ function updateModalState(response) {
                     })) : [...defaultState.yearlyTiers],
                     selectedInterval: "month",              // default to monthly pricing scheme
                     customer_meta: response.customer_meta,  // Make sure this exists
-                    category_id: response.post_category_data // Store the category ID
+                    category_id: response.post_category_data, // Store the category ID
+                    pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+                    tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+                    tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans',
                 };
                 console.log('VOF Debug: Updated modal state with category-based tier restrictions:', modalState);
             } else {
@@ -497,6 +511,9 @@ function updateModalState(response) {
                     isMultiPricingOn: adminMultiPricing,
                     isApiData: true,
                     isoCurrencyCode: response.pricing_data.iso_currency_code || adminSettings.iso_currency_code || 'USD',
+                    pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+                    tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+                    tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans',
                     monthlyTiers: adminMonthlyTiers,
                     yearlyTiers: adminYearlyTiers,
                     selectedInterval: "month",            // default to monthly pricing scheme
@@ -531,6 +548,9 @@ function updateModalState(response) {
                         stripeLookupKeyLive: tier.stripeLookupKeyLive || ''
                     })) : [...defaultState.yearlyTiers],
                 selectedInterval: "month", // default to monthly pricing scheme
+                pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+                tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+                tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans'
             };
         }
 
@@ -545,6 +565,9 @@ function updateModalState(response) {
                 adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
             isApiData: defaultState.isApiData,
             isoCurrencyCode: adminSettings.iso_currency_code || 'USD',
+            pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+            tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+            tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans',
             monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
                 adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
             yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
@@ -587,6 +610,9 @@ function openModal(apiData = null) {
                 adminSettings.is_multi_pricing_on : defaultState.isMultiPricingOn,
             isApiData: false,
             isoCurrencyCode: adminSettings.iso_currency_code || 'USD',
+            pricingModalTitle: adminSettings.pricing_modal_title || 'Select Your Plan',
+            tab_label_monthly: adminSettings.tab_label_monthly || 'Monthly Plans',
+            tab_label_yearly: adminSettings.tab_label_yearly || 'Yearly Plans',
             monthlyTiers: adminSettings.monthly_tiers && adminSettings.monthly_tiers.length ? 
                 adminSettings.monthly_tiers : [...defaultState.monthlyTiers],
             yearlyTiers: adminSettings.yearly_tiers && adminSettings.yearly_tiers.length ? 
