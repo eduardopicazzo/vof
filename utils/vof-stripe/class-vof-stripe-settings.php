@@ -9,7 +9,7 @@ class VOF_Stripe_Settings {
 
     public function vof_add_stripe_settings_page() {
         add_submenu_page(
-            'vof_debug', // Parent slug
+            'vof_admin', // Parent slug
             'Stripe Settings',
             'Stripe Settings',
             'manage_options',
@@ -35,6 +35,8 @@ class VOF_Stripe_Settings {
     }
 
     public function vof_render_stripe_settings_page() {
+        $is_development = defined('WP_DEBUG') && WP_DEBUG;
+
         ?>
         <div class="wrap">
             <h1>VOF Stripe Settings</h1>
@@ -108,8 +110,9 @@ class VOF_Stripe_Settings {
                         </td>
                     </tr>
                 </table>
-                <hr>
+                <?php if($is_development): ?>
                 <!-- Interim Fulfillment Setting -->
+                <hr>
                 <table class="form-table">
                     <h2>VOF Subscription Management</h2>
                     <tr>
@@ -126,6 +129,7 @@ class VOF_Stripe_Settings {
                     </td>
                     </tr>                    
                 </table>
+                <?php endif; ?>
 
                 <?php submit_button('Save Settings'); ?>
             </form>

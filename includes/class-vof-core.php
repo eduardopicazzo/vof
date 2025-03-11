@@ -310,15 +310,152 @@ class VOF_Core {
 
     // Add admin menu MENU
     public function vof_add_admin_menu() {
+        // Define a condition to check if we're in a development environment
+        $is_development = defined('WP_DEBUG') && WP_DEBUG;
+        // Add VOF Admin Menu Page
         add_menu_page(
             'VOF Debug',                      // Page title
-            'VOF Debug',                      // Menu title
+            'VOF',                            // Menu title
             'manage_options',                 // Capability required
-            'vof_debug',                      // Menu slug
-            [$this, 'vof_render_debug_page'], // callback function
-            'dashicons-bug',                  // Icon URL
+            'vof_admin',                      // Menu slug
+            [$this, 'vof_render_admin_dashboard'], // callback function
+            'dashicons-store',                // Icon URL
             100                               // position
         );
+
+        // Only add debug submenu in development environments
+        if ($is_development) {
+            add_submenu_page(
+                'vof_admin',                     // Parent slug
+                'VOF Debug',                     // Page title
+                'VOF Debug',                     // Menu title
+                'manage_options',                // Capability required
+                'vof_debug',                     // Debug-specific slug
+                [$this, 'vof_render_debug_page'] // Original debug renderer
+            );
+        }
+    }
+
+    // In class-vof-core.php
+    public function vof_render_admin_dashboard() {
+        // Check if we're in a development environment
+        $is_development = defined('WP_DEBUG') && WP_DEBUG;
+        // If we're in development AND the debug page is requested, show debug content
+        // if ($is_development && isset($_GET['page']) && $_GET['page'] === 'vof_debug') {
+        //     $this->vof_render_debug_page();
+        //     return;
+        // }
+        // Handle email submission
+        $message = '';
+        if (isset($_POST['vof_subscribe_email']) && wp_verify_nonce($_POST['vof_email_nonce'], 'vof_subscribe')) {
+            $email = sanitize_email($_POST['vof_subscribe_email']);
+            if (!empty($email) && is_email($email)) {
+                // Here you would typically store the email or make an API call
+                update_option('vof_latest_subscriber_email', $email);
+                $message = '<div class="notice notice-success"><p>Thank you for subscribing with ' . esc_html($email) . '!</p></div>';
+            } else {
+                $message = '<div class="notice notice-error"><p>Please enter a valid email address.</p></div>';
+            }
+        }
+
+        // Otherwise, show a production-friendly dashboard
+        ?>
+        <div class="wrap">
+            <h1>VOF Dashboard</h1>
+
+            <?php echo $message; ?>
+
+            <div class="card">
+                <h2>Vendor Onboarding Flow Management</h2>
+                <p>Welcome to the VOF management dashboard. Use the sub-menu options on the left to manage various aspects of the vendor onboarding process.</p>
+                <div>
+                    <p>
+                        <a href="https://www.youtube.com/@TheNoiseio" 
+                            target="_blank" 
+                            class="button button-secondary"
+                            style="text-decoration: none;">
+                            <span class="dashicons dashicons-video-alt3" style="margin-top: 3px; margin-right: 5px;"></span>
+                            Video Tutorials
+                        </a>
+                    </p>
+                </div>
+                <div style="margin-bottom: 25px;"></div>
+                <hr />
+                <div style="margin-top: 25px;"></div>
+                <h2>Cut Through with <i>TheNoise</i></h2>
+                <p>Subscribe for Vendor Onboarding Flow updates—new features, fresh insights. Plus, discover more tools to make your marketing sing. </p>
+
+                <!-- <form method="post" style="margin-top: 20px;">
+                    <//?php wp_nonce_field('vof_subscribe', 'vof_email_nonce'); ?>
+                    <div style="display: flex; max-width: 500px;">
+                        <input type="email" 
+                               name="vof_subscribe_email" 
+                               placeholder="Enter your email address" 
+                               required
+                               style="flex: 1; padding: 8px; margin-right: 10px;" />
+                        <input type="submit" 
+                               value="Subscribe" 
+                               class="button button-primary" />
+                    </div>
+                </form> -->
+
+                <div style="margin-top: 30px;">
+                    <!-- <h3>Check out more products and Follow TheNoise on Gumroad</h3> -->
+                    <p>
+                        <a href="https://gumroad.com/thenoise" 
+                           target="_blank" 
+                           class="button button-secondary"
+                           style="text-decoration: none;">
+                            <span class="dashicons dashicons-cart" style="margin-top: 3px; margin-right: 5px;"></span>
+                            Visit our Gumroad Profile
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    // Add a new method for rendering the admin dashboard
+    public function vof_render_admin_dashboard_OLD() {
+        // Check if we're in a development environment
+        $is_development = defined('WP_DEBUG') && WP_DEBUG;
+
+        // // If we're in development AND the debug page is requested, show debug content
+        // if ($is_development && isset($_GET['page']) && $_GET['page'] === 'vof_debug') {
+        //     $this->vof_render_debug_page();
+        //     return;
+        // }
+
+        // Otherwise, show a production-friendly dashboard
+        ?>
+        <div class="wrap">
+            <h1>VOF Dashboard</h1>
+
+            <div class="card">
+                <h2>Vendor Onboarding Flow Management</h2>
+                <p>Welcome to the VOF management dashboard. Use the menu options on the left to manage various aspects of the vendor onboarding process.</p>
+                <div style="margin-top: 50px;"></div>
+                <h2>Follow TheNoise to receive updates on this product</h2>
+                <p>Welcome to the VOF management dashboard. Use the menu options on the left to manage various aspects of the vendor onboarding process.</p>
+                <!-- <div class="vof-dashboard-stats"> -->
+                    <!-- <h3>Quick Stats</h3> -->
+                    <!-- <//?php -->
+                    <!-- // Optional: Add some basic stats about vendors, subscriptions, etc. -->
+                    <!-- $user_count = count_users(); -->
+                    <!-- $vendors = isset($user_count['avail_roles']['vendor']) ? $user_count['avail_roles']['vendor'] : 0; -->
+                    <!-- ?> -->
+                    <!-- <p><strong>Total Vendors:</strong> <//?php echo esc_html($vendors); ?></p> -->
+
+                    <!-- Add more stats as needed -->
+                <!-- </div> -->
+            </div>
+            <!-- <div> -->
+                <!-- <h2>Follow TheNoise to receive product's and updates on this product</h2>
+                <p>Welcome to the VOF management dashboard. Use the menu options on the left to manage various aspects of the vendor onboarding process.</p> -->
+            <!-- </div> -->
+        </div>
+        <?php
     }
 
     // Render debug page

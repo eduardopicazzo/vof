@@ -92,7 +92,7 @@ public function vof_ajax_toggle_enabled() {
      */
     public function vof_add_settings_page() {
         add_submenu_page(
-            'vof_debug', // Parent slug (your main plugin menu)
+            'vof_admin', // Parent slug (your main plugin menu)
             'MailerLite Settings',
             'MailerLite',
             'manage_options',

@@ -32,7 +32,7 @@ class VOF_Pricing_Modal_Settings {
         add_action('admin_init', [$this, 'vof_register_settings']);
         
         // Add AJAX handlers
-        add_action('wp_ajax_vof_fetch_stripe_products', [$this, 'vof_ajax_fetch_stripe_products']);
+        // add_action('wp_ajax_vof_fetch_stripe_products', [$this, 'vof_ajax_fetch_stripe_products']);
         add_action('wp_ajax_vof_save_pricing_modal_settings', [$this, 'vof_ajax_save_pricing_modal_settings']);
     }
 
@@ -41,7 +41,7 @@ class VOF_Pricing_Modal_Settings {
      */
     public function vof_add_settings_page() {
         add_submenu_page(
-            'vof_debug', // Parent slug
+            'vof_admin', // Parent slug
             'Pricing Modal Settings',
             'Pricing Modal',
             'manage_options',
@@ -607,15 +607,15 @@ class VOF_Pricing_Modal_Settings {
                 <div class="vof-actions">
                     <?php submit_button(esc_html__('Save Settings', 'vof'), 'primary', 'submit', false); ?>
                                                 
-                    <button type="button" class="button button-secondary vof-reset-defaults">
-                        <?php echo esc_html__('Reset to Defaults', 'vof'); ?>
-                    </button>
+                    <!-- <button type="button" class="button button-secondary vof-reset-defaults">
+                        <//?php echo esc_html__('Reset to Defaults', 'vof'); ?>
+                    </button> -->
                                                 
-                    <?php if (class_exists('\VOF\Utils\Stripe\VOF_Stripe_Config')) : ?>
-                    <button type="button" class="button button-secondary vof-sync-stripe">
-                        <?php echo esc_html__('Sync with Stripe', 'vof'); ?>
-                    </button>
-                    <?php endif; ?>
+                    <!-- <//?php if (class_exists('\VOF\Utils\Stripe\VOF_Stripe_Config')) : ?> -->
+                    <!-- <button type="button" class="button button-secondary vof-sync-stripe"> -->
+                        <!-- <//?php echo esc_html__('Sync with Stripe', 'vof'); ?> -->
+                    <!-- </button> -->
+                    <!-- <//?php endif; ?> -->
                 </div>
             </form>
         </div>
@@ -710,46 +710,46 @@ class VOF_Pricing_Modal_Settings {
                 });
             
                 // Add functionality for the reset defaults button
-                $('.vof-reset-defaults').on('click', function(e) {
-                    e.preventDefault();
-                    if (confirm('Are you sure you want to reset all pricing tier settings to defaults? This cannot be undone.')) {
-                        window.location.href = window.location.href + '&reset=true';
-                    }
-                });
+                // $('.vof-reset-defaults').on('click', function(e) {
+                //     e.preventDefault();
+                //     if (confirm('Are you sure you want to reset all pricing tier settings to defaults? This cannot be undone.')) {
+                //         window.location.href = window.location.href + '&reset=true';
+                //     }
+                // });
             
                 // Add sync with Stripe functionality when available
-                $('.vof-sync-stripe').on('click', function(e) {
-                    e.preventDefault();
+                // $('.vof-sync-stripe').on('click', function(e) {
+                //     e.preventDefault();
 
-                    if (confirm('This will attempt to sync your pricing tiers with Stripe. Continue?')) {
-                        // Show loading indicator
-                        $(this).text('Syncing...').attr('disabled', true);
+                //     if (confirm('This will attempt to sync your pricing tiers with Stripe. Continue?')) {
+                //         // Show loading indicator
+                //         $(this).text('Syncing...').attr('disabled', true);
 
-                        // Make AJAX request to sync with Stripe
-                        $.ajax({
-                            url: ajaxurl,
-                            type: 'POST',
-                            data: {
-                                action: 'vof_fetch_stripe_products',
-                                nonce: '<?php echo wp_create_nonce('vof_pricing_modal_nonce'); ?>'
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    alert('Successfully synced pricing data with Stripe!');
-                                    window.location.reload();
-                                } else {
-                                    alert('Error: ' + (response.data?.message || 'Unknown error occurred during sync'));
-                                }
-                            },
-                            error: function() {
-                                alert('Connection error while trying to sync with Stripe.');
-                            },
-                            complete: function() {
-                                $('.vof-sync-stripe').text('Sync with Stripe').attr('disabled', false);
-                            }
-                        });
-                    }
-                });
+                //         // Make AJAX request to sync with Stripe
+                //         $.ajax({
+                //             url: ajaxurl,
+                //             type: 'POST',
+                //             data: {
+                //                 action: 'vof_fetch_stripe_products',
+                //                 nonce: '<?php echo wp_create_nonce('vof_pricing_modal_nonce'); ?>'
+                //             },
+                //             success: function(response) {
+                //                 if (response.success) {
+                //                     alert('Successfully synced pricing data with Stripe!');
+                //                     window.location.reload();
+                //                 } else {
+                //                     alert('Error: ' + (response.data?.message || 'Unknown error occurred during sync'));
+                //                 }
+                //             },
+                //             error: function() {
+                //                 alert('Connection error while trying to sync with Stripe.');
+                //             },
+                //             complete: function() {
+                //                 $('.vof-sync-stripe').text('Sync with Stripe').attr('disabled', false);
+                //             }
+                //         });
+                //     }
+                // });
                 
                 // Handle billing cycle label toggles
                 $('.vof-billing-cycle-label-toggle').on('change', function() {
@@ -1182,30 +1182,30 @@ class VOF_Pricing_Modal_Settings {
     /**
      * AJAX handler for fetching Stripe products
      */
-    public function vof_ajax_fetch_stripe_products() {
-        // Check permissions
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => 'Permission denied']);
-            return;
-        }
+    // public function vof_ajax_fetch_stripe_products() {
+    //     // Check permissions
+    //     if (!current_user_can('manage_options')) {
+    //         wp_send_json_error(['message' => 'Permission denied']);
+    //         return;
+    //     }
         
-        // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'vof_pricing_modal_nonce')) {
-            wp_send_json_error(['message' => 'Invalid nonce']);
-            return;
-        }
+    //     // Verify nonce
+    //     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'vof_pricing_modal_nonce')) {
+    //         wp_send_json_error(['message' => 'Invalid nonce']);
+    //         return;
+    //     }
         
-        // Check if Stripe config class exists
-        if (!class_exists('\VOF\Utils\Stripe\VOF_Stripe_Config')) {
-            wp_send_json_error(['message' => 'Stripe configuration not available']);
-            return;
-        }
+    //     // Check if Stripe config class exists
+    //     if (!class_exists('\VOF\Utils\Stripe\VOF_Stripe_Config')) {
+    //         wp_send_json_error(['message' => 'Stripe configuration not available']);
+    //         return;
+    //     }
         
-        // Placeholder - actual implementation would fetch from Stripe
-        $products = [];
+    //     // Placeholder - actual implementation would fetch from Stripe
+    //     $products = [];
         
-        wp_send_json_success(['products' => $products]);
-    }
+    //     wp_send_json_success(['products' => $products]);
+    // }
     
     /**
      * AJAX handler for saving pricing modal settings
