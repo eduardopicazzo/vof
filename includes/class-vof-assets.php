@@ -4,6 +4,8 @@ namespace VOF;
 class VOF_Assets {
     public function __construct() {
         add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts'], 20); // Higher priority to ensure RTCL loads first
+        // Add admin styles
+        add_action('admin_head', [$this, 'vof_add_admin_styles']);
     }
 
     public function enqueue_scripts() {
@@ -186,5 +188,63 @@ class VOF_Assets {
         ));
 
         error_log('VOF Debug: Modal assets enqueued with pricing config');
+    }
+
+    /**
+     * Add admin styles for VOF menu and submenu
+     */
+    public function vof_add_admin_styles() {
+        echo '<style>
+
+            /* VOF menu folded */
+            #adminmenu .wp-has-current-submenu.toplevel_page_vof_admin .wp-submenu .wp-submenu-head, 
+            #adminmenu li.toplevel_page_vof_admin.current a.menu-top, 
+            #adminmenu li.toplevel_page_vof_admin.wp-has-current-submenu a.wp-has-current-submenu {
+                background-color: #000000;
+                color: #fff;
+            }
+            
+            /* Main VOF menu item */
+            #adminmenu li.menu-top.toplevel_page_vof_admin {
+                background-color: #000000;
+            }
+
+            /* VOF menu icon and text */
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-menu-name,
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-menu-image:before {
+                color: white;
+            }
+            
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-menu-name  {
+                background-color: #000000 !important;
+            }
+
+            /* VOF submenu container */
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-submenu {
+                background-color: #000000;
+            }
+
+            /* VOF submenu items */
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-submenu li a {
+                color: #f0f0f0;
+            }
+
+            /* VOF submenu items on hover */
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-submenu li a:hover,
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-submenu li.current a {
+                color: #C2426D !important;
+            }
+
+            /* VOF menu highlight bar (replaces blue stripe) */
+            #adminmenu li.menu-top.toplevel_page_vof_admin.wp-has-current-submenu ,
+            #adminmenu li.menu-top.toplevel_page_vof_admin.current .wp-menu-image {
+                background-color: #e0e0e0;
+            }
+
+            /* VOF menu highlight for current submenu */
+            #adminmenu li.menu-top.toplevel_page_vof_admin .wp-submenu li.current a {
+                font-weight: bold;
+            }
+        </style>';
     }
 }

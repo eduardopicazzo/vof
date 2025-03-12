@@ -43,7 +43,7 @@ class VOF_Stripe_Config {
         error_log('VOF Debug: Stripe config loaded. Test mode WEBHOOK SECRET:' . $this->webhook_secret);
     }
 
-    private function vof_init_stripeOLD() {
+    private function vof_init_stripeOLDER() {
         try {
             error_log('VOF Debug: Initializing Stripe with test mode: ' . ($this->is_test_mode ? 'Yes' : 'No'));
 
@@ -59,7 +59,7 @@ class VOF_Stripe_Config {
         }
     }
 
-    private function vof_init_stripe() {
+    private function vof_init_stripe_OLD() {
         try {
             // Debug logging
             error_log('VOF Debug: Initializing Stripe with key: ' . ($this->secret_key ? 'exists' : 'missing'));
@@ -88,20 +88,60 @@ class VOF_Stripe_Config {
         }
     }
 
+private function vof_init_stripe() {
+    try {
+        // Debug logging
+        error_log('VOF Debug: Initializing Stripe with key: ' . ($this->secret_key ? 'exists' : 'missing'));
+        
+        // Don't throw an exception if secret key is missing, just log it
+        if (!$this->secret_key) {
+            error_log('VOF Warning: Stripe secret key is missing. Some functionality will be limited until keys are configured.');
+            return; // Return early instead of throwing an exception
+        }
+
+        // Initialize Stripe client
+        $this->stripe = new \Stripe\StripeClient([
+            'api_key' => $this->secret_key,
+            'stripe_version' => '2023-10-16'
+        ]);
+        
+        // Verify initialization
+        if (!$this->stripe) {
+            error_log('VOF Debug: Failed to initialize Stripe client');
+        } else {
+            error_log('VOF Debug: Stripe client initialized successfully');
+        }
+        
+    } catch (\Exception $e) {
+        error_log('VOF Error: Failed to initialize Stripe - ' . $e->getMessage());
+        // Don't rethrow the exception
+    }
+}
+
     /**
      * Get Stripe client instance
      */
-    public function vof_get_stripeOLD() {
+    public function vof_get_stripeOLDER() {
         return $this->stripe;
     }
 
-    public function vof_get_stripe() {
+    public function vof_get_stripe_OLD() {
         if (!$this->stripe) {
             error_log('VOF Debug: Reinitializing Stripe client');
             $this->vof_init_stripe();
         }
         return $this->stripe;
     }
+
+
+public function vof_get_stripe() {
+    if (!$this->stripe && $this->secret_key) {
+        error_log('VOF Debug: Attempting to reinitialize Stripe client');
+        $this->vof_init_stripe();
+    }
+    
+    return $this->stripe; // May be null if keys are missing
+}
 
     /**
      * Get publishable key

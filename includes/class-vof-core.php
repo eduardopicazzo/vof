@@ -143,7 +143,13 @@ class VOF_Core {
         $this->form_handler   = new VOF_Form_Handler();
         $this->temp_user_meta = VOF_Temp_User_Meta::vof_get_temp_user_meta_instance(); // commenting this will break the modal
         $this->vof_helper     = new VOF_Helper_Functions();
-        $this->stripe_config  = VOF_Stripe_Config::vof_get_stripe_config_instance();
+        
+        try {
+            $this->stripe_config = VOF_Stripe_Config::vof_get_stripe_config_instance();
+        } catch (\Exception $e) {
+            error_log('VOF Warning: Could not initialize Stripe config: ' . $e->getMessage());
+            $this->stripe_config = null;
+        }
 
         // Initialize MailerLite integration if the class exists
         error_log('VOF Debug: MailerLite class exists: ' . (class_exists('\VOF\Utils\MailingESPs\VOF_MailerLite') ? 'Yes' : 'No'));
@@ -258,9 +264,17 @@ class VOF_Core {
         return $this->subscription_handler;
     }
 
-    public function vof_get_stripe_config() {
+    public function vof_get_stripe_config_OLD() {
         return $this->stripe_config;
     }
+
+public function vof_get_stripe_config() {
+    if (!$this->stripe_config) {
+        // Return a dummy config object or null
+        error_log('VOF Warning: Stripe configuration not available');
+    }
+    return $this->stripe_config;
+}
 
     public function vof_get_vof_api() {
         if (!$this->api) {
@@ -314,7 +328,7 @@ class VOF_Core {
         $is_development = defined('WP_DEBUG') && WP_DEBUG;
         // Add VOF Admin Menu Page
         add_menu_page(
-            'VOF Debug',                      // Page title
+            'VOF',                            // Page title
             'VOF',                            // Menu title
             'manage_options',                 // Capability required
             'vof_admin',                      // Menu slug
