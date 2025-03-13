@@ -200,9 +200,299 @@ add_action('template_redirect', function() {
     }
 }, 5); // Note the priority of 5 to ensure early execution
 
+// Add this filter to prevent logout after password change
+// Use a higher priority (999) to ensure it runs after WP's own handlers
+add_filter('send_auth_cookies', function($send_cookies, $expire, $expiration, $user_id) {
+    global $vof_prevent_auth_cookie_clear;
+    
+    // Check if we're in a password reset context
+    if (doing_action('password_reset') || doing_action('after_password_reset')) {
+        error_log('VOF Debug: Preserving authentication during password reset for user ID: ' . $user_id);
+        $vof_prevent_auth_cookie_clear = true;
+        
+        // Force set cookies with cross-domain support
+        vof_set_cross_domain_auth_cookies($user_id);
+    }
+    
+    return $send_cookies;
+}, 999, 4);
+
+// Add an early hook to prevent cookie clearing during password reset
+add_action('clear_auth_cookie', function() {
+    global $vof_prevent_auth_cookie_clear;
+    
+    if (!empty($vof_prevent_auth_cookie_clear)) {
+        error_log('VOF Debug: Preventing auth cookie clearing during password reset');
+        
+        // Get current user ID before cookies are cleared
+        $user_id = get_current_user_id();
+        if ($user_id) {
+            // Schedule immediate re-authentication
+            add_action('set_logged_in_cookie', function() use ($user_id) {
+                vof_set_cross_domain_auth_cookies($user_id);
+            }, 0, 0);
+        }
+    }
+}, 0);
+
+// Override the WordPress password reset behavior
+add_action('after_password_reset', function($user, $new_password) {
+    error_log('VOF Debug: After password reset for user: ' . $user->ID);
+    
+    // Force reauth with new password
+    wp_set_auth_cookie($user->ID, true);
+    
+    // Set cross-domain cookies
+    vof_set_cross_domain_auth_cookies($user->ID, true);
+    
+    // Store password reset info for later login attempts
+    update_user_meta($user->ID, 'vof_last_password_reset', time());
+    
+    // Add a hook to the end of the request to ensure user stays logged in
+    add_action('shutdown', function() use ($user) {
+        error_log('VOF Debug: Final authentication check at shutdown for user: ' . $user->ID);
+        if (!is_user_logged_in()) {
+            error_log('VOF Debug: User not logged in at shutdown, forcing login');
+            wp_set_current_user($user->ID);
+            wp_set_auth_cookie($user->ID, true);
+        }
+    }, 999);
+}, 1, 2);
+
+// Special handler for profile password changes
+add_action('profile_update', function($user_id, $old_user_data) {
+    // Get the updated user data
+    $user = get_userdata($user_id);
+    
+    // Check if the password has changed
+    if ($user && $user->user_pass !== $old_user_data->user_pass) {
+        error_log('VOF Debug: Password changed in profile update for user: ' . $user_id);
+        
+        // Save the last password change time
+        update_user_meta($user_id, 'vof_password_changed', time());
+        
+        // Ensure the user stays logged in
+        wp_set_auth_cookie($user_id, true);
+        
+        // Also set cross-domain cookies
+        vof_set_cross_domain_auth_cookies($user_id, true);
+        
+        // Disable any hooks that might log the user out
+        add_filter('send_password_change_email', '__return_false', 999);
+    }
+}, 1, 2);
+
+// Add this to override wp_password_change_notification to prevent logout
+if (!function_exists('wp_password_change_notification')) {
+    function wp_password_change_notification($user) {
+        // Do nothing - prevent WordPress from sending notification which can cause logout
+        error_log('VOF Debug: Preventing standard password change notification for user: ' . $user->ID);
+        return;
+    }
+}
+
+// Helper function to set cross-domain authentication cookies
+function vof_set_cross_domain_auth_cookies($user_id, $remember = true) {
+    // Avoid infinite recursion
+    static $processing = false;
+    if ($processing) {
+        error_log('VOF Debug: Avoiding recursion in cookie setting for user ID: ' . $user_id);
+        return;
+    }
+    $processing = true;
+    
+    error_log('VOF Debug: Setting cross-domain auth cookies for user ID: ' . $user_id);
+    
+    // Force cookie domain setup
+    $host = parse_url(get_site_url(), PHP_URL_HOST);
+    
+    // Skip for localhost/IP
+    if (preg_match('/^(?:localhost|(?:\d{1,3}\.){3}\d{1,3})$/', $host)) {
+        error_log('VOF Debug: Local environment detected, using standard cookies');
+        wp_set_auth_cookie($user_id, $remember);
+        $processing = false;
+        return;
+    }
+    
+    $domain_parts = explode('.', $host);
+    $root_domain = count($domain_parts) > 2 ? 
+        implode('.', array_slice($domain_parts, -2)) : 
+        $host;
+        
+    error_log('VOF Debug: Using root domain for cookies: .' . $root_domain);
+        
+    // Define cookie parameters
+    $secure = is_ssl();
+    // Calculate expiration based on remember preference
+    $expiration = $remember ? time() + MONTH_IN_SECONDS : 0; // 0 = browser session
+    if ($expiration === 0) {
+        $expiration = time() + DAY_IN_SECONDS; // Force at least one day even for session cookies
+    }
+    
+    // Generate standard WordPress auth cookies (uses WP's format)
+    $auth_cookie = wp_generate_auth_cookie($user_id, $expiration, 'auth');
+    $logged_in_cookie = wp_generate_auth_cookie($user_id, $expiration, 'logged_in');
+    
+    // Common cookie options
+    $cookie_options = [
+        'expires' => $expiration,
+        'path' => COOKIEPATH,
+        'domain' => '.' . $root_domain, // Note the leading dot for cross-subdomain support
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax' // Balance security with cross-domain functionality
+    ];
+    
+    // Set auth cookie - only if headers not sent
+    if (!headers_sent()) {
+        // First set standard cookies via WordPress to ensure compatibility
+        wp_set_auth_cookie($user_id, $remember);
+        
+        // Then set cross-domain cookies
+        if (!setcookie(AUTH_COOKIE, $auth_cookie, $cookie_options)) {
+            error_log('VOF Error: Failed to set cross-domain AUTH_COOKIE');
+        }
+        
+        // Set logged in cookie
+        if (!setcookie(LOGGED_IN_COOKIE, $logged_in_cookie, $cookie_options)) {
+            error_log('VOF Error: Failed to set cross-domain LOGGED_IN_COOKIE');
+        }
+        
+        // Set secure auth cookie if needed
+        if ($secure) {
+            if (!setcookie(SECURE_AUTH_COOKIE, $auth_cookie, $cookie_options)) {
+                error_log('VOF Error: Failed to set cross-domain SECURE_AUTH_COOKIE');
+            }
+        }
+        
+        // Also set cookies at site root path
+        if (SITECOOKIEPATH != COOKIEPATH) {
+            $site_options = $cookie_options;
+            $site_options['path'] = SITECOOKIEPATH;
+            
+            setcookie(AUTH_COOKIE, $auth_cookie, $site_options);
+            setcookie(LOGGED_IN_COOKIE, $logged_in_cookie, $site_options);
+            if ($secure) {
+                setcookie(SECURE_AUTH_COOKIE, $auth_cookie, $site_options);
+            }
+        }
+        
+        error_log('VOF Debug: Successfully set both standard and cross-domain cookies');
+    } else {
+        error_log('VOF Debug: Headers already sent, cannot set cookies');
+    }
+    
+    // Update current user
+    wp_set_current_user($user_id);
+    
+    // Set special user meta to indicate we've set custom cookies
+    update_user_meta($user_id, 'vof_custom_auth_cookies_set', time());
+    
+    // Force no caching
+    nocache_headers();
+    
+    // Reset static flag
+    $processing = false;
+}
+
+// Add action to properly handle logout and clear all cookies
+add_action('wp_logout', 'VOF\vof_clear_all_auth_cookies', 1, 0);
+
+// Function to properly clear all auth cookies
+function vof_clear_all_auth_cookies() {
+    // Check if we should skip cookie clearing (during password change)
+    $user_id = get_current_user_id();
+    if ($user_id) {
+        $prevent_logout = get_user_meta($user_id, 'vof_prevent_pw_reset_logout', true);
+        $password_reset = get_user_meta($user_id, 'vof_last_password_reset', true);
+        
+        // If we're in the middle of a password reset, don't clear cookies
+        if ($prevent_logout || ($password_reset && time() - (int)$password_reset < 300)) {
+            error_log('VOF Debug: Skipping cookie clear during password reset for user: ' . $user_id);
+            return;
+        }
+    }
+    
+    error_log('VOF Debug: Explicitly clearing all auth cookies including cross-domain ones');
+    
+    // Get host and determine cookie domain
+    $host = parse_url(get_site_url(), PHP_URL_HOST);
+    $domain_parts = explode('.', $host);
+    $root_domain = count($domain_parts) > 2 ? 
+        implode('.', array_slice($domain_parts, -2)) : 
+        $host;
+    
+    error_log('VOF Debug: Using root domain for clearing cookies: .' . $root_domain);
+    
+    // Common cookie options for clearing
+    $cookie_options = [
+        'expires' => time() - YEAR_IN_SECONDS, // Set to past time to expire
+        'path' => COOKIEPATH,
+        'domain' => '.' . $root_domain, // Note the leading dot
+        'secure' => is_ssl(),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ];
+    
+    // Clear all WordPress auth cookies with our custom domain setting
+    setcookie(AUTH_COOKIE, '', $cookie_options);
+    setcookie(SECURE_AUTH_COOKIE, '', $cookie_options);
+    setcookie(LOGGED_IN_COOKIE, '', $cookie_options);
+    
+    // Also clear with SITECOOKIEPATH
+    $cookie_options['path'] = SITECOOKIEPATH;
+    setcookie(AUTH_COOKIE, '', $cookie_options);
+    setcookie(SECURE_AUTH_COOKIE, '', $cookie_options);
+    setcookie(LOGGED_IN_COOKIE, '', $cookie_options);
+    
+    // Also clear cookies without domain restriction
+    $cookie_options['domain'] = '';
+    setcookie(AUTH_COOKIE, '', $cookie_options);
+    setcookie(SECURE_AUTH_COOKIE, '', $cookie_options);
+    setcookie(LOGGED_IN_COOKIE, '', $cookie_options);
+}
+
+// Handle login authentication - add better error logging and fallback
+add_filter('authenticate', function($user, $username, $password) {
+    if (!empty($username) && is_wp_error($user)) {
+        // Try to find user by username or email
+        $user_data = get_user_by('login', $username);
+        if (!$user_data) {
+            $user_data = get_user_by('email', $username);
+        }
+        
+        if ($user_data) {
+            error_log('VOF Debug: Login failed for user: ' . $user_data->ID . ' - Error: ' . $user->get_error_message());
+            
+            // Check for recent password reset
+            $password_reset = get_user_meta($user_data->ID, 'vof_last_password_reset', true);
+            $password_changed = get_user_meta($user_data->ID, 'vof_password_changed', true);
+            
+            // Special handling for recent password changes (within 5 minutes)
+            if (($password_reset && time() - (int)$password_reset < 300) || 
+                ($password_changed && time() - (int)$password_changed < 300)) {
+                
+                error_log('VOF Debug: Special handling for recent password change user: ' . $user_data->ID);
+                
+                // For users who recently changed passwords, provide more detailed error info
+                if (!empty($password) && wp_check_password($password, $user_data->user_pass, $user_data->ID)) {
+                    error_log('VOF Debug: Password is correct, login issue is related to authentication state');
+                    
+                    // If password is correct but login still failed, force login and fix cookies
+                    wp_set_current_user($user_data->ID);
+                    wp_set_auth_cookie($user_data->ID, true);
+                    vof_set_cross_domain_auth_cookies($user_data->ID, true);
+                    
+                    return $user_data;
+                }
+            }
+        }
+    }
+    
+    return $user;
+}, 999, 3);
+
 // ################### REDIRECT STUFF [end] ###################
-
-
 
 // TO DO: Remove this after testing
 add_action('init', function() {
