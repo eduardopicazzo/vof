@@ -143,9 +143,9 @@
         });
 
         // Optional: Add debug button
-        const debugHTML = `<div style="position:fixed;bottom:20px;right:20px;z-index:9999;background:#fff;padding:10px;border:1px solid #ccc;">
-            <button onclick="window.openModal(false)">Test Modal</button>
-        </div>`;
+        // const debugHTML = `<div style="position:fixed;bottom:20px;right:20px;z-index:9999;background:#fff;padding:10px;border:1px solid #ccc;">
+            // <button onclick="window.openModal(false)">Test Modal</button>
+        // </div>`;
         document.body.insertAdjacentHTML('beforeend', debugHTML);
     });
 

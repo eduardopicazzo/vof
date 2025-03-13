@@ -13,11 +13,15 @@ use Rtcl\Resources\Options;
 use RtclStore\Helpers\Functions as StoreFunctions;
 
 $member = rtclStore()->factory->get_membership();
+// ADD A SHOULD NUDGE FLAG TO CONTINUE ABANDONED CHECKOUT. 
+// IF TRUE, ADD TO !$member conditional to continue with checkout procees and previous built listing.
+// IF FALSE, REDIRECT TO LISTING FORM PAGE.
+$should_nudge = false; // develop this flag's logic based on the abandoned checkout.
 
 ?>
 <div class="membership-statistic-report-outer">
     <div class="membership-statistic-report-wrap">
-        <h4><?php esc_html_e( "VOF Membership Report", "classified-listing-store" ) ?></h4>
+        <h4><?php esc_html_e( "Membership Report", "classified-listing-store" ) ?></h4>
         <div class="statistic-report">
             <div class="reports">
 				<?php
@@ -53,9 +57,9 @@ $member = rtclStore()->factory->get_membership();
                     </div>
 					<?php if ( StoreFunctions::is_enable_free_ads() ) { ?>
                         <div class="report-item rtcl-membership-free-ads">
-                            <label><?php esc_html_e( 'Free Ads', 'classified-listing-store' ) ?></label>
-                            <div class="value"><?php $ads = $member->get_remaining_free_ads();
-								echo - 1 === $ads ? esc_html__( 'Unlimited', 'classified-listing-store' ) : absint( $ads ); ?></div>
+                            <!-- <label>//<?php esc_html_e( 'Free Ads', 'classified-listing-store' ) ?></label> -->
+                            <!-- <div class="value"><//?php $ads = $member->get_remaining_free_ads(); -->
+								<!-- echo - 1 === $ads ? esc_html__( 'Unlimited', 'classified-listing-store' ) : absint( $ads ); ?></div> -->
                         </div>
 					<?php } ?>
 					<?php if ( ! empty( $promotions = $member->get_promotions() ) ): ?>
@@ -79,16 +83,19 @@ $member = rtclStore()->factory->get_membership();
 				<?php else: ?>
 					<?php if ( StoreFunctions::is_enable_free_ads() ) { ?>
                         <div class="report-item rtcl-membership-free-ads">
-                            <label><?php esc_html_e( 'Free Ads', 'classified-listing-store' ) ?></label>
-                            <div class="value"><?php echo absint( StoreFunctions::user_is_valid_to_post_as_free() ) ?></div>
+                            <!-- <label><//?php esc_html_e( 'Free Ads', 'classified-listing-store' ) ?></label> -->
+                            <!-- <div class="value"><//?php echo absint( StoreFunctions::user_is_valid_to_post_as_free() ) ?></div> -->
                         </div>
 					<?php } ?>
                     <p><?php esc_html_e( "You have no membership.", "classified-listing-store" ) ?></p>
 				<?php endif ?>
             </div>
-            <?php
-            if (!$member ):?>
-            <p><?php printf( __( "You can buy a membership from <a href='%s'>here</a>.", "classified-listing-store" ), Link::get_checkout_endpoint_url( 'membership' ) ) ?></p>
+            <?php if (!$member ):?>
+                <?php if ($should_nudge) :?>
+                    <p><?php printf( __( "Continue where you left-off <a href='%s'>here</a>.", "classified-listing-store" ), Link::get_regular_submission_end_point('') ) ?></p>
+                <?php else: ?>
+                    <p><?php printf( __( "Start posting and get your membership <a href='%s'>here</a>", "classified-listing-store" ), Link::get_listing_form_page_link() ) ?></p>
+                <?php endif;?>
             <?php endif; ?>
         </div>
     </div>

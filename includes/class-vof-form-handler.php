@@ -66,17 +66,6 @@ class VOF_Form_Handler {
 		});
 	}
 
-	public function vof_show_pricing_modal() { // can remove
-		?>
-		<script>
-			function openPricingModal() {
-				window.openModal(false);
-			}
-		</script>
-		<button id="vof-pm-openModalBtn" class="vof-pm-btn-trigger" onclick="openPricingModal()">View Pricing Plans</button>
-		<?php
-	}
-
 	public function vof_intercept_listing_submission() { // TODO: CLEANUP ???
 		if (self::vof_is_vof_conditions()) {
 			error_log('VOF Debug: Form submission data: ' . print_r($_POST, true));

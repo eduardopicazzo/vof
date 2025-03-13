@@ -12,10 +12,13 @@
 
 use Rtcl\Helpers\Functions;
 use RtclPro\Models\Subscription;
+use VOF\Utils\Stripe\VOF_Stripe_Config;
+
+$is_vof_stripe_test_mode = VOF_Stripe_Config::vof_get_stripe_config_instance()->vof_is_stripe_test_mode();
 
 if ( ! empty( $subscriptions ) ) {
 	echo '<div class="rtcl-subs-reports-outer"><div class="rtcl-subs-reports">';
-	echo '<h4>' . esc_html__( 'VOF Subscription Report', 'classified-listing-pro' ) . '</h4>';
+	echo '<h4>' . esc_html__( 'Subscription Report', 'classified-listing-pro' ) . '</h4>';
 	echo '<div class="rtcl-subs">';
 	foreach ( $subscriptions as $subscription ) {
 		$gateway = Functions::get_payment_gateway( $subscription->getGatewayId() );
@@ -28,11 +31,11 @@ if ( ! empty( $subscriptions ) ) {
 		<div class="rtcl-sub-item" data-gateway="<?php echo esc_attr( $gateway->id ) ?>"
 			 data-id="<?php echo absint( $subscription->getId() ) ?>">
 			<div class="rtcl-sub-info">
-				<div class="rtcl-subi-label"><?php echo esc_html__( 'VOF Payment Method: ', 'classified-listing-pro' ) ?></div>
+				<div class="rtcl-subi-label"><?php echo esc_html__( 'Paid Via: ', 'classified-listing-pro' ) ?></div>
 				<div class="rtcl-subi-value"><?php echo esc_html( $gateway->get_method_title() ) ?></div>
 			</div>
 			<div class="rtcl-sub-info">
-				<div class="rtcl-subi-label"><?php echo esc_html__( 'VOF Name: ', 'classified-listing-pro' ) ?></div>
+				<div class="rtcl-subi-label"><?php echo esc_html__( 'Paid Product: ', 'classified-listing-pro' ) ?></div>
 				<div class="rtcl-subi-value"><?php echo esc_html( $subscription->getName() ) ?></div>
 			</div>
 			<div class="rtcl-sub-info">
@@ -41,25 +44,28 @@ if ( ! empty( $subscriptions ) ) {
 			</div>
 			<?php if ( $subscription->getExpiryAt() ): ?>
 				<div class="rtcl-sub-info">
-					<div
-						class="rtcl-subi-label"><?php echo esc_html__( 'Renew at: ', 'classified-listing-pro' ) ?></div>
+					<div class="rtcl-subi-label"><?php echo esc_html__( 'Renew at: ', 'classified-listing-pro' ) ?></div>
 					<div class="rtcl-subi-value"><?php echo esc_html( $subscription->getExpiryAt() ) ?></div>
 				</div>
 			<?php endif; ?>
 			<?php if ( ( $cc = $subscription->get_meta( 'cc', true ) ) && is_array( $cc ) ): ?>
 				<div class="rtcl-sub-info cc-info">
 					<div class="rtcl-subi-cc">
-						<div class="cc-type"
-							 data-id="<?php echo esc_attr( $cc['type'] ) ?>"><?php echo esc_html( $cc['type'] ) ?></div>
-						<div class="cc-number"><?php echo esc_html( $cc['last4'] ) ?></div>
-						<div class="cc-expiry">(<?php echo esc_html( $cc['expiry'] ) ?>)</div>
-						<a class="update-card-info" href="#"><?php echo esc_html__( 'Update card ', 'classified-listing-pro' ) ?></a>
+						<!-- <div class="cc-type" -->
+							 <!-- data-id="<//?php echo esc_attr( $cc['type'] ) ?>"><//?php echo esc_html( $cc['type'] ) ?></div> -->
+						<!-- <div class="cc-number"><//?php echo esc_html( $cc['last4'] ) ?></div> -->
+						<!-- <div class="cc-expiry">(<//?php echo esc_html( $cc['expiry'] ) ?>)</div> -->
+						<!-- <a class="update-card-info" href="#"><//?php echo esc_html__( 'Update card ', 'classified-listing-pro' ) ?></a> -->
 					</div>
 				</div>
 			<?php endif; ?>
 			<div class="rtcl-sub-action">
 				<!-- <a class="rtcl-sub-cancel rtcl-btn" data-id="<//?php echo absint( $subscription->getId() ) ?>"><//?php esc_html_e( 'CancelRRR Plan', 'classified-listing-pro' ) ?></a> -->
-                 <a class="vof-manage-subscription" href="<?php echo esc_url('https://billing.stripe.com/p/login/test_9AQbKK4Yd9ODeNa002'); ?>"><?php esc_html_e( 'Manage Subscription', 'classified-listing-pro' )?></a>
+				 <?php if ($is_vof_stripe_test_mode):?>
+                 	<a class="vof-manage-subscription" href="<?php echo esc_url('https://billing.stripe.com/p/login/test_9AQbKK4Yd9ODeNa002'); ?>"><?php esc_html_e( 'Manage Subscription', 'classified-listing-pro' )?></a>
+				<?php else:?>
+					<a class="vof-manage-subscription" href="<?php echo esc_url('https://billing.stripe.com/p/login/4gw6opdi7eGT5oIfYY'); ?>"><?php esc_html_e( 'Manage Subscription', 'classified-listing-pro' )?></a>
+				<?php endif ?>
 			</div>
 			<div class="sub-payment-update-wrap" style="display: none">
 				<form id="rtcl-sub-update-payment" method="post">

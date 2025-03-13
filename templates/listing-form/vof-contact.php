@@ -26,85 +26,6 @@ error_log('VOF Debug: Custom VOF contact template loaded');
  * @var integer $selected_locations
  */
 
-// originally from wp-content/plugins/classified-listing/templates/listing-form/contact.php
-
-// This template is included by wp-content/plugins/classified-listing/templates/listing-form/form.php
-// which loads all the listing form sections via do_action('rtcl_listing_form_{$section}')
-//
-// The variables ($hidden_fields, $state_text etc) are extracted from an array passed to 
-// rtcl_get_template() MOST LIKELY TEMPLATEHOOKS.PHP  AND IT'S  
-// Functions::get_template( "listing-form/contact", apply_filters( 'rtcl_listing_form_contact_tpl_attributes', $data, $post_id ) );
-// before including this template, preventing undefined variable errors
-// also look for this hook 'rtcl_listing_form_contact_tpl_attributes'
-// This template handles contact details for:
-// 1. New listing submission form - When users create listings
-// 2. Edit listing form - When users edit existing listings 
-// 3. Admin listing edit form - When admins edit listings in wp-admin
-
-// This template is overridden by wp-content/plugins/vendor-onboarding-flow/templates/listing-form/vof-contact.php
-// when the VOF plugin is active and certain conditions are met.
-
-// Hook into 'rtcl_get_template' filter to swap template paths
-
-//  add_filter('rtcl_get_template', function($template, $template_name, $args) {
-//         // Only override the contact.php template
-//         if ($template_name === 'listing-form/contact.php') {
-
-//             // Check if VOF plugin is active and conditions are met
-//             if (defined('VOF_VERSION') && vof_should_use_custom_template()) {
-//                 // Return path to VOF contact template instead
-//                 return VOF_PLUGIN_DIR . 'templates/listing-form/vof-contact.php';
-//             }
-//         }
-//         return $template;
-//     }, 10, 3);
-
-//     // Hook into 'rtcl_get_template_args' to ensure template variables are available 
-//     add_filter('rtcl_get_template_args', function($args, $template_name) {
-//         if ($template_name === 'listing-form/contact.php' && 
-//             defined('VOF_VERSION') && 
-//             vof_should_use_custom_template()) {
-
-//             // Ensure all required variables exist to prevent fatal errors
-//             $required_vars = [
-//                 'hidden_fields' => [],
-//                 'state_text' => '',
-//                 'city_text' => '',
-//                 'town_text' => '',
-//                 'zipcode' => '',
-//                 'phone' => '',
-//                 'whatsapp_number' => '',
-//                 'enable_post_for_unregister' => false,
-//                 'website' => '',
-//                 'latitude' => false,
-//                 'longitude' => false, 
-//                 'has_map' => false,
-//                 'hide_map' => false,
-//                 'email' => '',
-//                 'address' => '',
-//                 'geo_address' => '',
-//                 'selected_locations' => 0
-//             ];
-
-//             // Merge with existing args, keeping existing values if set
-//             $args = wp_parse_args($args, $required_vars);
-
-//             // Add any VOF-specific variables
-//             $args['vof_custom_var'] = 'value';
-//         }
-//         return $args;
-//     }, 10, 2);
-
-//     // Helper function to check conditions
-//     function vof_should_use_custom_template() {
-//         // Add your conditions here, for example:
-//         // - Check if user is vendor
-//         // - Check if specific settings are enabled
-//         // - etc.
-//         return true; // Return true to use VOF template
-//     }
-
-
 use Rtcl\Helpers\Functions;
 use RtclPro\Helpers\Fns;
 
@@ -120,7 +41,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 <div class="rtcl-post-contact-details rtcl-post-section<?php echo esc_attr( is_admin() ? " rtcl-is-admin" : '' ) ?>">
     <div class="classified-listing-form-title">
         <i class="fa fa-user" aria-hidden="true"></i>
-        <h3><?php esc_html_e( "Contact Details [VOF]", 'classima' ); ?></h3>
+        <h3><?php esc_html_e( "Contact Details", 'classima' ); ?></h3>
     </div>
 	<?php if ( 'local' === Functions::location_type() ) : ?>
 
@@ -248,7 +169,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         <div class="row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <label class="control-label"
-                       for="rtcl-geo-address"><?php esc_html_e( "Location", 'classima' ); ?></label>
+                       for="rtcl-geo-address"><?php esc_html_e( "Location", 'classima' ); ?><span class="rtcl-required">*</span></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="rtcl-geo-address-field form-group">
@@ -273,9 +194,8 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         ?>
         <div class="row classima-form-phone-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <!-- <label class="control-label" for="rtcl-phone"> -->
                 <label class="control-label" for="vof-phone">
-                    <?php esc_html_e( "Phone [VOF]", 'classima' ); ?>
+                    <?php esc_html_e( "Phone", 'classima' ); ?>
 	                <span class="rtcl-required">*</span>
 	                <!-- <//?php if ( $phoneIsRequired ) { ?><span class="rtcl-required">*</span> <//?php } ?> -->
                 </label>
@@ -286,26 +206,17 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
                         $field = '<input type="text" name="vof_phone" id="vof-phone" value="' . esc_attr( $phone ) . '" class="form-control" />';
                         Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );   
                     ?>
-					<!-- <//?php 
-					//$required_attr = $phoneIsRequired ? 'required' : '';
-					// $field = '<input type="text" name="phone" id="rtcl-phone" value="' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
-					$field = '<input type="text" name="vof-phone" id="vof-phone"' . esc_attr( $phone ) . '" class="form-control" ' . esc_attr( $required_attr ) . '/>';
-					// Functions::print_html( apply_filters( 'rtcl_verification_listing_form_phone_field', $field, $phone ), true );
-					?>-->
-					<!-- <//?php do_action( 'rtcl_listing_form_phone_warning' ); ?> --> 
                 </div>
             </div>
         </div>
 	<?php endif; ?>
 
-
-	<!-- <//?php if ( ! in_array( 'whatsapp_number', $hidden_fields ) ): ?> -->
 	<?php if ( ! in_array( 'vof_whatsapp_number', $hidden_fields ) ): ?>
         <div class="row classima-form-whatsapp-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
                 <!-- <label class="control-label"> -->
                 <label class="control-label" for="vof-whatsapp-number">
-                    <?php esc_html_e( "Whatsapp Number [VOF]", 'classima' ); ?>
+                    <?php esc_html_e( "Whatsapp Number", 'classima' ); ?>
                     <span class="rtcl-required"> *</span>
                 </label>
             </div>
@@ -320,20 +231,14 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-
-
-
-
-	<!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
 	<?php if ( ! in_array( 'vof_email', $hidden_fields ) || $enable_post_for_unregister ): ?>
         <div class="row classima-form-email-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label"><?php esc_html_e( "Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                <label class="control-label"><?php esc_html_e( "Email", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
                     <span> *</span><?php endif; ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
-                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
                     <input type="email" 
                            class="form-control" 
                            id="vof_email" 
@@ -358,16 +263,14 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         </div>
 	<?php endif; ?>
 
-    <!-- <//?php if ( ! in_array( 'email', $hidden_fields ) || $enable_post_for_unregister ): ?> -->
 	<?php if ( $enable_post_for_unregister ): ?>
         <div class="row classima-form-email-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label"><?php esc_html_e( "Confirma Email [VOF]", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
+                <label class="control-label"><?php esc_html_e( "Confirm your email", 'classima' ); ?><?php if ( $enable_post_for_unregister ): ?>
                     <span> *</span><?php endif; ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
-                    <!-- <input type="email" class="form-control" id="rtcl-email" name="vof-email" -->
                     <input type="email" 
                            class="form-control" 
                            id="vof_email_confirm" 
@@ -380,24 +283,17 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
                             name="email" 
                             value="<?php echo esc_attr( $vof_email ); ?>" />
 					<?php if ( $enable_post_for_unregister ): ?>
-                        <p class="description"><?php esc_html_e( "Confirma tu email. Enviaremos el acceso a tu cuenta a este correo", 'classima' ); ?></p>
+                        <p class="description"><?php esc_html_e( "IMPORTANT: Confirm your email. We'll send your login credentials to this address", 'classima' ); ?></p>
 					<?php endif; ?>
                 </div>
             </div>
         </div>
 	<?php endif; ?>
 
-
-
-
-
-
-
-
 	<?php if ( ! in_array( 'website', $hidden_fields ) ): ?>
         <div class="row classima-form-website-row">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label" for="rtcl-website"><?php esc_html_e( "Website [VOF]", 'classima' ); ?></label>
+                <label class="control-label" for="rtcl-website"><?php esc_html_e( "Website", 'classima' ); ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
@@ -414,7 +310,7 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
 		?>
         <div class="row rtcl-listing-map">
             <div class="col-12 <?php echo esc_attr( $labelColumn ); ?>">
-                <label class="control-label"><?php esc_html_e( 'Map [VOF]', 'classima' ); ?></label>
+                <label class="control-label"><?php esc_html_e( 'Map', 'classima' ); ?></label>
             </div>
             <div class="col-12 <?php echo esc_attr( $inputColumn ); ?>">
                 <div class="form-group">
@@ -449,18 +345,34 @@ $inputColumn = is_admin() ? 'col-sm-10' : 'col-sm-9';
         const whatsappField = document.getElementById('vof-whatsapp-number');
         const vofEmailField = document.getElementById('vof_email');
         const emailField = document.querySelector('input[name="email"]');
+        
+        // Flag to track if WhatsApp field was directly modified by user
+        let whatsappDirectlyModified = false;
 
+        // Add an event listener to the WhatsApp field to detect direct user input
+        whatsappField.addEventListener('input', function(e) {
+            // If this event wasn't triggered programmatically
+            if (e.isTrusted) {
+                whatsappDirectlyModified = true;
+                // Apply styling for direct user input
+                whatsappField.style.color = '#495057';
+            }
+        });
 
         // Add an event listener to the phone field
         phoneField.addEventListener('input', function () {
-            // Update the value of the WhatsApp field
-            whatsappField.value = phoneField.value;
+            // Only update WhatsApp field if it hasn't been directly modified
+            if (!whatsappDirectlyModified) {
+                // Update the value of the WhatsApp field
+                whatsappField.value = phoneField.value;
+                // Apply styling for indirect input
+                whatsappField.style.color = '#7b7b7b';
+            }
         });
 
+        // Add an event listener to the vofEmailField
         vofEmailField.addEventListener('input', function () {
-        emailField.value = this.value;
+            emailField.value = this.value;
         });
-
-
     });
 </script>

@@ -57,7 +57,6 @@ class VOF_Listing {
         if (!is_user_logged_in() && $this->vof_is_post_ad_page()) {
             $is_guest = true;
             $this->vof_render_guest_submit_button($is_guest);
-            $form_handler->vof_show_pricing_modal(); // MAYBE REMOVE??
             return;
         }
 
@@ -65,7 +64,6 @@ class VOF_Listing {
             $is_guest = false;           
             // $this->vof_render_subscription_required_button();
             $this->vof_render_guest_submit_button($is_guest); 
-            $form_handler->vof_show_pricing_modal(); // MAYBE REMOVE??
             return;
         }
 
