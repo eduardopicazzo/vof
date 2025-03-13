@@ -184,8 +184,19 @@ add_action('template_redirect', function() {
                         error_log('VOF Debug: Cookie domain used: .' . $root_domain);
                         error_log('VOF Debug: Cookie path: ' . COOKIEPATH);
                         
-                        // Redirect
+                        // Redirect with cache-busting parameter to ensure fresh data
                         $redirect_url = remove_query_arg(['session_id', 'checkout']);
+                        
+                        // Add cache-busting parameter to ensure the page loads fresh data
+                        $redirect_url = add_query_arg('vof_ts', time(), $redirect_url);
+                        
+                        // Ensure nocache headers are sent
+                        nocache_headers();
+                        
+                        // Store a flag that this user needs fresh data
+                        set_transient('vof_user_needs_fresh_data_' . $user_id, time(), HOUR_IN_SECONDS);
+                        
+                        // Redirect with cache-busting in place
                         wp_redirect($redirect_url);
                         exit;
                     } else {
@@ -500,8 +511,92 @@ add_action('init', function() {
         (has_filter('rtcl_listing_form_contact_tpl_attributes') ? 'Yes' : 'No'));
 });
 
-// TO DO: MAYBE CHECK IF THIS IS NEEDED
 // Add the new filter hook
 add_action('init', function() {
     add_filter('rtcl_listing_form_contact_tpl_attributes', ['\VOF\VOF_Form_Handler', 'vof_listing_contact_details_fields']);
 });
+
+// Add a cache-busting mechanism for dashboard pages to ensure fresh data
+add_action('template_redirect', function() {
+    // Only run on frontend requests for logged in users
+    if (!is_admin() && is_user_logged_in()) {
+        $user_id = get_current_user_id();
+        
+        // Check if cache-busting parameter is present or if user needs fresh data
+        $needs_fresh_data = isset($_GET['vof_ts']) || get_transient('vof_user_needs_fresh_data_' . $user_id);
+        
+        if ($needs_fresh_data) {
+            error_log('VOF Debug: Forcing fresh data for user: ' . $user_id);
+            
+            // Clear any transient caches that might affect the dashboard display
+            delete_transient('vof_user_needs_fresh_data_' . $user_id);
+            
+            // Clear all user meta cache
+            clean_user_cache($user_id);
+            
+            // Force subscription data to be re-fetched directly from the database
+            if (function_exists('wp_cache_delete')) {
+                // Clear user-specific data from cache
+                wp_cache_delete($user_id, 'user_meta');
+                
+                // Clear subscription data caches if they exist
+                $cache_keys = [
+                    'rtcl_user_subscription_' . $user_id,
+                    'rtcl_has_user_subscription_' . $user_id,
+                    'rtcl_user_subscription_details_' . $user_id,
+                    'rtcl_user_membership_' . $user_id,
+                    'vof_user_subscription_data_' . $user_id,
+                    'membership_' . $user_id
+                ];
+                
+                foreach ($cache_keys as $key) {
+                    wp_cache_delete($key, 'rtcl');
+                    delete_transient($key);
+                }
+                
+                // Clear any potential global caches
+                wp_cache_delete('rtcl_subscriptions', 'rtcl');
+                wp_cache_delete('rtcl_memberships', 'rtcl');
+            }
+            
+            // For specific pages like dashboard, run additional cleanup
+            if (is_page('my-account') || strpos($_SERVER['REQUEST_URI'], '/my-account') !== false) {
+                // Force refresh of membership/subscription data if those classes exist
+                // This uses the class instance methods to force a database refresh
+                if (class_exists('\RtclPro\Models\Subscription') && method_exists('\RtclPro\Models\Subscription', 'get_subscriptions')) {
+                    $subscriptions = \RtclPro\Models\Subscription::get_subscriptions([
+                        'user_id' => $user_id,
+                        'cache' => false // Force no caching
+                    ]);
+                    error_log('VOF Debug: Forced refresh of subscription data');
+                }
+                
+                if (class_exists('\RtclStore\Models\Membership') && method_exists('\RtclStore\Models\Membership', 'get_membership')) {
+                    $membership = \RtclStore\Models\Membership::get_membership($user_id, false); // Force no caching
+                    error_log('VOF Debug: Forced refresh of membership data');
+                }
+            }
+            
+            // Add no-cache headers to ensure browser doesn't cache the response
+            header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+            header("Pragma: no-cache");
+            header("Expires: 0");
+            
+            // Remove the timestamp parameter from the URL to avoid sharing it
+            if (isset($_GET['vof_ts'])) {
+                add_action('wp_footer', function() {
+                    ?>
+                    <script>
+                    // Update URL without the timestamp parameter
+                    if (window.history && window.history.replaceState) {
+                        var url = new URL(window.location.href);
+                        url.searchParams.delete('vof_ts');
+                        window.history.replaceState({}, document.title, url.toString());
+                    }
+                    </script>
+                    <?php
+                });
+            }
+        }
+    }
+}, 5); // Early priority to ensure it runs before content is generated
